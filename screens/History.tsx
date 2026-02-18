@@ -21,11 +21,10 @@ const History: React.FC<HistoryProps> = ({ onBack, orders, onNavigate }) => {
          </div>
          <p className="text-[10px] font-bold opacity-70 tracking-widest uppercase mt-1">Synced to Ayoo Cloud Hub</p>
          
-         {/* Wave SVG Decor */}
          <div className="absolute -bottom-1 left-0 right-0 h-4 bg-gray-50 rounded-t-full"></div>
       </div>
 
-      <div className="px-8 pt-10 space-y-8">
+      <div className="px-8 pt-10 space-y-8 pb-20">
         {orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
              <div className="w-24 h-24 bg-pink-50 rounded-[40px] flex items-center justify-center text-5xl mb-6 grayscale opacity-40">🍽️</div>
@@ -52,7 +51,13 @@ const History: React.FC<HistoryProps> = ({ onBack, orders, onNavigate }) => {
                      }`}>
                         {order.status}
                      </span>
-                     <span className="text-[8px] font-bold text-gray-300 mt-2 uppercase">Ref: AY-CLOUD-01</span>
+                     {order.rating && (
+                        <div className="mt-2 flex gap-0.5">
+                           {Array.from({length: 5}).map((_, i) => (
+                              <span key={i} className={`text-[8px] ${i < (order.rating || 0) ? 'grayscale-0' : 'grayscale opacity-30'}`}>⭐</span>
+                           ))}
+                        </div>
+                     )}
                   </div>
                </div>
                
@@ -65,14 +70,23 @@ const History: React.FC<HistoryProps> = ({ onBack, orders, onNavigate }) => {
                   ))}
                </div>
 
-               <div className="pt-4 flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                     <span className="text-[9px] font-black text-gray-400 uppercase">Secure Payment</span>
+               <div className="pt-4 flex justify-between items-center border-t border-gray-50 mt-4">
+                  <div className="flex items-center gap-4">
+                     {order.tipAmount ? (
+                        <div className="flex flex-col">
+                           <span className="text-[8px] font-black text-gray-400 uppercase">Tip Given</span>
+                           <span className="text-[10px] font-black text-green-500">₱{order.tipAmount} 🛵</span>
+                        </div>
+                     ) : (
+                        <div className="flex items-center gap-2">
+                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                           <span className="text-[9px] font-black text-gray-400 uppercase">Secure Payment</span>
+                        </div>
+                     )}
                   </div>
                   <div className="text-right">
-                     <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Total Value</p>
-                     <span className="font-black text-[#FF00CC] text-2xl tracking-tighter">₱{order.total}</span>
+                     <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Total Paid</p>
+                     <span className="font-black text-[#FF00CC] text-2xl tracking-tighter">₱{order.total + (order.tipAmount || 0)}</span>
                   </div>
                </div>
             </div>

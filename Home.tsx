@@ -1,10 +1,11 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { MOCK_RESTAURANTS, CATEGORIES, PHILIPPINE_CITIES } from '../constants';
+import { CATEGORIES, PHILIPPINE_CITIES } from '../constants';
 import { Restaurant, UserBadge, AppScreen } from '../types';
 import { GoogleGenAI } from "@google/genai";
 
 interface HomeProps {
+  restaurants: Restaurant[];
   onSelectRestaurant: (restaurant: Restaurant) => void;
   onOpenCart: () => void;
   onNavigate: (s: AppScreen) => void;
@@ -17,6 +18,7 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ 
+  restaurants,
   onSelectRestaurant, 
   onOpenCart, 
   onNavigate, 
@@ -49,15 +51,11 @@ const Home: React.FC<HomeProps> = ({
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          // In a real app, we'd reverse-geocode this via Google Maps API
-          // For now, we simulate finding the user is in Iligan
-          console.log("Coords:", position.coords.latitude, position.coords.longitude);
           onSetDeliveryCity('Iligan City');
           setGeoStatus('IDLE');
           setShowLocationPicker(false);
         },
         (error) => {
-          console.error("Geo Error", error);
           setGeoStatus('ERROR');
         }
       );
@@ -69,24 +67,32 @@ const Home: React.FC<HomeProps> = ({
   const askAiForMood = async (mood: string) => {
     setSelectedMood(mood);
     setAiLoading(true);
+    setAiSuggestion(null);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `User feels ${mood}. Recommend one restaurant from: ${MOCK_RESTAURANTS.map(r => r.name).join(', ')}. Mention a specific dish. 15 words max.`;
+      
+      // Build a detailed context of the actual menus
+      const menuContext = restaurants.map(r => 
+        `${r.name} (${r.cuisine}) offers: ${r.items.map(i => i.name).join(', ')}`
+      ).join('; ');
+
+      const prompt = `The user is feeling "${mood}". Based on these local restaurants and their menus: ${menuContext}, recommend EXACTLY one restaurant and one specific dish that fits this mood. Give a catchy 1-sentence reason. 20 words max.`;
+      
       const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
-      const text = response.text || "Pizza House is perfect!";
+      const text = response.text || "Try something fresh today!";
       setAiSuggestion(text);
-      const match = MOCK_RESTAURANTS.find(r => text.toLowerCase().includes(r.name.toLowerCase()));
+      
+      const match = restaurants.find(r => text.toLowerCase().includes(r.name.toLowerCase()));
       if (match) setRecommendedId(match.id);
     } catch (err) {
-      setAiSuggestion("Pizza House is perfect for that vibe!");
-      setRecommendedId('4');
+      setAiSuggestion("The AI is hungry! Try browsing our top partners.");
     } finally {
       setAiLoading(false);
     }
   };
 
   const filteredRestaurants = useMemo(() => {
-    let list = MOCK_RESTAURANTS.filter(r => 
+    let list = restaurants.filter(r => 
       r.name.toLowerCase().includes(search.toLowerCase()) || 
       r.cuisine.toLowerCase().includes(search.toLowerCase())
     );
@@ -99,7 +105,7 @@ const Home: React.FC<HomeProps> = ({
       return rec ? [rec, ...others] : list;
     }
     return list;
-  }, [search, recommendedId, selectedCategory]);
+  }, [search, recommendedId, selectedCategory, restaurants]);
 
   return (
     <div className="flex flex-col h-screen bg-white pb-24 overflow-y-auto scroll-smooth scrollbar-hide">
@@ -163,8 +169,8 @@ const Home: React.FC<HomeProps> = ({
         </div>
         
         <div className="relative mb-6">
-          <input type="text" placeholder="Search food or cuisine..." className="w-full p-4 pl-12 rounded-2xl bg-white focus:outline-none font-bold text-gray-800" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2">🔍</span>
+          <input type="text" placeholder="Tell Ayoo what you're craving..." className="w-full p-4 pl-12 rounded-2xl bg-white focus:outline-none font-bold text-gray-800" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <span className="absolute left-4 top-1/2 -translate-y-1/2">✨</span>
         </div>
 
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
@@ -193,10 +199,10 @@ const Home: React.FC<HomeProps> = ({
       </div>
 
       <div className="px-6 pt-8">
-        <h3 className="font-black text-lg text-gray-900 mb-4 tracking-tighter uppercase">Vibe Check ✨</h3>
+        <h3 className="font-black text-lg text-gray-900 mb-4 tracking-tighter uppercase">Vibe Check Suggestions 🪄</h3>
         <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
           {MOODS.map(mood => (
-            <button key={mood.name} onClick={() => askAiForMood(mood.name)} className={`flex-shrink-0 px-6 py-4 rounded-[28px] flex flex-col items-center gap-2 transition-all ${selectedMood === mood.name ? 'bg-[#FF00CC] text-white' : 'bg-white border border-gray-100 text-gray-700'}`}>
+            <button key={mood.name} onClick={() => askAiForMood(mood.name)} className={`flex-shrink-0 px-6 py-4 rounded-[28px] flex flex-col items-center gap-2 transition-all ${selectedMood === mood.name ? 'bg-[#FF00CC] text-white shadow-lg shadow-pink-200' : 'bg-white border border-gray-100 text-gray-700'}`}>
               <span className="text-2xl">{mood.icon}</span>
               <span className="text-[10px] font-black uppercase">{mood.name}</span>
             </button>
@@ -204,10 +210,13 @@ const Home: React.FC<HomeProps> = ({
         </div>
       </div>
 
-      {aiSuggestion && (
+      {(aiLoading || aiSuggestion) && (
         <div className="mx-6 mt-6 p-6 bg-pink-50 rounded-[35px] border-2 border-[#FF00CC]/10 shadow-lg animate-in zoom-in-95">
-            <p className="text-[10px] font-black text-[#FF00CC] uppercase mb-1">🤖 Ayoo AI Says</p>
-            <p className="text-gray-700 font-bold italic leading-snug">"{aiSuggestion}"</p>
+            <div className="flex items-center justify-between mb-2">
+               <p className="text-[10px] font-black text-[#FF00CC] uppercase">🤖 Ayoo Concierge Suggests</p>
+               {aiLoading && <div className="w-3 h-3 border-2 border-[#FF00CC] border-t-transparent rounded-full animate-spin"></div>}
+            </div>
+            {aiSuggestion && <p className="text-gray-700 font-bold italic leading-snug">"{aiSuggestion}"</p>}
         </div>
       )}
 
@@ -220,11 +229,21 @@ const Home: React.FC<HomeProps> = ({
                 <div className="h-56 overflow-hidden relative">
                   <img src={res.image} alt={res.name} className="w-full h-full object-cover" />
                   <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-black text-[#FF00CC]">🛵 {res.deliveryTime}</div>
+                  
+                  {res.hasLiveCam && (
+                    <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1.5 rounded-xl text-[8px] font-black uppercase flex items-center gap-2 animate-pulse">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                      Live Prep
+                    </div>
+                  )}
                 </div>
                 <div className="p-6">
-                  <h4 className="font-black text-xl text-gray-900 tracking-tight">{res.name}</h4>
+                  <div className="flex justify-between items-start">
+                    <h4 className="font-black text-xl text-gray-900 tracking-tight">{res.name}</h4>
+                    <span className="text-yellow-400 font-black text-xs">⭐ {res.rating}</span>
+                  </div>
                   <div className="flex items-center gap-4 mt-2">
-                    <span className="text-[10px] font-black text-gray-400 uppercase">Free Delivery</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase">{res.cuisine}</span>
                     <span className="text-[#FF00CC] font-black text-[10px] uppercase">View Menu →</span>
                   </div>
                 </div>

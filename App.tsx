@@ -15,6 +15,7 @@ import PaymentsScreen from './screens/Payments';
 import MerchantDashboard from './screens/MerchantDashboard';
 import RiderDashboard from './screens/RiderDashboard';
 import AdminPanel from './screens/AdminPanel';
+import AyooManual from './screens/AyooManual';
 import AIChat from './components/AIChat';
 import Logo from './components/Logo';
 import Button from './components/Button';
@@ -71,10 +72,6 @@ const App: React.FC = () => {
     const initApp = async () => {
       try {
         const connected = await db.connect();
-        if (!connected && (db as any).constructor.ENV.USE_REAL_BACKEND) {
-          throw new Error("Ayoo Production Nodes are unreachable. Check your BASE_URL.");
-        }
-
         const [session, hasSeenOnboarding, resList, config] = await Promise.all([
           db.getSession(),
           db.hasSeenOnboarding(),
@@ -105,21 +102,30 @@ const App: React.FC = () => {
         db.getSession().then(s => { if (s) setCurrentUser(s); });
       }
     });
-  }, [loadUserData, currentUser]);
+  }, [loadUserData]);
 
-  const handleSetRole = (role: UserRole) => {
+  const handleSetRole = async (role: UserRole) => {
     setActiveRole(role);
     if (currentUser) {
-       db.updateProfile(currentUser.email, { role });
+      const updated = await db.updateProfile(currentUser.email, { role });
+      if (updated) setCurrentUser(updated);
+
+      // Check if user has seen manual for this role
+      const seen = updated?.manualsSeen || [];
+      if (!seen.includes(role)) {
+        setScreen('MANUAL');
+      } else {
+        setScreen(role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
+      }
     }
-    setScreen(role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
   };
 
-  const handleSetDeliveryCity = async (city: string) => {
-    setDeliveryCity(city);
+  const handleManualFinish = async () => {
     if (currentUser) {
-      const updated = await db.updateProfile(currentUser.email, { preferredCity: city });
+      const seen = currentUser.manualsSeen || [];
+      const updated = await db.updateProfile(currentUser.email, { manualsSeen: [...seen, activeRole] });
       if (updated) setCurrentUser(updated);
+      setScreen(activeRole === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : activeRole === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
     }
   };
 
@@ -168,7 +174,7 @@ const App: React.FC = () => {
       id: `AYO-${Math.floor(Math.random() * 90000) + 10000}`,
       date: new Date().toLocaleDateString(),
       items: orderDetails,
-      total: finalTotal,
+      total: Math.max(0, finalTotal),
       status: 'PENDING',
       restaurantName: selectedRestaurant?.name || 'Jollibee Iligan',
       customerEmail: currentUser.email,
@@ -180,18 +186,11 @@ const App: React.FC = () => {
     const res = await ayooCloud.placeOrder(newOrder);
     if (res.success) {
       await db.saveOrder(currentUser.email, newOrder);
-      
-      const newXp = (currentUser.xp || 0) + finalTotal;
-      const newPoints = (currentUser.points || 0) + (newOrder.pointsEarned || 0);
-      const newLevel = Math.floor(newXp / 5000) + 1;
-      
       const updated = await db.updateProfile(currentUser.email, { 
-        xp: newXp, 
-        points: newPoints, 
-        level: newLevel 
+        xp: (currentUser.xp || 0) + finalTotal, 
+        points: (currentUser.points || 0) + (newOrder.pointsEarned || 0)
       });
       if (updated) setCurrentUser(updated);
-
       await db.clearCart(currentUser.email);
       setLastOrder([...cartItems]);
       setCartItems([]);
@@ -200,46 +199,27 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAiSelectRestaurant = (name: string) => {
-    const found = restaurants.find(r => r.name.toLowerCase().includes(name.toLowerCase()));
-    if (found) {
-      setSelectedRestaurant(found);
-      setScreen('RESTAURANT');
-      return true;
-    }
-    return false;
-  };
-
   const renderScreen = () => {
     if (syncError) return (
       <div className="h-screen bg-black flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
          <div className="w-24 h-24 ayoo-gradient rounded-[40px] flex items-center justify-center text-5xl mb-10 shadow-[0_0_60px_rgba(255,0,204,0.3)] animate-pulse">📡</div>
          <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">Cloud Sync Fault</h2>
-         <p className="text-gray-400 font-bold text-sm mb-12 leading-relaxed px-4">
-            The app is in "Production Mode" but the Ayoo Server at <code className="text-[#FF00CC] break-all">{(db as any).constructor.ENV.BASE_URL}</code> is not responding.
-         </p>
-         <div className="flex flex-col w-full gap-4">
-            <Button onClick={() => window.location.reload()} className="pill-shadow">Re-Ping Nodes</Button>
-            <button 
-              onClick={() => { (db as any).constructor.ENV.USE_REAL_BACKEND = false; window.location.reload(); }}
-              className="py-4 text-[10px] font-black text-white/40 uppercase tracking-widest"
-            >
-              Switch back to Local Nodes
-            </button>
-         </div>
+         <p className="text-gray-400 font-bold text-sm mb-12 leading-relaxed px-4">Server unreachable. Switching back to simulation mode.</p>
+         <Button onClick={() => window.location.reload()}>Re-Ping Nodes</Button>
       </div>
     );
 
     switch (screen) {
       case 'ONBOARDING': return <Onboarding onFinish={() => { db.setOnboardingSeen(true); setScreen('AUTH'); }} />;
       case 'AUTH': return <Auth onLogin={handleLogin} />;
+      case 'MANUAL': return <AyooManual role={activeRole} onFinish={handleManualFinish} />;
       case 'HOME': return <Home 
           restaurants={restaurants}
           onSelectRestaurant={(r) => { setSelectedRestaurant(r); setScreen('RESTAURANT'); }} 
           onOpenCart={() => setScreen('CART')} 
           onNavigate={(s) => setScreen(s)}
           cartCount={cartItems.length} points={currentUser?.points || 0} streak={currentUser?.streak || 0} badges={currentUser?.badges || []}
-          deliveryCity={deliveryCity} onSetDeliveryCity={handleSetDeliveryCity}
+          deliveryCity={deliveryCity} onSetDeliveryCity={(c) => setDeliveryCity(c)}
         />;
       case 'RESTAURANT': return selectedRestaurant ? <RestaurantDetail restaurant={selectedRestaurant} onBack={() => setScreen('HOME')} onAddToCart={addToCart} onOpenCart={() => setScreen('CART')} cartCount={cartItems.length} /> : null;
       case 'CART': return <Cart items={cartItems} onBack={() => setScreen('HOME')} onCheckout={handleCheckout} isGroup={isGroupOrder} onStartGroup={() => setIsGroupOrder(true)} appliedVoucher={appliedVoucher} onUpdateQuantity={updateQuantity} customDeliveryFee={deliveryFee} />;
@@ -249,14 +229,9 @@ const App: React.FC = () => {
       case 'PROFILE': return <Profile onBack={() => setScreen('HOME')} user={currentUser} onLogout={handleLogout} onNavigate={(s) => setScreen(s)} onUpdateUser={setCurrentUser} onSetRole={handleSetRole} />;
       case 'ADDRESSES': return <AddressesScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} currentCity={deliveryCity} />;
       case 'PAYMENTS': return <PaymentsScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} />;
-      case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name || 'Jollibee Iligan'} />;
+      case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name || 'Tatay\'s Grill'} />;
       case 'RIDER_DASHBOARD': return <RiderDashboard />;
-      case 'ADMIN_PANEL': 
-        if (currentUser?.email.toLowerCase() !== OWNER_EMAIL.toLowerCase()) {
-          setScreen('HOME');
-          return null;
-        }
-        return <AdminPanel onBack={() => setScreen('PROFILE')} restaurants={restaurants} onUpdateRestaurants={setRestaurants} />;
+      case 'ADMIN_PANEL': return <AdminPanel onBack={() => setScreen('PROFILE')} restaurants={restaurants} onUpdateRestaurants={setRestaurants} />;
       default: return null;
     }
   };
@@ -270,9 +245,7 @@ const App: React.FC = () => {
              <div className="w-48 h-1 bg-gray-100 rounded-full overflow-hidden relative">
                 <div className="absolute inset-0 bg-[#FF00CC] animate-progress"></div>
              </div>
-             <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-[#FF00CC]/40 animate-pulse text-center">
-               Securing Ayoo Cloud Connection...
-             </p>
+             <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-[#FF00CC]/40 animate-pulse text-center">Securing Ayoo Cloud Connection...</p>
           </div>
         </div>
       ) : (
@@ -280,14 +253,6 @@ const App: React.FC = () => {
           <SystemStatus />
           {renderScreen()}
         </>
-      )}
-      {['HOME', 'RESTAURANT', 'CART', 'VOUCHERS', 'HISTORY', 'PROFILE', 'TRACKING', 'MERCHANT_DASHBOARD', 'RIDER_DASHBOARD'].includes(screen) && (
-        <AIChat 
-          restaurants={restaurants}
-          onAddToCart={addToCart}
-          onSelectRestaurant={handleAiSelectRestaurant}
-          onNavigate={(s) => setScreen(s)}
-        />
       )}
     </div>
   );

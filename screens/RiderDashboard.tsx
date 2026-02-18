@@ -41,6 +41,16 @@ const RiderDashboard: React.FC = () => {
     refresh();
   };
 
+  const handleAcceptTask = async (task: OrderRecord) => {
+    if (!currentUser) return;
+    await ayooCloud.updateOrderStatus(task.id, 'ACCEPTED', {
+      riderName: currentUser.name,
+      riderEmail: currentUser.email
+    });
+    setActiveTab('duty');
+    refresh();
+  };
+
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white p-8 pb-32 overflow-y-auto scrollbar-hide">
       <div className="flex justify-between items-center mb-10">
@@ -52,8 +62,8 @@ const RiderDashboard: React.FC = () => {
       </div>
 
       <div className="flex gap-1 mb-8 bg-white/5 p-1 rounded-[24px] border border-white/5">
-        <button onClick={() => setActiveTab('duty')} className={`flex-1 py-3.5 rounded-[18px] text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'duty' ? 'bg-[#FF00CC] text-white' : 'text-gray-500'}`}>Duty</button>
-        <button onClick={() => setActiveTab('market')} className={`flex-1 py-3.5 rounded-[18px] text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'market' ? 'bg-[#FF00CC] text-white' : 'text-gray-500'}`}>Market</button>
+        <button onClick={() => setActiveTab('duty')} className={`flex-1 py-3.5 rounded-[18px] text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'duty' ? 'bg-[#FF00CC] text-white' : 'text-gray-500'}`}>Duty ({myDuty.length})</button>
+        <button onClick={() => setActiveTab('market')} className={`flex-1 py-3.5 rounded-[18px] text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'market' ? 'bg-[#FF00CC] text-white' : 'text-gray-500'}`}>Market ({marketTasks.length})</button>
         <button onClick={() => setActiveTab('wallet')} className={`flex-1 py-3.5 rounded-[18px] text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'wallet' ? 'bg-[#FF00CC] text-white' : 'text-gray-500'}`}>Wallet</button>
       </div>
 
@@ -64,38 +74,53 @@ const RiderDashboard: React.FC = () => {
               <h3 className="text-5xl font-black tracking-tighter text-green-400 mb-6">₱{earnings.toFixed(2)}</h3>
               <button className="w-full py-5 bg-white text-black rounded-3xl font-black text-xs uppercase tracking-widest">Cash Out Now</button>
            </div>
-           <div className="bg-[#161616] p-8 rounded-[35px] border border-white/5">
-              <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-500 mb-4">Daily Breakdown</h4>
-              <div className="flex justify-between items-center text-xs font-bold py-2 border-b border-white/5">
-                 <span className="text-gray-400">Task Payouts</span>
-                 <span>₱{(earnings * 0.7).toFixed(0)}</span>
-              </div>
-              <div className="flex justify-between items-center text-xs font-bold py-2">
-                 <span className="text-gray-400">Total Tips</span>
-                 <span className="text-yellow-400">₱{(earnings * 0.3).toFixed(0)}</span>
-              </div>
-           </div>
         </div>
       ) : activeTab === 'duty' ? (
         <div className="space-y-6">
            {myDuty.length === 0 ? (
-             <div className="py-24 text-center opacity-20 uppercase font-black text-xs">Clear skies, no orders.</div>
+             <div className="py-24 text-center">
+                <p className="text-gray-600 font-black text-[10px] uppercase tracking-[0.3em] mb-4">No active assignments</p>
+                <button onClick={() => setActiveTab('market')} className="text-[#FF00CC] font-black uppercase text-[8px] tracking-widest border border-[#FF00CC]/20 px-6 py-2 rounded-full">Check Market</button>
+             </div>
            ) : (
              myDuty.map(task => (
-               <div key={task.id} className="bg-[#1A1A1A] p-10 rounded-[50px] border-2 border-[#FF00CC]/30 shadow-2xl relative overflow-hidden">
+               <div key={task.id} className="bg-[#1A1A1A] p-10 rounded-[50px] border-2 border-[#FF00CC]/30 shadow-2xl relative overflow-hidden animate-in zoom-in-95">
                   <div className="mb-8">
-                     <p className="text-[9px] font-black text-[#FF00CC] uppercase tracking-widest mb-1">Status: {task.status}</p>
+                     <div className="flex justify-between items-start mb-2">
+                        <span className="text-[8px] font-black text-[#FF00CC] uppercase tracking-widest border border-[#FF00CC]/30 px-2 py-0.5 rounded-lg">{task.status}</span>
+                        <span className="text-[10px] font-black">₱{task.total}</span>
+                     </div>
                      <h4 className="font-black text-2xl tracking-tighter leading-none mb-1">{task.restaurantName}</h4>
-                     <p className="text-[10px] font-bold text-gray-500 uppercase">{task.deliveryAddress}</p>
+                     <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{task.deliveryAddress}</p>
                   </div>
-                  {task.status === 'READY_FOR_PICKUP' && <Button onClick={() => handleUpdate(task.id, 'OUT_FOR_DELIVERY')} className="py-5 ayoo-gradient">I've Arrived</Button>}
-                  {task.status === 'OUT_FOR_DELIVERY' && <Button onClick={() => handleUpdate(task.id, 'DELIVERED')} className="py-5 bg-green-500">Confirm Delivery</Button>}
+                  {task.status === 'READY_FOR_PICKUP' && <Button onClick={() => handleUpdate(task.id, 'OUT_FOR_DELIVERY')} className="py-5 ayoo-gradient">I've Arrived at Merchant</Button>}
+                  {task.status === 'OUT_FOR_DELIVERY' && <Button onClick={() => handleUpdate(task.id, 'DELIVERED')} className="py-5 bg-green-500">Confirm Drop-off</Button>}
                </div>
              ))
            )}
         </div>
       ) : (
-        <div className="py-20 text-center opacity-20 uppercase font-black tracking-widest text-xs">Market View Placeholder</div>
+        <div className="space-y-6">
+           {marketTasks.length === 0 ? (
+             <div className="py-24 text-center opacity-20 uppercase font-black text-[10px] tracking-widest">Market is currently dry.</div>
+           ) : (
+             marketTasks.map(task => (
+               <div key={task.id} className="bg-[#161616] p-8 rounded-[40px] border border-white/5 flex flex-col gap-6">
+                  <div className="flex justify-between">
+                     <div>
+                        <h4 className="font-black text-lg tracking-tight leading-none mb-1">{task.restaurantName}</h4>
+                        <p className="text-[9px] font-bold text-gray-500 uppercase">{task.deliveryAddress}</p>
+                     </div>
+                     <div className="text-right">
+                        <p className="text-green-400 font-black text-xl">₱{(task.total * 0.1).toFixed(0)}</p>
+                        <p className="text-[7px] text-gray-600 font-black uppercase">Est. Payout</p>
+                     </div>
+                  </div>
+                  <button onClick={() => handleAcceptTask(task)} className="w-full py-4 bg-white text-black rounded-2xl font-black text-[9px] uppercase tracking-widest shadow-xl">Accept Task</button>
+               </div>
+             ))
+           )}
+        </div>
       )}
     </div>
   );

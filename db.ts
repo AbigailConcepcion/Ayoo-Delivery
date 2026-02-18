@@ -2,10 +2,6 @@
 import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant } from './types';
 import { MOCK_RESTAURANTS } from './constants';
 
-/**
- * Ayoo Production-Ready Data Client
- * This layer bridges the Frontend to the "Ayoo Cloud".
- */
 class AyooDatabase {
   private readonly STORAGE_KEYS = {
     AUTH_TOKEN: 'ayoo_session_token_v1',
@@ -13,12 +9,28 @@ class AyooDatabase {
     ACCOUNTS: 'ayoo_user_registry_v11',
     REMEMBERED: 'ayoo_remembered_v1',
     GLOBAL_HISTORY: 'ayoo_order_log_v1',
-    RESTAURANTS: 'ayoo_restaurants_v1'
+    RESTAURANTS: 'ayoo_restaurants_v1',
+    SYSTEM_CONFIG: 'ayoo_system_config_v1'
   };
 
   async connect() {
     console.log("📡 Ayoo Node: Handshake initialized...");
     return true;
+  }
+
+  // System Configuration
+  async getSystemConfig() {
+    const data = localStorage.getItem(this.STORAGE_KEYS.SYSTEM_CONFIG);
+    if (!data) {
+      const defaultConfig = { deliveryFee: 45 };
+      localStorage.setItem(this.STORAGE_KEYS.SYSTEM_CONFIG, JSON.stringify(defaultConfig));
+      return defaultConfig;
+    }
+    return JSON.parse(data);
+  }
+
+  async saveSystemConfig(config: { deliveryFee: number }) {
+    localStorage.setItem(this.STORAGE_KEYS.SYSTEM_CONFIG, JSON.stringify(config));
   }
 
   // Restaurant Management
@@ -33,6 +45,12 @@ class AyooDatabase {
 
   async saveRestaurants(restaurants: Restaurant[]): Promise<void> {
     localStorage.setItem(this.STORAGE_KEYS.RESTAURANTS, JSON.stringify(restaurants));
+  }
+
+  async updateMerchantMenu(resId: string, items: any[]): Promise<void> {
+    const restaurants = await this.getRestaurants();
+    const updated = restaurants.map(r => r.id === resId ? { ...r, items } : r);
+    await this.saveRestaurants(updated);
   }
 
   async login(email: string, pass: string, remember: boolean): Promise<UserAccount | null> {
@@ -100,6 +118,8 @@ class AyooDatabase {
     if (registry.some((u: any) => u.email === user.email)) {
       return { success: false, message: 'Account exists.' };
     }
+    // Assign merchantId if they are signing up as merchant (mock)
+    if (user.role === 'MERCHANT') user.merchantId = '1'; // Defaulting to Jollibee for demo
     localStorage.setItem(this.STORAGE_KEYS.ACCOUNTS, JSON.stringify([...registry, user]));
     return { success: true, message: 'Registered.' };
   }

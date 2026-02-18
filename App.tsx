@@ -22,6 +22,8 @@ import SystemStatus from './components/SystemStatus';
 import { db } from './db';
 import { ayooCloud } from './api';
 
+const OWNER_EMAIL = 'ayoo.admin@gmail.com';
+
 const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(true);
   const [screen, setScreen] = useState<AppScreen>('ONBOARDING');
@@ -34,11 +36,11 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<OrderRecord[]>([]);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [deliveryFee, setDeliveryFee] = useState(45);
   
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
   const [isGroupOrder, setIsGroupOrder] = useState(false);
 
-  // Sync cart to local storage
   useEffect(() => {
     if (currentUser) {
       db.saveCart(currentUser.email, cartItems, appliedVoucher);
@@ -50,26 +52,30 @@ const App: React.FC = () => {
     setActiveRole(user.role || 'CUSTOMER');
     if (user.preferredCity) setDeliveryCity(user.preferredCity);
     
-    const [orders, cartData] = await Promise.all([
+    const [orders, cartData, config] = await Promise.all([
       db.getHistory(user.email),
-      db.getCart(user.email)
+      db.getCart(user.email),
+      db.getSystemConfig()
     ]);
     setHistory(orders);
     setCartItems(cartData.items);
     setAppliedVoucher(cartData.voucher);
+    setDeliveryFee(config.deliveryFee);
   }, []);
 
   useEffect(() => {
     const initApp = async () => {
       try {
         await db.connect();
-        const [session, hasSeenOnboarding, resList] = await Promise.all([
+        const [session, hasSeenOnboarding, resList, config] = await Promise.all([
           db.getSession(),
           db.hasSeenOnboarding(),
-          db.getRestaurants()
+          db.getRestaurants(),
+          db.getSystemConfig()
         ]);
         
         setRestaurants(resList);
+        setDeliveryFee(config.deliveryFee);
 
         if (session) {
           await loadUserData(session);
@@ -147,7 +153,7 @@ const App: React.FC = () => {
     });
 
     const subtotal = orderDetails.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
-    const finalTotal = subtotal + 45 - (appliedVoucher ? (appliedVoucher.type === 'percent' ? (subtotal * appliedVoucher.discount / 100) : appliedVoucher.discount) : 0);
+    const finalTotal = subtotal + deliveryFee - (appliedVoucher ? (appliedVoucher.type === 'percent' ? (subtotal * appliedVoucher.discount / 100) : appliedVoucher.discount) : 0);
 
     const newOrder: OrderRecord = {
       id: `AYO-${Math.floor(Math.random() * 90000) + 10000}`,
@@ -194,16 +200,21 @@ const App: React.FC = () => {
           deliveryCity={deliveryCity} onSetDeliveryCity={handleSetDeliveryCity}
         />;
       case 'RESTAURANT': return selectedRestaurant ? <RestaurantDetail restaurant={selectedRestaurant} onBack={() => setScreen('HOME')} onAddToCart={addToCart} onOpenCart={() => setScreen('CART')} cartCount={cartItems.length} /> : null;
-      case 'CART': return <Cart items={cartItems} onBack={() => setScreen('HOME')} onCheckout={handleCheckout} isGroup={isGroupOrder} onStartGroup={() => setIsGroupOrder(true)} appliedVoucher={appliedVoucher} onUpdateQuantity={updateQuantity} />;
+      case 'CART': return <Cart items={cartItems} onBack={() => setScreen('HOME')} onCheckout={handleCheckout} isGroup={isGroupOrder} onStartGroup={() => setIsGroupOrder(true)} appliedVoucher={appliedVoucher} onUpdateQuantity={updateQuantity} customDeliveryFee={deliveryFee} />;
       case 'TRACKING': return <OrderTracking onBack={() => setScreen('HOME')} orderItems={lastOrder} restaurant={selectedRestaurant} deliveryCity={deliveryCity} customerEmail={currentUser?.email || ''} />;
       case 'VOUCHERS': return <Vouchers onBack={() => setScreen('HOME')} onApply={(v) => {setAppliedVoucher(v); setScreen('CART');}} onNavigate={(s) => setScreen(s)} />;
       case 'HISTORY': return <History onBack={() => setScreen('HOME')} orders={history} onNavigate={(s) => setScreen(s)} />;
       case 'PROFILE': return <Profile onBack={() => setScreen('HOME')} user={currentUser} onLogout={handleLogout} onNavigate={(s) => setScreen(s)} onUpdateUser={setCurrentUser} onSetRole={handleSetRole} />;
       case 'ADDRESSES': return <AddressesScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} currentCity={deliveryCity} />;
       case 'PAYMENTS': return <PaymentsScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} />;
-      case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name?.includes('Jollibee') ? 'Jollibee Iligan' : 'Jollibee Iligan'} />;
+      case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name || 'Jollibee Iligan'} />;
       case 'RIDER_DASHBOARD': return <RiderDashboard />;
-      case 'ADMIN_PANEL': return <AdminPanel onBack={() => setScreen('PROFILE')} restaurants={restaurants} onUpdateRestaurants={setRestaurants} />;
+      case 'ADMIN_PANEL': 
+        if (currentUser?.email.toLowerCase() !== OWNER_EMAIL.toLowerCase()) {
+          setScreen('HOME');
+          return null;
+        }
+        return <AdminPanel onBack={() => setScreen('PROFILE')} restaurants={restaurants} onUpdateRestaurants={setRestaurants} />;
       default: return null;
     }
   };

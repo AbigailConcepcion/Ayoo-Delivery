@@ -52,21 +52,29 @@ const App: React.FC = () => {
     setActiveRole(user.role || 'CUSTOMER');
     if (user.preferredCity) setDeliveryCity(user.preferredCity);
     
-    const [orders, cartData, config] = await Promise.all([
-      db.getHistory(user.email),
-      db.getCart(user.email),
-      db.getSystemConfig()
-    ]);
-    setHistory(orders);
-    setCartItems(cartData.items);
-    setAppliedVoucher(cartData.voucher);
-    setDeliveryFee(config.deliveryFee);
+    try {
+      const [orders, cartData, config] = await Promise.all([
+        db.getHistory(user.email),
+        db.getCart(user.email),
+        db.getSystemConfig()
+      ]);
+      setHistory(orders);
+      setCartItems(cartData.items);
+      setAppliedVoucher(cartData.voucher);
+      setDeliveryFee(config.deliveryFee);
+    } catch (e) {
+      console.warn("User data fetch failed, staying offline.");
+    }
   }, []);
 
   useEffect(() => {
     const initApp = async () => {
       try {
-        await db.connect();
+        const connected = await db.connect();
+        if (!connected && (db as any).constructor.ENV.USE_REAL_BACKEND) {
+          throw new Error("Ayoo Production Nodes are unreachable. Check your BASE_URL.");
+        }
+
         const [session, hasSeenOnboarding, resList, config] = await Promise.all([
           db.getSession(),
           db.hasSeenOnboarding(),
@@ -83,8 +91,8 @@ const App: React.FC = () => {
         } else {
           setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
         }
-      } catch (err) {
-        setSyncError("Failed to connect to Ayoo Nodes");
+      } catch (err: any) {
+        setSyncError(err.message || "Failed to connect to Ayoo Nodes");
       } finally {
         setTimeout(() => setIsConnecting(false), 2000);
       }
@@ -94,6 +102,7 @@ const App: React.FC = () => {
     return ayooCloud.subscribe(() => {
       if (currentUser) {
         db.getHistory(currentUser.email).then(setHistory);
+        db.getSession().then(s => { if (s) setCurrentUser(s); });
       }
     });
   }, [loadUserData, currentUser]);
@@ -164,12 +173,25 @@ const App: React.FC = () => {
       restaurantName: selectedRestaurant?.name || 'Jollibee Iligan',
       customerEmail: currentUser.email,
       customerName: currentUser.name,
-      deliveryAddress: `Tibanga, ${deliveryCity}`
+      deliveryAddress: `Tibanga, ${deliveryCity}`,
+      pointsEarned: Math.floor(finalTotal / 10)
     };
 
     const res = await ayooCloud.placeOrder(newOrder);
     if (res.success) {
       await db.saveOrder(currentUser.email, newOrder);
+      
+      const newXp = (currentUser.xp || 0) + finalTotal;
+      const newPoints = (currentUser.points || 0) + (newOrder.pointsEarned || 0);
+      const newLevel = Math.floor(newXp / 5000) + 1;
+      
+      const updated = await db.updateProfile(currentUser.email, { 
+        xp: newXp, 
+        points: newPoints, 
+        level: newLevel 
+      });
+      if (updated) setCurrentUser(updated);
+
       await db.clearCart(currentUser.email);
       setLastOrder([...cartItems]);
       setCartItems([]);
@@ -178,13 +200,33 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAiSelectRestaurant = (name: string) => {
+    const found = restaurants.find(r => r.name.toLowerCase().includes(name.toLowerCase()));
+    if (found) {
+      setSelectedRestaurant(found);
+      setScreen('RESTAURANT');
+      return true;
+    }
+    return false;
+  };
+
   const renderScreen = () => {
     if (syncError) return (
-      <div className="h-screen bg-white flex flex-col items-center justify-center p-10 text-center">
-         <div className="w-20 h-20 bg-red-50 text-red-500 rounded-[30px] flex items-center justify-center text-4xl mb-6 shadow-xl">⚠️</div>
-         <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">Connection Lost</h2>
-         <p className="text-gray-400 font-bold text-sm mb-8">{syncError}</p>
-         <Button onClick={() => window.location.reload()}>Retry Cloud Sync</Button>
+      <div className="h-screen bg-black flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
+         <div className="w-24 h-24 ayoo-gradient rounded-[40px] flex items-center justify-center text-5xl mb-10 shadow-[0_0_60px_rgba(255,0,204,0.3)] animate-pulse">📡</div>
+         <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">Cloud Sync Fault</h2>
+         <p className="text-gray-400 font-bold text-sm mb-12 leading-relaxed px-4">
+            The app is in "Production Mode" but the Ayoo Server at <code className="text-[#FF00CC] break-all">{(db as any).constructor.ENV.BASE_URL}</code> is not responding.
+         </p>
+         <div className="flex flex-col w-full gap-4">
+            <Button onClick={() => window.location.reload()} className="pill-shadow">Re-Ping Nodes</Button>
+            <button 
+              onClick={() => { (db as any).constructor.ENV.USE_REAL_BACKEND = false; window.location.reload(); }}
+              className="py-4 text-[10px] font-black text-white/40 uppercase tracking-widest"
+            >
+              Switch back to Local Nodes
+            </button>
+         </div>
       </div>
     );
 
@@ -239,7 +281,14 @@ const App: React.FC = () => {
           {renderScreen()}
         </>
       )}
-      {['HOME', 'RESTAURANT', 'CART', 'VOUCHERS', 'HISTORY', 'PROFILE', 'TRACKING', 'MERCHANT_DASHBOARD', 'RIDER_DASHBOARD'].includes(screen) && <AIChat />}
+      {['HOME', 'RESTAURANT', 'CART', 'VOUCHERS', 'HISTORY', 'PROFILE', 'TRACKING', 'MERCHANT_DASHBOARD', 'RIDER_DASHBOARD'].includes(screen) && (
+        <AIChat 
+          restaurants={restaurants}
+          onAddToCart={addToCart}
+          onSelectRestaurant={handleAiSelectRestaurant}
+          onNavigate={(s) => setScreen(s)}
+        />
+      )}
     </div>
   );
 };

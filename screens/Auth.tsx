@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Logo from '../components/Logo';
 import Button from '../components/Button';
 import AIChat from '../components/AIChat';
-import { UserAccount } from '../types';
+import { UserAccount, UserRole } from '../types';
 import { db } from '../db';
 
 interface AuthProps {
@@ -22,6 +22,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('CUSTOMER');
   
   // UI states
   const [showPassword, setShowPassword] = useState(false);
@@ -33,12 +34,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
   // Initialize with remembered credentials
   useEffect(() => {
-    const creds = db.getRemembered();
-    if (creds) {
-      setEmail(creds.email);
-      setPassword(creds.password);
-      setRememberMe(true);
-    }
+    // Fixed: getRemembered is an async method, need to await it inside an async function
+    const loadCredentials = async () => {
+      const creds = await db.getRemembered();
+      if (creds) {
+        setEmail(creds.email);
+        setPassword(creds.password);
+        setRememberMe(true);
+      }
+    };
+    loadCredentials();
   }, []);
 
   const validateEmail = (email: string) => {
@@ -69,7 +74,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
     if (mode === 'SIGNUP') {
       if (!name.trim()) {
-        setErrorMessage('Full name is required.');
+        setErrorMessage(selectedRole === 'MERCHANT' ? 'Business name is required.' : 'Full name is required.');
         setShowError(true);
         return;
       }
@@ -89,25 +94,27 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           setShowSuccess(true);
           setTimeout(() => onLogin(user), 1000);
         } else {
-          // Check if account even exists
           const exists = await db.getUserByEmail(cleanEmail);
           setErrorMessage(exists ? 'Wrong password! Try again.' : 'Account not found. Sign up instead!');
           setShowError(true);
         }
       } else if (mode === 'SIGNUP') {
+        // Fix: Added missing required properties 'xp' and 'level' for UserAccount type compliance
         const newUser: UserAccount = {
           name: name.trim(),
           email: cleanEmail,
           password: cleanPass,
           points: 500,
+          xp: 0,
+          level: 1,
           streak: 1,
-          badges: []
+          badges: [],
+          role: selectedRole
         };
 
         const result = await db.register(newUser);
         if (result.success) {
           setShowSuccess(true);
-          // Automatically log them in after signup
           const loggedInUser = await db.login(cleanEmail, cleanPass, rememberMe);
           if (loggedInUser) {
              setTimeout(() => onLogin(loggedInUser), 1000);
@@ -206,7 +213,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
         <div className="flex items-center justify-between px-2">
             <label className="flex items-center gap-3 cursor-pointer group">
-              <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-[#FF00CC] border-[#FF00CC]' : 'bg-white border-gray-200 group-hover:border-pink-300'}`}>
+              <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-[#FF00CC] border-[#FF00CC]' : 'bg-white border-gray-100 group-hover:border-pink-300'}`}>
                   <input 
                   type="checkbox" 
                   className="hidden" 
@@ -238,21 +245,37 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
   const renderSignupForm = () => (
     <div className="flex-1 flex flex-col p-8 pt-12 animate-in slide-in-from-right-full duration-500 bg-white overflow-y-auto scrollbar-hide">
-      <div className="mb-10 flex justify-center"><Logo variant="colored" size="sm" withSubtext={false} /></div>
+      <div className="mb-8 flex justify-center"><Logo variant="colored" size="sm" withSubtext={false} /></div>
       <div className="w-full max-w-sm mx-auto">
         <h2 className="text-4xl font-black text-gray-900 mb-2 text-center tracking-tight uppercase leading-none">Get Started</h2>
-        <p className="text-gray-400 text-center mb-10 font-bold leading-relaxed px-6 text-sm">Join the Iligan delivery revolution</p>
+        <p className="text-gray-400 text-center mb-8 font-bold leading-relaxed px-6 text-sm">Choose your role and join the fleet</p>
         
+        {/* Role Selector */}
+        <div className="flex gap-2 mb-10 bg-gray-50 p-1.5 rounded-[24px] border border-gray-100">
+           {(['CUSTOMER', 'MERCHANT', 'RIDER'] as UserRole[]).map(role => (
+             <button 
+                key={role}
+                type="button"
+                onClick={() => setSelectedRole(role)}
+                className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${
+                  selectedRole === role ? 'bg-[#FF00CC] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'
+                }`}
+             >
+                {role === 'CUSTOMER' ? '🛒' : role === 'MERCHANT' ? '🏪' : '🛵'}<br/>{role}
+             </button>
+           ))}
+        </div>
+
         <form className="space-y-6 pb-12" onSubmit={handleAuth}>
           <div className="input-label-border">
-            <label>Full Name</label>
+            <label>{selectedRole === 'MERCHANT' ? 'Business Name' : 'Full Name'}</label>
             <input 
                 type="text" 
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
                 disabled={isSubmitting}
                 className="w-full p-5 border border-gray-200 rounded-2xl focus:border-[#FF00CC] text-gray-700 font-bold outline-none" 
-                placeholder="Juan Dela Cruz"
+                placeholder={selectedRole === 'MERCHANT' ? 'e.g. Tatay\'s Grill' : 'Juan Dela Cruz'}
                 required 
             />
           </div>
@@ -305,7 +328,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           
           <div className="pt-4">
             <Button type="submit" disabled={isSubmitting} className="pill-shadow py-5 text-xl font-black uppercase tracking-widest">
-              {isSubmitting ? 'Synchronizing...' : 'Join Ayoo'}
+              {isSubmitting ? 'Synchronizing...' : `Join as ${selectedRole}`}
             </Button>
           </div>
         </form>

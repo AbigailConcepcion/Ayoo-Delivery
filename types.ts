@@ -9,11 +9,26 @@ export interface UserAccount {
   avatar?: string;
   password?: string;
   points: number;
+  xp: number; 
+  level: number;
   streak: number;
   badges: UserBadge[];
   preferredCity?: string;
   role?: UserRole;
   merchantId?: string;
+  earnings?: number;
+}
+
+export interface WalletTransaction {
+  id: string;
+  amount: number;
+  type: 'CREDIT' | 'DEBIT';
+  description: string;
+  timestamp: string;
+  orderId?: string;
+  methodType?: PaymentType;
+  referenceId: string;
+  status: 'SETTLED' | 'PENDING' | 'FAILED';
 }
 
 export interface FoodItem {
@@ -63,8 +78,17 @@ export interface OrderRecord {
   customerEmail: string;
   customerName: string;
   riderName?: string;
+  riderEmail?: string;
   deliveryAddress: string;
-  estimatedArrival?: string;
+  tipAmount?: number;
+  pointsEarned?: number;
+  paymentMethod?: string;
+  paymentId?: string;
+  isPaid?: boolean;
+  transactionId?: string;
+  rating?: number;
+  comment?: string;
+  receiptUrl?: string;
 }
 
 export interface UserBadge {
@@ -89,15 +113,13 @@ export interface Address {
   city: string;
 }
 
+export type PaymentType = 'VISA' | 'MASTERCARD' | 'GCASH' | 'MAYA' | 'CASH';
+
 export interface PaymentMethod {
   id: string;
-  type: 'VISA' | 'MASTERCARD';
-  last4: string;
-  expiry: string;
-}
-
-export interface GroupMember {
-  id: string;
-  name: string;
-  avatar: string;
+  type: PaymentType;
+  last4?: string;
+  expiry?: string;
+  phoneNumber?: string;
+  balance?: number;
 }

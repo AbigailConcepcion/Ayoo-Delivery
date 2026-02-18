@@ -1,5 +1,5 @@
 
-export type AppScreen = 'ONBOARDING' | 'AUTH' | 'HOME' | 'RESTAURANT' | 'CART' | 'TRACKING' | 'VOUCHERS' | 'HISTORY' | 'PROFILE' | 'ADDRESSES' | 'PAYMENTS' | 'MERCHANT_DASHBOARD' | 'RIDER_DASHBOARD' | 'ADMIN_PANEL';
+export type AppScreen = 'ONBOARDING' | 'AUTH' | 'HOME' | 'RESTAURANT' | 'CART' | 'TRACKING' | 'VOUCHERS' | 'HISTORY' | 'PROFILE' | 'ADDRESSES' | 'PAYMENTS' | 'MERCHANT_DASHBOARD' | 'RIDER_DASHBOARD' | 'ADMIN_PANEL' | 'MANUAL';
 
 export type UserRole = 'CUSTOMER' | 'MERCHANT' | 'RIDER';
 
@@ -17,6 +17,7 @@ export interface UserAccount {
   role?: UserRole;
   merchantId?: string;
   earnings?: number;
+  manualsSeen?: string[]; // Tracks which role manuals the user has viewed
 }
 
 export interface WalletTransaction {

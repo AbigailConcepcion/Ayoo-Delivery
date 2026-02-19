@@ -1,6 +1,8 @@
 
 import { Restaurant, Review } from './types';
 
+export const GLOBAL_REGISTRY_KEY = 'ayoo_registry_v15';
+
 export const COLORS = {
   HOT_PINK: '#FF00CC',
   PURPLE: '#8A2BE2',
@@ -40,11 +42,6 @@ const MOCK_REVIEWS: Review[] = [
   { id: 'r2', userName: 'John Doe', userAvatar: 'https://i.pravatar.cc/150?u=john', rating: 4, comment: 'Great portions, but the delivery took a bit longer than expected.', date: '1 week ago' },
 ];
 
-const generateItems = (prefix: string, cuisine: string) => [
-  { id: `${prefix}1`, name: `Signature ${cuisine} Plate`, price: 250, description: 'The chef\'s special selection of premium ingredients.', image: `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=200`, category: 'Best Sellers', isPopular: true },
-  { id: `${prefix}2`, name: `Classic ${cuisine} Bowl`, price: 180, description: 'A hearty serving of traditional flavors.', image: `https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=200`, category: 'Main Course' },
-];
-
 export const MOCK_RESTAURANTS: Restaurant[] = [
   {
     id: '1',
@@ -53,7 +50,7 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
     deliveryTime: '20-30 min',
     cuisine: 'Fast Food',
     isPartner: true,
-    hasLiveCam: true, // Enabled Live Cam
+    hasLiveCam: true,
     address: 'Aguinaldo St, Iligan City',
     image: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?auto=format&fit=crop&q=80&w=600',
     reviews: MOCK_REVIEWS,
@@ -69,7 +66,7 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
     deliveryTime: '35-50 min',
     cuisine: 'Filipino BBQ',
     isPartner: true,
-    hasLiveCam: true, // Enabled Live Cam
+    hasLiveCam: true,
     address: 'Pala-o, Iligan City',
     image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=600',
     reviews: MOCK_REVIEWS,

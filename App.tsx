@@ -110,7 +110,6 @@ const App: React.FC = () => {
       const updated = await db.updateProfile(currentUser.email, { role });
       if (updated) setCurrentUser(updated);
 
-      // Check if user has seen manual for this role
       const seen = updated?.manualsSeen || [];
       if (!seen.includes(role)) {
         setScreen('MANUAL');
@@ -252,6 +251,25 @@ const App: React.FC = () => {
         <>
           <SystemStatus />
           {renderScreen()}
+          
+          {/* GLOBAL AI ASSISTANT: Only show after onboarding */}
+          {screen !== 'ONBOARDING' && (
+            <AIChat 
+              restaurants={restaurants}
+              onAddToCart={addToCart}
+              onSelectRestaurant={(name) => {
+                const res = restaurants.find(r => r.name.toLowerCase().includes(name.toLowerCase()));
+                if (res) {
+                  setSelectedRestaurant(res);
+                  setScreen('RESTAURANT');
+                  return true;
+                }
+                return false;
+              }}
+              onNavigate={(s) => setScreen(s)}
+              context={screen === 'AUTH' ? 'login help' : 'general'}
+            />
+          )}
         </>
       )}
     </div>

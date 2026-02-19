@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Restaurant, FoodItem, UserAccount, OrderRecord } from '../types';
 import { db } from '../db';
 import { ayooCloud } from '../api';
+import { GLOBAL_REGISTRY_KEY } from '../constants';
 import Button from '../components/Button';
 
 interface AdminPanelProps {
@@ -21,9 +21,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
   
   // Menu Editing State
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const merchantFileRef = useRef<HTMLInputElement>(null);
 
   const refreshData = async () => {
-    const registry = JSON.parse(localStorage.getItem('ayoo_user_registry_v11') || '[]');
+    // Corrected to use the same central registry key used by Auth/db.ts
+    const registryRaw = localStorage.getItem(GLOBAL_REGISTRY_KEY);
+    const registry = registryRaw ? JSON.parse(registryRaw) : [];
+    
     setRegisteredUsers(registry);
     setLiveOrders(ayooCloud.getAllLiveOrders());
     const config = await db.getSystemConfig();
@@ -45,6 +50,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
     if (window.confirm(`Force assign order ${orderId} to ${rider.name}?`)) {
       await ayooCloud.forceAssignOrder(orderId, rider.email, rider.name);
       refreshData();
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'MERCHANT' | 'ITEM') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        if (target === 'MERCHANT' && editingRes) {
+          setEditingRes({ ...editingRes, image: base64 });
+        } else if (target === 'ITEM' && editingItem) {
+          setEditingItem({ ...editingItem, image: base64 });
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -103,37 +124,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
       {!editingRes ? (
         activeTab === 'merchants' ? (
           <div className="space-y-6">
-            <button onClick={() => setEditingRes({ name: '', cuisine: '', image: '', items: [] } as any)} className="w-full p-8 bg-[#FF00CC] rounded-[35px] font-black uppercase tracking-widest text-sm active:scale-95 transition-all">Add Merchant +</button>
+            <button onClick={() => setEditingRes({ name: '', cuisine: '', image: '', items: [] } as any)} className="w-full p-8 bg-[#FF00CC] rounded-[35px] font-black uppercase tracking-widest text-sm active:scale-95 transition-all shadow-xl shadow-pink-900/10">Add Merchant +</button>
             {restaurants.map(res => (
-              <div key={res.id} className="bg-[#1A1A1A] p-6 rounded-[35px] border border-white/5 flex items-center justify-between group">
+              <div key={res.id} className="bg-[#1A1A1A] p-6 rounded-[35px] border border-white/5 flex items-center justify-between group hover:border-pink-500/30 transition-all">
                 <div className="flex items-center gap-4">
-                  <img src={res.image} className="w-12 h-12 rounded-xl object-cover" alt={res.name} />
+                  <img src={res.image} className="w-14 h-14 rounded-2xl object-cover border border-white/10" alt={res.name} />
                   <div>
-                    <h4 className="font-black text-lg tracking-tight leading-none">{res.name}</h4>
+                    <h4 className="font-black text-lg tracking-tight leading-none uppercase">{res.name}</h4>
                     <p className="text-[10px] font-bold text-gray-500 uppercase mt-1">{res.items.length} items • {res.cuisine}</p>
                   </div>
                 </div>
-                <button onClick={() => setEditingRes(res)} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-[#FF00CC] transition-all">✎</button>
+                <button onClick={() => setEditingRes(res)} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-[#FF00CC] transition-all">✎</button>
               </div>
             ))}
           </div>
         ) : activeTab === 'dispatch' ? (
           <div className="space-y-6">
-            {/* Visual Heatmap Placeholder */}
-            <div className="bg-[#1A1A1A] p-10 rounded-[45px] border border-white/5 text-center mb-4">
+            <div className="bg-[#1A1A1A] p-10 rounded-[45px] border border-white/5 text-center mb-4 shadow-inner">
                <div className="w-16 h-1 bg-[#FF00CC]/20 rounded-full mx-auto mb-6"></div>
-               <h4 className="text-[10px] font-black uppercase text-gray-400 mb-6">Dispatch Heatmap</h4>
+               <h4 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest">Dispatch Heatmap</h4>
                <div className="flex justify-center gap-4 h-24 items-end">
                   {[40, 70, 30, 90, 50, 80].map((h, i) => (
-                    <div key={i} className="w-4 bg-[#FF00CC]/20 rounded-t-lg transition-all" style={{ height: `${h}%` }}></div>
+                    <div key={i} className="w-4 ayoo-gradient rounded-t-lg transition-all opacity-40" style={{ height: `${h}%` }}></div>
                   ))}
                </div>
             </div>
             {liveOrders.map(order => (
-              <div key={order.id} className="bg-[#1A1A1A] p-8 rounded-[40px] border border-white/5 relative">
+              <div key={order.id} className="bg-[#1A1A1A] p-8 rounded-[40px] border border-white/5 relative shadow-xl">
                  <div className="flex justify-between mb-4">
                    <div className="flex-1">
-                     <h4 className="font-black text-lg truncate leading-none mb-1">{order.customerName}</h4>
+                     <h4 className="font-black text-lg truncate leading-none mb-1 uppercase tracking-tighter">{order.customerName}</h4>
                      <p className="text-[9px] text-gray-500 uppercase font-bold tracking-tight">{order.restaurantName} → {order.deliveryAddress}</p>
                    </div>
                    <div className="text-right">
@@ -159,24 +179,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
             {registeredUsers.map(u => (
               <div key={u.email} className="bg-[#1A1A1A] p-6 rounded-[35px] border border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[#FF00CC]/10 rounded-xl flex items-center justify-center font-black text-[#FF00CC] text-xs">{u.name[0]}</div>
+                  <div className="w-12 h-12 bg-[#FF00CC]/10 rounded-2xl flex items-center justify-center font-black text-[#FF00CC] text-xs border border-pink-500/20">{u.name[0]}</div>
                   <div>
-                    <h4 className="font-black text-sm tracking-tight">{u.name}</h4>
-                    <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">{u.role} • {u.email}</p>
+                    <h4 className="font-black text-sm tracking-tight uppercase leading-none">{u.name}</h4>
+                    <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">{u.role} • {u.email}</p>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="bg-[#1A1A1A] p-10 rounded-[45px] border border-white/5 space-y-8">
+          <div className="bg-[#1A1A1A] p-10 rounded-[45px] border border-white/5 space-y-8 shadow-2xl">
              <div className="space-y-2">
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-2">Base Delivery Fee (₱)</label>
-                <input type="number" value={deliveryFee} onChange={e => setDeliveryFee(Number(e.target.value))} className="w-full p-5 bg-black border border-white/10 rounded-3xl font-black text-xl text-[#FF00CC]" />
+                <input type="number" value={deliveryFee} onChange={e => setDeliveryFee(Number(e.target.value))} className="w-full p-5 bg-black border border-white/10 rounded-3xl font-black text-xl text-[#FF00CC] outline-none" />
              </div>
              <div className="space-y-2">
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-2">Master Root PIN</label>
-                <input type="text" maxLength={4} value={masterPin} onChange={e => setMasterPin(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-3xl font-black text-xl text-green-400 tracking-[0.5em] text-center" />
+                <input type="text" maxLength={4} value={masterPin} onChange={e => setMasterPin(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-3xl font-black text-xl text-green-400 tracking-[0.5em] text-center outline-none" />
              </div>
              <button onClick={saveSystemConfig} className="w-full py-5 ayoo-gradient rounded-3xl font-black uppercase tracking-widest text-[10px]">Sync Logistics</button>
           </div>
@@ -186,11 +206,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
         <div className="animate-in slide-in-from-right-10 duration-500 pb-20">
           <button onClick={() => setEditingRes(null)} className="text-[#FF00CC] font-black text-xs uppercase tracking-widest mb-10 flex items-center gap-2">← Discard Changes</button>
           
-          <div className="bg-[#1A1A1A] p-10 rounded-[50px] border border-white/10 space-y-6 mb-10">
-            <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-[#FF00CC]">Merchant Identity</h3>
-            <input placeholder="Merchant Name" value={editingRes.name} onChange={e => setEditingRes({...editingRes, name: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none focus:border-[#FF00CC]" />
-            <input placeholder="Cuisine Category" value={editingRes.cuisine} onChange={e => setEditingRes({...editingRes, cuisine: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none focus:border-[#FF00CC]" />
-            <input placeholder="Logo/Image URL" value={editingRes.image} onChange={e => setEditingRes({...editingRes, image: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none focus:border-[#FF00CC]" />
+          <div className="bg-[#1A1A1A] p-10 rounded-[50px] border border-white/10 space-y-8 mb-10 shadow-2xl">
+            <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-[#FF00CC] text-center">Merchant Brand Identity</h3>
+            
+            <div className="flex flex-col items-center">
+               <div onClick={() => merchantFileRef.current?.click()} className="w-40 h-40 ayoo-gradient rounded-[40px] p-1 mb-2 relative cursor-pointer group shadow-xl">
+                  <img src={editingRes.image || 'https://via.placeholder.com/150'} className="w-full h-full rounded-[38px] object-cover border-2 border-white/10" alt="Brand Logo" />
+                  <div className="absolute inset-0 bg-black/50 rounded-[38px] opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all">
+                     <span className="text-3xl">📸</span>
+                     <span className="text-[8px] font-black uppercase">Change Logo</span>
+                  </div>
+               </div>
+               <input ref={merchantFileRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'MERCHANT')} className="hidden" />
+               <p className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em]">Primary Visual Node</p>
+            </div>
+
+            <div className="space-y-4">
+               <input placeholder="Merchant Name" value={editingRes.name} onChange={e => setEditingRes({...editingRes, name: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none focus:border-[#FF00CC] text-sm" />
+               <input placeholder="Cuisine Category" value={editingRes.cuisine} onChange={e => setEditingRes({...editingRes, cuisine: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none focus:border-[#FF00CC] text-sm" />
+            </div>
           </div>
 
           <div className="space-y-6">
@@ -201,17 +235,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
 
              <div className="grid grid-cols-1 gap-4">
                 {editingRes.items.map(item => (
-                   <div key={item.id} className="bg-[#1A1A1A] p-6 rounded-[35px] border border-white/5 flex items-center justify-between group">
+                   <div key={item.id} className="bg-[#1A1A1A] p-6 rounded-[35px] border border-white/5 flex items-center justify-between group hover:border-pink-500/20">
                       <div className="flex items-center gap-4">
-                         <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt={item.name} />
+                         <img src={item.image} className="w-12 h-12 rounded-xl object-cover border border-white/5" alt={item.name} />
                          <div>
-                            <h4 className="font-black text-sm tracking-tight">{item.name}</h4>
-                            <p className="text-[10px] text-[#FF00CC] font-black">₱{item.price}</p>
+                            <h4 className="font-black text-sm tracking-tight uppercase leading-none">{item.name}</h4>
+                            <p className="text-[10px] text-[#FF00CC] font-black uppercase mt-1">₱{item.price}</p>
                          </div>
                       </div>
                       <div className="flex gap-2">
-                         <button onClick={() => setEditingItem(item)} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-white/10">✎</button>
-                         <button onClick={() => setEditingRes({ ...editingRes, items: editingRes.items.filter(i => i.id !== item.id) })} className="w-10 h-10 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20">✕</button>
+                         <button onClick={() => setEditingItem(item)} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-all">✎</button>
+                         <button onClick={() => setEditingRes({ ...editingRes, items: editingRes.items.filter(i => i.id !== item.id) })} className="w-10 h-10 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500/20 transition-all">✕</button>
                       </div>
                    </div>
                 ))}
@@ -224,16 +258,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
 
           {/* Item Editor Overlay */}
           {editingItem && (
-             <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-8">
-                <div className="bg-[#1A1A1A] w-full max-w-sm rounded-[50px] p-10 border border-white/10 shadow-2xl animate-in zoom-in-95">
-                   <h3 className="text-xl font-black uppercase text-center mb-8">Item Blueprint</h3>
-                   <div className="space-y-6">
-                      <input placeholder="Dish Name" value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none" />
-                      <input placeholder="Price" type="number" value={editingItem.price} onChange={e => setEditingItem({...editingItem, price: Number(e.target.value)})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none" />
-                      <input placeholder="Category (e.g. Burgers)" value={editingItem.category} onChange={e => setEditingItem({...editingItem, category: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none" />
+             <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-8 animate-in zoom-in-95">
+                <div className="bg-[#1A1A1A] w-full max-w-sm rounded-[50px] p-10 border border-white/10 shadow-2xl">
+                   <h3 className="text-xl font-black uppercase text-center mb-8 tracking-tighter">Item Blueprint</h3>
+                   
+                   <div className="flex flex-col items-center mb-8">
+                      <div onClick={() => fileInputRef.current?.click()} className="w-32 h-32 ayoo-gradient rounded-[32px] p-1 relative cursor-pointer group shadow-xl">
+                         <img src={editingItem.image} className="w-full h-full rounded-[30px] object-cover" alt="Item Preview" />
+                         <div className="absolute inset-0 bg-black/50 rounded-[30px] opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all">
+                            <span className="text-2xl">📸</span>
+                         </div>
+                      </div>
+                      <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'ITEM')} className="hidden" />
+                      <p className="text-[8px] font-black uppercase text-gray-500 tracking-[0.2em] mt-2">Dish Image</p>
+                   </div>
+
+                   <div className="space-y-4">
+                      <input placeholder="Dish Name" value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none focus:border-pink-500 text-sm" />
+                      <input placeholder="Price" type="number" value={editingItem.price} onChange={e => setEditingItem({...editingItem, price: Number(e.target.value)})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none focus:border-pink-500 text-sm" />
+                      <input placeholder="Category (e.g. Burgers)" value={editingItem.category} onChange={e => setEditingItem({...editingItem, category: e.target.value})} className="w-full p-5 bg-black border border-white/10 rounded-2xl font-black outline-none focus:border-pink-500 text-sm" />
                       <div className="flex flex-col gap-3 pt-4">
-                         <Button onClick={handleSaveMenuItem} className="py-5 font-black uppercase">Save Blueprint</Button>
-                         <button onClick={() => setEditingItem(null)} className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Abort</button>
+                         <Button onClick={handleSaveMenuItem} className="py-5 font-black uppercase tracking-widest text-[10px]">Save Blueprint</Button>
+                         <button onClick={() => setEditingItem(null)} className="text-[10px] font-black text-gray-500 uppercase tracking-widest py-2">Abort</button>
                       </div>
                    </div>
                 </div>

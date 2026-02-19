@@ -1,6 +1,6 @@
-
 import { OrderRecord, OrderStatus, PaymentMethod, WalletTransaction } from './types';
 import { db } from './db';
+import { GLOBAL_REGISTRY_KEY } from './constants';
 
 /**
  * Ayoo StreamHub
@@ -105,7 +105,8 @@ class AyooCloudAPI {
       const currentDeliveryFee = config.deliveryFee || 45;
       const merchantCut = order.total * 0.85; 
       const riderCut = currentDeliveryFee + (order.tipAmount || 0);
-      const allUsers = JSON.parse(localStorage.getItem('ayoo_user_registry_v11') || '[]');
+      
+      const allUsers = JSON.parse(localStorage.getItem(GLOBAL_REGISTRY_KEY) || '[]');
       
       const mIdx = allUsers.findIndex((u: any) => u.name === order.restaurantName);
       if (mIdx !== -1) {
@@ -117,7 +118,7 @@ class AyooCloudAPI {
       if (rIdx !== -1) {
         allUsers[rIdx].earnings = (allUsers[rIdx].earnings || 0) + riderCut;
       }
-      localStorage.setItem('ayoo_user_registry_v11', JSON.stringify(allUsers));
+      localStorage.setItem(GLOBAL_REGISTRY_KEY, JSON.stringify(allUsers));
     }
 
     const updated = orders.map(o => o.id === orderId ? { ...o, ...extra, status } : o);

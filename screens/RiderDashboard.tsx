@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ayooCloud } from '../api';
 import { OrderRecord, UserAccount } from '../types';
 import { db } from '../db';
+import { GLOBAL_REGISTRY_KEY } from '../constants';
 import Button from '../components/Button';
 
 const RiderDashboard: React.FC = () => {
@@ -20,8 +21,8 @@ const RiderDashboard: React.FC = () => {
       setMarketTasks(ayooCloud.getMarketOrders(zone));
       setMyDuty(ayooCloud.getMyRiderTasks(session.email));
       
-      const allUsers = JSON.parse(localStorage.getItem('ayoo_user_registry_v11') || '[]');
-      const me = allUsers.find((u: any) => u.email === session.email);
+      const allUsers = JSON.parse(localStorage.getItem(GLOBAL_REGISTRY_KEY) || '[]');
+      const me = allUsers.find((u: any) => u.email.toLowerCase() === session.email.toLowerCase());
       if (me) setEarnings(me.earnings || 0);
     }
   }, []);

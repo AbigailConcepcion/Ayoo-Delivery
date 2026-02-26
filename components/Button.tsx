@@ -1,13 +1,9 @@
-
 import React from 'react';
 
-interface ButtonProps {
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
-  onClick?: () => void;
   variant?: 'primary' | 'secondary' | 'outline';
   fullWidth?: boolean;
-  className?: string;
-  disabled?: boolean;
 }
 
 const Button: React.FC<ButtonProps> = ({ 
@@ -16,18 +12,21 @@ const Button: React.FC<ButtonProps> = ({
   variant = 'primary', 
   fullWidth = true,
   className = '',
-  disabled = false
+  disabled = false,
+  type = 'button', 
+  ...props 
 }) => {
   const baseStyles = "py-4 px-8 rounded-full font-semibold transition-all duration-200 active:scale-95 flex items-center justify-center";
   
   const variants = {
-    primary: "bg-ayoo-pink text-white shadow-lg hover:brightness-110",
-    secondary: "bg-white text-ayoo-pink shadow-md hover:bg-gray-100",
-    outline: "border-2 border-ayoo-pink text-ayoo-pink hover:bg-pink-50",
+    primary: "bg-[#FF00CC] text-white shadow-lg hover:brightness-110", 
+    secondary: "bg-white text-[#FF00CC] shadow-md hover:bg-gray-100",
+    outline: "border-2 border-[#FF00CC] text-[#FF00CC] hover:bg-pink-50",
   };
 
   return (
     <button 
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className={`
@@ -37,6 +36,7 @@ const Button: React.FC<ButtonProps> = ({
         ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         ${className}
       `}
+      {...props} 
     >
       {children}
     </button>

@@ -5,6 +5,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ayoo Delivery</title>
+    <!-- PWA manifest and mobile hints -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#FF00CC" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -60,6 +66,17 @@
       .scrollbar-hide {
         -ms-overflow-style: none;
         scrollbar-width: none;
+      }
+
+      /* dark mode fallback: invert the background and text */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #1a1a1a;
+          color: #f2f2f2;
+        }
+        .ayoo-gradient {
+          filter: brightness(0.9);
+        }
       }
     </style>
     <script type="importmap">

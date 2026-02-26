@@ -4,7 +4,7 @@ import Logo from '../components/Logo';
 import Button from '../components/Button';
 import { UserAccount, UserRole } from '../types';
 import { db } from '../db';
-import { GLOBAL_REGISTRY_KEY } from '../constants';
+
 
 interface AuthProps {
   onLogin: (user: UserAccount) => void;
@@ -17,7 +17,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   
-  const [registryCount, setRegistryCount] = useState(0);
+  // vault registry count is no longer shown on the login/signup screens
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -41,9 +41,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         setRememberMe(true);
       }
       
-      const raw = localStorage.getItem(GLOBAL_REGISTRY_KEY);
-      const reg = raw ? JSON.parse(raw) : [];
-      setRegistryCount(reg.length);
+      // registry count used to be read here; not needed anymore
     };
     loadRemembered();
   }, [mode]);
@@ -216,13 +214,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               <button onClick={() => setMode('SIGNUP')} className="ml-2 text-[#FF00CC] font-black hover:underline uppercase tracking-tighter">Create Account</button>
           </p>
           
-          <div className="flex items-center justify-center gap-6 mt-4 opacity-40">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-              <span className="text-[8px] font-black uppercase tracking-widest text-gray-900">Ayoo Vault: {registryCount} Accounts</span>
-            </div>
-            <button onClick={() => db.flushRegistry()} className="text-[8px] font-black text-red-500 uppercase tracking-widest hover:underline">Flush Registry</button>
-          </div>
+          {/* vault information and flush button have been removed */}
       </div>
     </div>
   );

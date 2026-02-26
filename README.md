@@ -6,8 +6,6 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/c02eb247-bbaf-44dc-8cb6-c651f026d23e
-
 ## Run Locally
 
 This repository is split into two parts:
@@ -85,4 +83,4 @@ The `Dockerfile` compiles the TypeScript source and runs `dist/index.js`.
 
 ---
 
-Add additional information as your project matures.
+Add additional information as project matures.

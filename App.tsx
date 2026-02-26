@@ -71,6 +71,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
       try {
+        try {
         const connected = await db.connect();
         const [session, hasSeenOnboarding, resList, config] = await Promise.all([
           db.getSession(),
@@ -88,6 +89,25 @@ const App: React.FC = () => {
         } else {
           setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
         }
+      } catch (err: any) {
+        // on any failure connecting to backend, fall back to offline mode
+        console.warn('Backend unreachable, switching to offline mode', err.message);
+        (db as any).ENV.USE_REAL_BACKEND = false;
+        const [session, hasSeenOnboarding, resList, config] = await Promise.all([
+          db.getSession(),
+          db.hasSeenOnboarding(),
+          db.getRestaurants(),
+          db.getSystemConfig()
+        ]);
+        setRestaurants(resList);
+        setDeliveryFee(config.deliveryFee);
+        if (session) {
+          await loadUserData(session);
+          setScreen(session.role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : session.role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
+        } else {
+          setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
+        }
+      }
       } catch (err: any) {
         setSyncError(err.message || "Failed to connect to Ayoo Nodes");
       } finally {
@@ -155,7 +175,7 @@ const App: React.FC = () => {
     setCartItems(prev => prev.map(item => item.id === itemId ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item).filter(i => i.quantity > 0));
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (paymentMethod: any = null, isPaid: boolean = true) => {
     if (!currentUser) return;
     const orderDetails = cartItems.map(cartItem => {
       let found = null;
@@ -179,8 +199,11 @@ const App: React.FC = () => {
       customerEmail: currentUser.email,
       customerName: currentUser.name,
       deliveryAddress: `Tibanga, ${deliveryCity}`,
-      pointsEarned: Math.floor(finalTotal / 10)
-    };
+      pointsEarned: Math.floor(finalTotal / 10),
+      paymentMethod: paymentMethod?.type || 'COD',
+      isPaid: isPaid ? 1 : 0,
+      paymentId: paymentMethod?.id || null
+    } as any;
 
     const res = await ayooCloud.placeOrder(newOrder);
     if (res.success) {

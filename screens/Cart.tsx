@@ -9,7 +9,7 @@ import { ayooCloud } from '../api';
 interface CartProps {
   items: { id: string; quantity: number }[];
   onBack: () => void;
-  onCheckout: () => void;
+  onCheckout: (paymentMethod: PaymentMethod | null, isPaid: boolean) => void;
   onUpdateQuantity: (itemId: string, delta: number) => void;
   isGroup?: boolean;
   onStartGroup?: () => void;
@@ -31,8 +31,11 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
     const fetchPay = async () => {
       const email = (await db.getSession())?.email || '';
       const methods = await db.getPayments(email);
-      setPaymentMethods(methods);
-      if (methods.length > 0) setSelectedMethod(methods[0]);
+      // always offer cash-on-delivery
+      const codOption: PaymentMethod = { id: 'COD', type: 'COD' as PaymentType, last4: '', expiry: '', phoneNumber: '', balance: null };
+      const all = [codOption, ...methods];
+      setPaymentMethods(all);
+      if (all.length > 0) setSelectedMethod(all[0]);
     };
     fetchPay();
   }, []);
@@ -66,6 +69,23 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
     setTimeout(() => addLog("Handshaking with Payment Gateway..."), 800);
     setTimeout(() => addLog("Verifying SSL Certificates..."), 1600);
     setTimeout(() => addLog(`Confirming Funds with ${selectedMethod.type}...`), 2400);
+
+    if (selectedMethod.type === 'COD') {
+      // cash on delivery: no processing, just mark as unpaid
+      setPayStep(3);
+      setReceiptData({
+        ref: 'COD',
+        txn: '',
+        date: new Date().toLocaleString(),
+        method: 'COD',
+        total: total
+      });
+      setTimeout(() => {
+        setIsProcessing(false);
+        setShowReceipt(true);
+      }, 500);
+      return;
+    }
 
     const res = await ayooCloud.processPayment(email, selectedMethod, total, tempId);
     
@@ -119,7 +139,7 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
               </div>
 
               <div className="flex flex-col gap-3">
-                 <Button onClick={onCheckout} className="pill-shadow py-5 font-black uppercase tracking-[0.1em]">Track Real-time</Button>
+                 <Button onClick={() => onCheckout(selectedMethod, selectedMethod?.type !== 'COD')} className="pill-shadow py-5 font-black uppercase tracking-[0.1em]">Track Real-time</Button>
               </div>
            </div>
         </div>

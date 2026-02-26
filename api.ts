@@ -38,6 +38,23 @@ class AyooCloudAPI {
   private subscribers: (() => void)[] = [];
   
   private readonly PRODUCTION_GATEWAY = false;
+  private readonly USE_BACKEND = true; // toggle off if running purely client-side
+
+  private async request(path: string, options: RequestInit = {}) {
+    const url = `${AyooCloudAPI.prototype['PRODUCTION_GATEWAY'] ? AyooCloudAPI.prototype['PRODUCTION_GATEWAY'] : ''}${path}`; // dummy
+    // we don't have simple access to ENV here, so replicate logic using import.meta
+    const base = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+    const finalUrl = `${base}${path}`;
+    const headers: Record<string,string> = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem('ayoo_jwt_v2');
+    if (token) headers.Authorization = `Bearer ${token}`;
+    options.headers = { ...headers, ...(options.headers as object || {}) };
+    const res = await fetch(finalUrl, options);
+    if (!res.ok) {
+      throw new Error(await res.text());
+    }
+    return res.json();
+  }
 
   constructor() {
     const channel = new BroadcastChannel('ayoo_production_sync');
@@ -66,17 +83,45 @@ class AyooCloudAPI {
     orderId: string
   ): Promise<{ success: boolean; transactionId: string; error?: string; reference: string }> {
     const ref = `AYO-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
-    
+
+    if (this.USE_BACKEND) {
+      try {
+        // if card payment, hit stripe-specific endpoint for capturing funds
+        if (['VISA','MASTERCARD'].includes(method.type)) {
+          const result: any = await this.request('/payments/stripe', {
+            method: 'POST',
+            body: JSON.stringify({ amount, source: method.token || method.id, description: `Order ${orderId}` })
+          });
+          if (result.success) {
+            return { success: true, transactionId: result.charge?.id || '', reference: result.charge?.balance_transaction || ref };
+          } else {
+            return { success: false, transactionId: '', error: result.error || 'Stripe failure', reference: ref };
+          }
+        }
+
+        const result: any = await this.request('/payments/process', {
+          method: 'POST',
+          body: JSON.stringify({ email, methodId: method.id, amount, orderId })
+        });
+        return result;
+      } catch (err: any) {
+        console.error('processPayment failed', err);
+        return { success: false, transactionId: '', error: err.message || 'Network', reference: ref };
+      }
+    }
+
     return new Promise((resolve) => {
       setTimeout(async () => {
-        if (method.balance !== undefined && method.balance < amount) {
+        if (method.balance !== null && method.balance !== undefined && method.balance < amount) {
           resolve({ success: false, transactionId: '', error: `Insufficient Funds`, reference: ref });
           return;
         }
 
         if (method.balance !== undefined) {
           const txnId = `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-          await db.updatePaymentBalance(email, method.id, method.balance - amount);
+          if (method.balance !== null) {
+            await db.updatePaymentBalance(email, method.id, method.balance - amount);
+          }
           await db.addLedgerEntry(email, {
             id: txnId, amount, type: 'DEBIT', description: `Checkout: ${orderId}`,
             timestamp: new Date().toISOString(), orderId, methodType: method.type,
@@ -91,6 +136,21 @@ class AyooCloudAPI {
   }
 
   async placeOrder(order: OrderRecord): Promise<{ success: boolean; orderId: string }> {
+    if (this.USE_BACKEND) {
+      try {
+        await this.request('/orders', {
+          method: 'POST',
+          body: JSON.stringify(order)
+        });
+        // still mirror locally for instant UI
+        const orders = this.getOrders();
+        this.saveOrders([order, ...orders]);
+        return { success: true, orderId: order.id };
+      } catch (err) {
+        console.error('placeOrder failed', err);
+        return { success: false, orderId: '' };
+      }
+    }
     const orders = this.getOrders();
     this.saveOrders([order, ...orders]);
     return { success: true, orderId: order.id };

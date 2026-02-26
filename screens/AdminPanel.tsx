@@ -25,12 +25,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
   const merchantFileRef = useRef<HTMLInputElement>(null);
 
   const refreshData = async () => {
-    // Corrected to use the same central registry key used by Auth/db.ts
-    const registryRaw = localStorage.getItem(GLOBAL_REGISTRY_KEY);
-    const registry = registryRaw ? JSON.parse(registryRaw) : [];
-    
+    const registry = await db.getRegistryUsers();
     setRegisteredUsers(registry);
-    setLiveOrders(ayooCloud.getAllLiveOrders());
+    setLiveOrders(await db.getAllLiveOrders());
     const config = await db.getSystemConfig();
     setDeliveryFee(config.deliveryFee);
     setMasterPin(config.masterPin || '1234');
@@ -48,7 +45,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
     const rider = registeredUsers.find(u => u.email === riderEmail);
     if (!rider) return;
     if (window.confirm(`Force assign order ${orderId} to ${rider.name}?`)) {
-      await ayooCloud.forceAssignOrder(orderId, rider.email, rider.name);
+      if ((db as any).ENV?.USE_REAL_BACKEND) {
+        await db.updateOrderStatus(orderId, 'ACCEPTED', { riderEmail: rider.email, riderName: rider.name });
+      } else {
+        await ayooCloud.forceAssignOrder(orderId, rider.email, rider.name);
+      }
       refreshData();
     }
   };

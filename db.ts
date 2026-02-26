@@ -2,10 +2,18 @@
 import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem } from './types';
 import { MOCK_RESTAURANTS, GLOBAL_REGISTRY_KEY } from './constants';
 
+// allow access to Vite env vars without TS errors
+declare global {
+  interface ImportMeta {
+    env: any;
+  }
+}
+
 class AyooDatabase {
   public static ENV = {
-    USE_REAL_BACKEND: false,
-    BASE_URL: 'https://api.ayoo.ph/v1',
+    // controlled by Vite build variables (e.g. VITE_USE_REAL_BACKEND=true)
+    USE_REAL_BACKEND: import.meta.env.VITE_USE_REAL_BACKEND === 'true',
+    BASE_URL: import.meta.env.VITE_API_BASE || 'http://localhost:4000',
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3
   };
@@ -20,7 +28,28 @@ class AyooDatabase {
     ONBOARDING: 'ayoo_onboarding_seen_v2'
   };
 
+  // utility used when talking to the real backend
+  private async request(path: string, options: RequestInit = {}) {
+    const url = `${AyooDatabase.ENV.BASE_URL}${path}`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem(this.STORAGE_KEYS.AUTH_TOKEN);
+    if (token) headers.Authorization = `Bearer ${token}`;
+    options.headers = { ...headers, ...(options.headers as object || {}) };
+
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+    return res.json();
+  }
+
   async connect() { 
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      // ensure server is reachable
+      await this.request('/config');
+      return true;
+    }
     console.log("Ayoo Cloud: Establishing Node Connection...");
     return new Promise((resolve) => setTimeout(() => resolve(true), 1000));
   }
@@ -48,13 +77,39 @@ class AyooDatabase {
     localStorage.removeItem(this.STORAGE_KEYS.REGISTRY);
     localStorage.removeItem(this.STORAGE_KEYS.USER_PROFILE);
     localStorage.removeItem(this.STORAGE_KEYS.REMEMBERED);
+    localStorage.removeItem(this.STORAGE_KEYS.AUTH_TOKEN);
     window.location.reload();
   }
 
   async login(email: string, pass: string, remember: boolean): Promise<UserAccount | null> {
-    const registry = this.getRegistry();
     const cleanEmail = email.toLowerCase().trim();
-    const user = registry.find((u: any) => u.email.toLowerCase() === cleanEmail && u.password === pass);
+    const cleanPass = pass.trim();
+
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email: cleanEmail, password: cleanPass })
+        });
+        if (result.user && result.token) {
+          localStorage.setItem(this.STORAGE_KEYS.AUTH_TOKEN, result.token);
+          localStorage.setItem(this.STORAGE_KEYS.USER_PROFILE, JSON.stringify(result.user));
+          if (remember) {
+            localStorage.setItem(this.STORAGE_KEYS.REMEMBERED, JSON.stringify({ email: cleanEmail, password: cleanPass }));
+          } else {
+            localStorage.removeItem(this.STORAGE_KEYS.REMEMBERED);
+          }
+          return result.user;
+        }
+      } catch (err) {
+        console.error('login failed', err);
+        return null;
+      }
+      return null;
+    }
+
+    const registry = this.getRegistry();
+    const user = registry.find((u: any) => u.email.toLowerCase() === cleanEmail && u.password === cleanPass);
     
     if (user) {
       // Set the active session
@@ -72,9 +127,33 @@ class AyooDatabase {
   }
 
   async register(user: UserAccount): Promise<{ success: boolean; message: string }> {
-    const registry = this.getRegistry();
     const cleanEmail = user.email.toLowerCase().trim();
-    
+
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: cleanEmail,
+            name: user.name,
+            password: user.password,
+            preferredCity: user.preferredCity,
+            role: user.role,
+            merchantId: user.merchantId
+          })
+        });
+        if (result.success && result.token) {
+          localStorage.setItem(this.STORAGE_KEYS.AUTH_TOKEN, result.token);
+          return { success: true, message: 'Registered successfully' };
+        }
+        return { success: false, message: result.error || 'registration failed' };
+      } catch (err: any) {
+        console.error('register failed', err);
+        return { success: false, message: err.message || 'registration failed' };
+      }
+    }
+
+    const registry = this.getRegistry();
     if (registry.some((u: any) => u.email.toLowerCase() === cleanEmail)) {
       return { success: false, message: 'Identity conflict: Email already exists in cloud vault.' };
     }
@@ -108,14 +187,44 @@ class AyooDatabase {
   }
 
   async getUserByEmail(email: string): Promise<UserAccount | null> { 
-    const registry = this.getRegistry();
     const cleanEmail = email.toLowerCase().trim();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/users/${cleanEmail}`);
+        return result.user || null;
+      } catch (err) {
+        console.error('getUserByEmail failed', err);
+        return null;
+      }
+    }
+    const registry = this.getRegistry();
     return registry.find((u: any) => u.email.toLowerCase() === cleanEmail) || null;
   }
 
   async updateProfile(email: string, updates: Partial<UserAccount>): Promise<UserAccount | null> {
-    const registry = this.getRegistry();
     const cleanEmail = email.toLowerCase().trim();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/users/${cleanEmail}`, {
+          method: 'PUT',
+          body: JSON.stringify(updates)
+        });
+        if (result.user) {
+          // update session if necessary
+          const session = await this.getSession();
+          if (session && session.email.toLowerCase() === cleanEmail) {
+            localStorage.setItem(this.STORAGE_KEYS.USER_PROFILE, JSON.stringify(result.user));
+          }
+          return result.user;
+        }
+      } catch (err) {
+        console.error('updateProfile failed', err);
+        return null;
+      }
+      return null;
+    }
+
+    const registry = this.getRegistry();
     const idx = registry.findIndex((u: any) => u.email.toLowerCase() === cleanEmail);
     
     if (idx === -1) return null;
@@ -134,13 +243,31 @@ class AyooDatabase {
   }
 
   async getRestaurants(): Promise<Restaurant[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request('/restaurants');
+        return result.restaurants || [];
+      } catch (err) {
+        console.error('getRestaurants failed', err);
+        return [];
+      }
+    }
     const saved = localStorage.getItem(this.STORAGE_KEYS.RESTAURANTS);
     if (saved) return JSON.parse(saved);
     localStorage.setItem(this.STORAGE_KEYS.RESTAURANTS, JSON.stringify(MOCK_RESTAURANTS));
     return MOCK_RESTAURANTS;
   }
-
   async saveRestaurants(list: Restaurant[]) {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        await Promise.all(list.map(r => this.request('/restaurants', {
+          method: 'POST',
+          body: JSON.stringify(r)
+        })));
+      } catch (err) {
+        console.error('saveRestaurants failed', err);
+      }
+    }
     localStorage.setItem(this.STORAGE_KEYS.RESTAURANTS, JSON.stringify(list));
   }
 
@@ -152,7 +279,76 @@ class AyooDatabase {
   }
 
   async getHistory(email: string): Promise<OrderRecord[]> {
-    return JSON.parse(localStorage.getItem(`orders_${email.toLowerCase()}`) || '[]');
+    const clean = email.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/orders/${clean}`);
+        return result.orders || [];
+      } catch (err) {
+        console.error('getHistory failed', err);
+        return [];
+      }
+    }
+    return JSON.parse(localStorage.getItem(`orders_${clean}`) || '[]');
+  }
+
+  async getMerchantOrders(restaurantName: string): Promise<OrderRecord[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/orders/merchant/${encodeURIComponent(restaurantName)}`);
+        return result.orders || [];
+      } catch (err) {
+        console.error('getMerchantOrders failed', err);
+        return [];
+      }
+    }
+    // fallback to in-memory stream hub orders
+    const all = this.getRegistryOrders();
+    return all.filter(o => o.restaurantName === restaurantName);
+  }
+
+  async getMarketOrders(city: string): Promise<OrderRecord[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/orders/market?city=${encodeURIComponent(city)}`);
+        return result.orders || [];
+      } catch (err) {
+        console.error('getMarketOrders failed', err);
+        return [];
+      }
+    }
+    const all = this.getRegistryOrders();
+    return all.filter(o => o.status === 'READY_FOR_PICKUP' && !o.riderEmail);
+  }
+
+  async getMyRiderTasks(riderEmail: string): Promise<OrderRecord[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/orders/rider/${encodeURIComponent(riderEmail)}`);
+        return result.orders || [];
+      } catch (err) {
+        console.error('getMyRiderTasks failed', err);
+        return [];
+      }
+    }
+    const all = this.getRegistryOrders();
+    return all.filter(o => o.riderEmail === riderEmail);
+  }
+
+  // helper used by cloud logic - gather orders from all users in localStorage
+  private getRegistryOrders(): OrderRecord[] {
+    const orders: OrderRecord[] = [];
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('orders_')) {
+        try {
+          const arr = JSON.parse(localStorage.getItem(key) || '[]');
+          orders.push(...arr);
+        } catch {
+          // ignore malformed entries
+        }
+      }
+    });
+    return orders;
   }
 
   async getLedger(ownerId: string): Promise<WalletTransaction[]> {
@@ -182,32 +378,233 @@ class AyooDatabase {
     return JSON.parse(localStorage.getItem(`vouchers_${email.toLowerCase()}`) || '[]');
   }
 
-  async getAddresses(email: string) { return JSON.parse(localStorage.getItem(`addresses_${email.toLowerCase()}`) || '[]'); }
-  async saveAddresses(email: string, a: Address[]) { localStorage.setItem(`addresses_${email.toLowerCase()}`, JSON.stringify(a)); }
-  async getPayments(email: string) { return JSON.parse(localStorage.getItem(`pay_${email.toLowerCase()}`) || '[]'); }
-  async savePayments(email: string, p: PaymentMethod[]) { localStorage.setItem(`pay_${email.toLowerCase()}`, JSON.stringify(p)); }
+  async getAddresses(email: string) {
+    const clean = email.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/addresses/${clean}`);
+        return result.addresses || [];
+      } catch (err) {
+        console.error('getAddresses failed', err);
+        return [];
+      }
+    }
+    return JSON.parse(localStorage.getItem(`addresses_${clean}`) || '[]');
+  }
+  async saveAddresses(email: string, a: Address[]) {
+    const clean = email.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        // replace all addresses
+        await Promise.all(a.map(addr => this.request(`/addresses/${clean}`, {
+          method: 'POST',
+          body: JSON.stringify(addr)
+        })));
+      } catch (err) {
+        console.error('saveAddresses failed', err);
+      }
+    }
+    localStorage.setItem(`addresses_${clean}`, JSON.stringify(a));
+  }
+  async getPayments(email: string) {
+    const clean = email.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/payments/${clean}`);
+        return result.payments || [];
+      } catch (err) {
+        console.error('getPayments failed', err);
+        return [];
+      }
+    }
+    return JSON.parse(localStorage.getItem(`pay_${clean}`) || '[]');
+  }
+  async savePayments(email: string, p: PaymentMethod[]) {
+    const clean = email.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        await Promise.all(p.map(pm => this.request(`/payments/${clean}`, {
+          method: 'POST',
+          body: JSON.stringify(pm)
+        })));
+      } catch (err) {
+        console.error('savePayments failed', err);
+      }
+    }
+    localStorage.setItem(`pay_${clean}`, JSON.stringify(p));
+  }
   async updatePaymentBalance(email: string, mid: string, bal: number) {
+    const clean = email.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        await this.request(`/payments/${clean}/${mid}/balance`, {
+          method: 'PUT',
+          body: JSON.stringify({ balance: bal })
+        });
+      } catch (err) {
+        console.error('updatePaymentBalance failed', err);
+      }
+    }
     const pay = await this.getPayments(email);
-    const up = pay.map(p => p.id === mid ? { ...p, balance: bal } : p);
-    localStorage.setItem(`pay_${email.toLowerCase()}`, JSON.stringify(up));
+    const up = pay.map((p: any) => p.id === mid ? { ...p, balance: bal } : p);
+    localStorage.setItem(`pay_${clean}`, JSON.stringify(up));
+  }
+
+  async topUpPayment(email: string, mid: string, amount: number): Promise<number> {
+    const clean = email.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/payments/${clean}/topup`, {
+          method: 'POST',
+          body: JSON.stringify({ methodId: mid, amount })
+        });
+        return result.balance || 0;
+      } catch (err) {
+        console.error('topUpPayment failed', err);
+        throw err;
+      }
+    }
+    const pay = await this.getPayments(email);
+    const updated = pay.map((p: any) => p.id === mid ? { ...p, balance: (p.balance || 0) + amount } : p);
+    await this.savePayments(email, updated);
+    return (updated.find((p: any) => p.id === mid)?.balance || 0);
+  }
+
+  async getRegistryUsers(): Promise<UserAccount[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request('/users');
+        return result.users || [];
+      } catch (err) {
+        console.error('getRegistryUsers failed', err);
+        return [];
+      }
+    }
+    const raw = localStorage.getItem(this.STORAGE_KEYS.REGISTRY);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  async getAllLiveOrders(): Promise<OrderRecord[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request('/orders/live');
+        return result.orders || [];
+      } catch (err) {
+        console.error('getAllLiveOrders failed', err);
+        return [];
+      }
+    }
+    const all = this.getRegistryOrders();
+    return all.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED');
   }
   async addLedgerEntry(owner: string, entry: WalletTransaction) {
-    const ledger = JSON.parse(localStorage.getItem('ayoo_financial_ledger_v2') || '{}');
     const key = owner.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        await this.request(`/ledger/${key}`, {
+          method: 'POST',
+          body: JSON.stringify(entry)
+        });
+        return;
+      } catch (err) {
+        console.error('addLedgerEntry failed', err);
+      }
+    }
+    const ledger = JSON.parse(localStorage.getItem('ayoo_financial_ledger_v2') || '{}');
     if (!ledger[key]) ledger[key] = [];
     ledger[key] = [entry, ...ledger[key]];
     localStorage.setItem('ayoo_financial_ledger_v2', JSON.stringify(ledger));
   }
   async saveOrder(email: string, order: OrderRecord) {
-    const key = `orders_${email.toLowerCase()}`;
+    const clean = email.toLowerCase();
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        await this.request(`/orders`, {
+          method: 'POST',
+          body: JSON.stringify(order)
+        });
+      } catch (err) {
+        console.error('saveOrder failed', err);
+      }
+    }
+    const key = `orders_${clean}`;
     const history = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify([order, ...history]));
   }
-  async getSystemConfig() { return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.SYSTEM_CONFIG) || '{"deliveryFee":45,"masterPin":"1234"}'); }
-  async saveSystemConfig(c: any) { localStorage.setItem(this.STORAGE_KEYS.SYSTEM_CONFIG, JSON.stringify(c)); }
+
+  async saveOrders(orders: OrderRecord[]) {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      // backend maintains the canonical record; local state can be ignored
+      return;
+    }
+    // distribute orders back into individual user buckets
+    const grouped: Record<string, OrderRecord[]> = {};
+    orders.forEach(o => {
+      const user = (o as any).customerEmail || (o as any).email;
+      if (!user) return;
+      const key = `orders_${user.toLowerCase()}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(o);
+    });
+    Object.entries(grouped).forEach(([key, arr]) => {
+      localStorage.setItem(key, JSON.stringify(arr));
+    });
+  }
+
+  async updateOrderStatus(orderId: string, status: string, extra: any = {}) {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        await this.request(`/orders/${orderId}/status`, {
+          method: 'PUT',
+          body: JSON.stringify({ status, ...extra })
+        });
+      } catch (err) {
+        console.error('updateOrderStatus failed', err);
+      }
+    }
+    // also update local cache if needed
+    const orders = this.getRegistryOrders();
+    const updated = orders.map((o: any) => o.id === orderId ? { ...o, status, ...extra } : o);
+    this.saveOrders(updated);
+  }
+  async getSystemConfig() {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request('/config');
+        return result;
+      } catch (err) {
+        console.error('getSystemConfig failed', err);
+      }
+    }
+    return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.SYSTEM_CONFIG) || '{"deliveryFee":45,"masterPin":"1234"}');
+  }
+  async saveSystemConfig(c: any) {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        await this.request('/config', {
+          method: 'PUT',
+          body: JSON.stringify(c)
+        });
+      } catch (err) {
+        console.error('saveSystemConfig failed', err);
+      }
+    }
+    localStorage.setItem(this.STORAGE_KEYS.SYSTEM_CONFIG, JSON.stringify(c));
+  }
   async getCart(email: string) { return JSON.parse(localStorage.getItem(`cart_${email.toLowerCase()}`) || '{"items":[],"voucher":null}'); }
   async saveCart(email: string, items: any[], voucher: any) { localStorage.setItem(`cart_${email.toLowerCase()}`, JSON.stringify({ items, voucher })); }
   async clearCart(email: string) { localStorage.removeItem(`cart_${email.toLowerCase()}`); }
+
+  // helper for Stripe
+  async stripeCharge(token: string, amount: number, orderId: string) {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      return this.request('/payments/stripe', {
+        method: 'POST',
+        body: JSON.stringify({ token, amount, orderId })
+      });
+    }
+    return { success: true, charge: { id: 'LOCAL-'+Math.random().toString(36).substr(2,9) } };
+  }
 }
 
 export const db = new AyooDatabase();

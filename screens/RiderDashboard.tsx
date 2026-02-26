@@ -18,8 +18,13 @@ const RiderDashboard: React.FC = () => {
     if (session) {
       setCurrentUser(session);
       const zone = session.preferredCity || 'Iligan City';
-      setMarketTasks(ayooCloud.getMarketOrders(zone));
-      setMyDuty(ayooCloud.getMyRiderTasks(session.email));
+      if ((db as any).ENV?.USE_REAL_BACKEND) {
+        setMarketTasks(await db.getMarketOrders(zone));
+        setMyDuty(await db.getMyRiderTasks(session.email));
+      } else {
+        setMarketTasks(ayooCloud.getMarketOrders(zone));
+        setMyDuty(ayooCloud.getMyRiderTasks(session.email));
+      }
       
       const allUsers = JSON.parse(localStorage.getItem(GLOBAL_REGISTRY_KEY) || '[]');
       const me = allUsers.find((u: any) => u.email.toLowerCase() === session.email.toLowerCase());
@@ -35,19 +40,33 @@ const RiderDashboard: React.FC = () => {
 
   const handleUpdate = async (id: string, status: any) => {
     if (!currentUser) return;
-    await ayooCloud.updateOrderStatus(id, status, { 
-      riderName: currentUser.name, 
-      riderEmail: currentUser.email 
-    });
+    if ((db as any).ENV?.USE_REAL_BACKEND) {
+      await db.updateOrderStatus(id, status, {
+        riderName: currentUser.name,
+        riderEmail: currentUser.email
+      });
+    } else {
+      await ayooCloud.updateOrderStatus(id, status, { 
+        riderName: currentUser.name, 
+        riderEmail: currentUser.email 
+      });
+    }
     refresh();
   };
 
   const handleAcceptTask = async (task: OrderRecord) => {
     if (!currentUser) return;
-    await ayooCloud.updateOrderStatus(task.id, 'ACCEPTED', {
-      riderName: currentUser.name,
-      riderEmail: currentUser.email
-    });
+    if ((db as any).ENV?.USE_REAL_BACKEND) {
+      await db.updateOrderStatus(task.id, 'ACCEPTED', {
+        riderName: currentUser.name,
+        riderEmail: currentUser.email
+      });
+    } else {
+      await ayooCloud.updateOrderStatus(task.id, 'ACCEPTED', {
+        riderName: currentUser.name,
+        riderEmail: currentUser.email
+      });
+    }
     setActiveTab('duty');
     refresh();
   };

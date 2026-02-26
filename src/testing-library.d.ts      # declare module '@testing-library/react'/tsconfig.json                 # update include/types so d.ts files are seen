@@ -1,0 +1,10 @@
+src/testing-library.d.ts
+declare module '@testing-library/react';
+
+tsconfig.json
+{
+  "include": [
+    "src",
+    "src/testing-library.d.ts"
+  ]
+}

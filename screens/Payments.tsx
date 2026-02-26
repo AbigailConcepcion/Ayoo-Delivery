@@ -3,11 +3,15 @@ import React, { useState, useEffect } from 'react';
 import Button from '../components/Button';
 import { PaymentMethod, PaymentType } from '../types';
 import { db } from '../db';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
 interface PaymentsProps {
   onBack: () => void;
   email: string;
 }
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_KEY || '');
 
 const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
   const [payments, setPayments] = useState<PaymentMethod[]>([]);
@@ -18,6 +22,7 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
   // Card Form
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
+  const [cardToken, setCardToken] = useState('');
   
   // Wallet Form
   const [walletType, setWalletType] = useState<PaymentType>('GCASH');
@@ -34,14 +39,19 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
     fetch();
   }, [email]);
 
-  const handleAddCard = async () => {
+  const handleAddCard = async (token?: string) => {
+    // token may be provided by Stripe Elements
+    if (token) {
+      setCardToken(token);
+    }
     if (cardNumber.length < 16) return;
     setIsLoading(true);
     const item: PaymentMethod = { 
       id: Date.now().toString(), 
       type: cardNumber.startsWith('4') ? 'VISA' : 'MASTERCARD', 
       last4: cardNumber.slice(-4), 
-      expiry 
+      expiry,
+      token: cardToken || token || undefined
     };
     const updated = [...payments, item];
     await db.savePayments(email, updated);
@@ -50,6 +60,36 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
     setExpiry('');
     setShowForm(false);
     setIsLoading(false);
+  };
+
+  // component used when Stripe key present
+  const CardEntry: React.FC = () => {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [processing, setProcessing] = useState(false);
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!stripe || !elements) return;
+      setProcessing(true);
+      const card = elements.getElement(CardElement);
+      if (card) {
+        const result = await stripe.createToken(card);
+        if (result.error) {
+          alert(result.error.message);
+        } else {
+          await handleAddCard(result.token?.id);
+        }
+      }
+      setProcessing(false);
+    };
+    return (
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <CardElement options={{ style: { base: { fontSize: '16px' } } }} />
+        <button type="submit" disabled={!stripe || processing} className="pill-shadow py-6 font-black uppercase w-full px-6 rounded-2xl bg-[#FF00CC] text-white hover:shadow-lg transition-all active:scale-95">
+          Secure Card
+        </button>
+      </form>
+    );
   };
 
   const startWalletLink = () => {
@@ -136,6 +176,16 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
                          <p className="font-black text-xl tracking-tighter">₱{p.balance?.toFixed(0) || '---'}</p>
                       </div>
                    </div>
+                   {p.balance != null && (
+                     <button onClick={async () => {
+                       const amt = parseFloat(prompt('Top-up amount (PHP)') || '0');
+                       if (!amt || amt <= 0) return;
+                       setIsLoading(true);
+                       const newBal = await db.topUpPayment(email, p.id, amt);
+                       setPayments(payments.map(x => x.id === p.id ? { ...x, balance: newBal } : x));
+                       setIsLoading(false);
+                     }} className="mt-3 px-4 py-2 bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest">Top Up</button>
+                   )}
                 </div>
              </div>
            ))
@@ -149,17 +199,27 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
               </div>
 
               {activeTab === 'CARD' ? (
-                <div className="space-y-6">
-                   <div className="input-label-border">
-                      <label>Card Number</label>
-                      <input type="text" maxLength={16} value={cardNumber} onChange={e => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm tracking-widest" />
-                   </div>
-                   <div className="input-label-border">
-                      <label>Expiry Date</label>
-                      <input type="text" placeholder="MM/YY" value={expiry} onChange={e => setExpiry(e.target.value)} className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm" />
-                   </div>
-                   <Button onClick={handleAddCard} disabled={isLoading} className="pill-shadow py-6 font-black uppercase">Secure Card</Button>
-                </div>
+                stripePromise ? (
+                  <Elements stripe={stripePromise}>
+                    <CardEntry />
+                  </Elements>
+                ) : (
+                  <div className="space-y-6">
+                     <div className="input-label-border">
+                        <label>Card Number</label>
+                        <input type="text" maxLength={16} value={cardNumber} onChange={e => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm tracking-widest" />
+                     </div>
+                     <div className="input-label-border">
+                        <label>Expiry Date</label>
+                        <input type="text" placeholder="MM/YY" value={expiry} onChange={e => setExpiry(e.target.value)} className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm" />
+                     </div>
+                     <div className="input-label-border">
+                        <label>Stripe Token (for testing)</label>
+                        <input type="text" placeholder="tok_visa" value={cardToken} onChange={e => setCardToken(e.target.value)} className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm" />
+                     </div>
+                     <Button onClick={() => handleAddCard(cardToken)} disabled={isLoading} className="pill-shadow py-6 font-black uppercase">Secure Card</Button>
+                  </div>
+                )
               ) : (
                 <div className="space-y-6">
                    {!otpMode ? (

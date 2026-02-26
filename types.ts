@@ -114,7 +114,7 @@ export interface Address {
   city: string;
 }
 
-export type PaymentType = 'VISA' | 'MASTERCARD' | 'GCASH' | 'MAYA' | 'CASH';
+export type PaymentType = 'VISA' | 'MASTERCARD' | 'GCASH' | 'MAYA' | 'CASH' | 'COD';
 
 export interface PaymentMethod {
   id: string;
@@ -122,5 +122,7 @@ export interface PaymentMethod {
   last4?: string;
   expiry?: string;
   phoneNumber?: string;
-  balance?: number;
+  balance?: number | null;
+  // optional token or source id for card payments
+  token?: string;
 }

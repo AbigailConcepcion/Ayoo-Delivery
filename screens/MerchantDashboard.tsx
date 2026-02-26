@@ -25,7 +25,12 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName })
   const streamRef = useRef<MediaStream | null>(null);
 
   const refresh = async () => {
-    const fetched = ayooCloud.getMerchantOrders(restaurantName);
+    let fetched: OrderRecord[] = [];
+    if (db.constructor && (db as any).ENV && (db as any).ENV.USE_REAL_BACKEND) {
+      fetched = await db.getMerchantOrders(restaurantName);
+    } else {
+      fetched = ayooCloud.getMerchantOrders(restaurantName);
+    }
     setOrders(fetched);
     const allRes = await db.getRestaurants();
     const res = allRes.find(r => r.name === restaurantName);
@@ -184,8 +189,20 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName })
                    <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase ${order.status === 'DELIVERED' ? 'bg-green-500/10 text-green-500' : 'bg-[#FF00CC]/10 text-[#FF00CC]'}`}>{order.status}</span>
                  </div>
                  <div className="flex gap-2 mt-6">
-                    <Button onClick={() => ayooCloud.updateOrderStatus(order.id, 'PREPARING')} className="flex-1 py-3 bg-white/5 text-[9px] font-black tracking-widest uppercase">Prepare</Button>
-                    <Button onClick={() => ayooCloud.updateOrderStatus(order.id, 'READY_FOR_PICKUP')} className="flex-1 py-3 bg-[#FF00CC] text-[9px] font-black tracking-widest uppercase shadow-lg shadow-pink-900/20">Ready</Button>
+                    <Button onClick={async () => {
+                      if ((db as any).ENV?.USE_REAL_BACKEND) {
+                        await db.updateOrderStatus(order.id, 'PREPARING');
+                      } else {
+                        ayooCloud.updateOrderStatus(order.id, 'PREPARING');
+                      }
+                    }} className="flex-1 py-3 bg-white/5 text-[9px] font-black tracking-widest uppercase">Prepare</Button>
+                    <Button onClick={async () => {
+                      if ((db as any).ENV?.USE_REAL_BACKEND) {
+                        await db.updateOrderStatus(order.id, 'READY_FOR_PICKUP');
+                      } else {
+                        ayooCloud.updateOrderStatus(order.id, 'READY_FOR_PICKUP');
+                      }
+                    }} className="flex-1 py-3 bg-[#FF00CC] text-[9px] font-black tracking-widest uppercase shadow-lg shadow-pink-900/20">Ready</Button>
                  </div>
                </div>
              ))

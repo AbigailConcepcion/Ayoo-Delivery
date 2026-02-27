@@ -1,57 +1,65 @@
-
 import React from 'react';
+import { COLORS, IMAGES } from '../constants';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  variant?: 'white' | 'colored';
+  variant?: 'white' | 'colored' | 'image';
   withSubtext?: boolean;
 }
 
 const Logo: React.FC<LogoProps> = ({ size = 'md', variant = 'colored', withSubtext = true }) => {
-  const containerSize = {
-    sm: 'w-12 h-12',
-    md: 'w-20 h-20',
-    lg: 'w-28 h-28',
-    xl: 'w-36 h-36',
+  const dimensions = {
+    sm: { container: 'w-12 h-12', text: 'text-xl', imgW: 48 },
+    md: { container: 'w-20 h-20', text: 'text-3xl', imgW: 80 },
+    lg: { container: 'w-32 h-32', text: 'text-5xl', imgW: 128 },
+    xl: { container: 'w-48 h-48', text: 'text-7xl', imgW: 192 },
   }[size];
 
-  const textClass = {
-    sm: 'text-2xl',
-    md: 'text-4xl',
-    lg: 'text-5xl',
-    xl: 'text-7xl',
-  }[size];
+  // Primary style base sa bagong #FF1493
+  const primaryColor = variant === 'white' ? COLORS.white : COLORS.primary;
 
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className={`${containerSize} ayoo-gradient rounded-[35%] p-[2px] flex items-center justify-center relative shadow-xl transform hover:scale-105 transition-transform duration-300`}>
-        {/* Colorful Bubbles around the logo */}
-        <div className="absolute -top-1 -left-1 w-4 h-4 bg-[#FFD700] rounded-full border-2 border-white shadow-sm"></div>
-        <div className="absolute top-4 -right-2 w-3 h-3 bg-[#00C2FF] rounded-full border border-white"></div>
-        <div className="absolute -bottom-2 -left-1 w-3 h-3 bg-[#FF00CC] rounded-full border border-white"></div>
+      <div className={`relative group transition-transform duration-300 hover:scale-105`}>
         
-        <div className="bg-white rounded-[32%] w-full h-full flex items-center justify-center shadow-inner">
-            <span className="text-[#FF00CC] font-black text-xl select-none tracking-tighter">ay</span>
+        {/* Actual Image Logo Option */}
+        <div className={`${dimensions.container} overflow-hidden rounded-[30%] shadow-lg border-2 border-white`}>
+          <img 
+            src={IMAGES.logoPink} 
+            alt="Ayoo Logo" 
+            className="w-full h-full object-cover"
+          />
         </div>
+
+        {/* Decorative Bubbles gamit ang bagong Secondary/Accent colors */}
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#FFD700] rounded-full border-2 border-white shadow-sm animate-bounce"></div>
+        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-[#7B2FF7] rounded-full border border-white"></div>
       </div>
       
-      <div className="flex items-center mt-2">
-        <h1 className={`font-black tracking-tighter leading-none ${variant === 'white' ? 'text-white' : 'text-[#FF00CC]'} ${textClass}`}>
+      <div className="flex flex-col items-center mt-3">
+        <h1 
+          className="font-black tracking-tighter leading-none italic"
+          style={{ 
+            color: primaryColor, 
+            fontSize: dimensions.text === 'text-xl' ? '1.25rem' : 
+                      dimensions.text === 'text-3xl' ? '2rem' : '3.5rem' 
+          }}
+        >
           ayoo
         </h1>
-        {withSubtext && size === 'sm' && (
-          <div className="ml-2 flex flex-col text-left">
-            <span className={`text-[10px] font-bold leading-none ${variant === 'white' ? 'text-white/90' : 'text-pink-400'}`}>Ayoo MyFind</span>
-            <span className={`text-[10px] font-medium leading-none ${variant === 'white' ? 'text-white/70' : 'text-gray-400'}`}>and More</span>
-          </div>
+        
+        {withSubtext && (
+          <p 
+            className="mt-1 font-bold tracking-[0.2em] uppercase"
+            style={{ 
+                color: variant === 'white' ? 'rgba(255,255,255,0.8)' : COLORS.gray500,
+                fontSize: size === 'sm' ? '8px' : '10px'
+            }}
+          >
+            Food • Delivery • More
+          </p>
         )}
       </div>
-      
-      {withSubtext && size !== 'sm' && (
-        <p className={`text-[10px] mt-1 font-bold tracking-widest uppercase ${variant === 'white' ? 'text-white/80' : 'text-gray-400'}`}>
-          Food. Delivery. Services.
-        </p>
-      )}
     </div>
   );
 };

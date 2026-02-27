@@ -1,16 +1,45 @@
-
-import { Restaurant, Review } from './types';
+import { Restaurant, Review } from './types'; // Siguraduhing may types.ts ka
 
 export const GLOBAL_REGISTRY_KEY = 'ayoo_registry_v15';
 
 export const COLORS = {
-  HOT_PINK: '#FF00CC',
-  PURPLE: '#8A2BE2',
-  CYAN: '#00C2FF',
-  YELLOW: '#FFD700',
-  WHITE: '#FFFFFF',
-  BLACK: '#1A1A1A',
-  GREY: '#F2F2F2',
+  primary: '#FF1493',
+  primaryDark: '#E0007B',
+  primaryLight: '#FF69B4',
+  primaryBg: '#FFF0F5',
+  secondary: '#7B2FF7',
+  accent: '#FFD700',
+  success: '#00C853',
+  warning: '#FF9800',
+  error: '#F44336',
+  white: '#FFFFFF',
+  black: '#1A1A2E',
+  gray100: '#F8F9FA',
+  gray200: '#E9ECEF',
+  gray300: '#DEE2E6',
+  gray400: '#CED4DA',
+  gray500: '#ADB5BD',
+  gray600: '#6C757D',
+  gray700: '#495057',
+  gray800: '#343A40',
+  gray900: '#212529',
+};
+
+export const RADIUS = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  full: 9999,
+};
+
+export const IMAGES = {
+  logoHorizontal: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844265885_539cd4dd.jpg',
+  logoVertical: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844270632_70df58b5.png',
+  logoPinkMascot: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844273557_ae970a79.jpg',
+  logoPink: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844276236_36e2add8.jpg',
+  riders: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844278367_59b7ebed.jpeg',
 };
 
 export const PHILIPPINE_CITIES = [
@@ -38,8 +67,7 @@ export const CATEGORIES = [
 ];
 
 const MOCK_REVIEWS: Review[] = [
-  { id: 'r1', userName: 'Maria Santos', userAvatar: 'https://i.pravatar.cc/150?u=maria', rating: 5, comment: 'The food was absolutely amazing and arrived hot! Best in Iligan.', date: '2 days ago' },
-  { id: 'r2', userName: 'John Doe', userAvatar: 'https://i.pravatar.cc/150?u=john', rating: 4, comment: 'Great portions, but the delivery took a bit longer than expected.', date: '1 week ago' },
+  { id: 'r1', userName: 'Maria Santos', userAvatar: 'https://i.pravatar.cc/150?u=maria', rating: 5, comment: 'The food was absolutely amazing!', date: '2 days ago' },
 ];
 
 export const MOCK_RESTAURANTS: Restaurant[] = [
@@ -55,8 +83,7 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
     image: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?auto=format&fit=crop&q=80&w=600',
     reviews: MOCK_REVIEWS,
     items: [
-      { id: 'j1', name: 'Chickenjoy 1pc w/ Spaghetti', price: 135, description: 'Crispy licious chicken served with the legendary sweet-style spaghetti.', image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&q=80&w=200', category: 'Best Sellers', isPopular: true },
-      { id: 'j2', name: 'Yumburger w/ Fries', price: 95, description: 'Classic beef burger with a side of crispy golden fries.', image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&q=80&w=200', category: 'Burgers' },
+      { id: 'j1', name: 'Chickenjoy', price: 135, description: 'Crispy licious chicken.', image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&q=80&w=200', category: 'Best Sellers', isPopular: true },
     ]
   },
   {
@@ -71,22 +98,7 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
     image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80&w=600',
     reviews: MOCK_REVIEWS,
     items: [
-      { id: 't1', name: 'Special Pork BBQ (3pcs)', price: 120, description: 'Marinated in Tatay’s secret sauce and grilled to perfection.', image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=200', category: 'Best Sellers', isPopular: true },
-    ]
-  },
-  {
-    id: '4',
-    name: 'Pizza House Iligan',
-    rating: 4.6,
-    deliveryTime: '40-55 min',
-    cuisine: 'Pizza & Pasta',
-    isPartner: true,
-    hasLiveCam: false,
-    address: 'Quezon Ave, Iligan City',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=600',
-    reviews: MOCK_REVIEWS,
-    items: [
-      { id: 'p1', name: 'Hawaiian Overload', price: 350, description: 'Loaded with pineapples, ham, and premium cheese.', image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&q=80&w=200', category: 'Pizza', isPopular: true },
+      { id: 't1', name: 'Pork BBQ', price: 120, description: 'Grilled to perfection.', image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=200', category: 'Best Sellers', isPopular: true },
     ]
   }
 ];

@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { setupRoutes } from './routes';
-import { initDb } from './db';
+import { setupRoutes } from './routes.js';
+import { initDb } from './db.js';
 
 declare const process: any;
 

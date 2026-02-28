@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppScreen, Restaurant, OrderRecord, Voucher, UserAccount, UserRole } from './types';
 import Onboarding from './screens/Onboarding';
@@ -22,6 +21,7 @@ import Button from './components/Button';
 import SystemStatus from './components/SystemStatus';
 import { db } from './db';
 import { ayooCloud } from './api';
+import { COLORS } from './constants'; // Import para sa brand colors
 
 const OWNER_EMAIL = 'ayoo.admin@gmail.com';
 
@@ -64,7 +64,7 @@ const App: React.FC = () => {
       setAppliedVoucher(cartData.voucher);
       setDeliveryFee(config.deliveryFee);
     } catch (e) {
-      console.warn("User data fetch failed, staying offline.");
+      console.warn("Sync failed, operating in local mode.");
     }
   }, []);
 
@@ -72,44 +72,43 @@ const App: React.FC = () => {
     const initApp = async () => {
       try {
         try {
-        const connected = await db.connect();
-        const [session, hasSeenOnboarding, resList, config] = await Promise.all([
-          db.getSession(),
-          db.hasSeenOnboarding(),
-          db.getRestaurants(),
-          db.getSystemConfig()
-        ]);
-        
-        setRestaurants(resList);
-        setDeliveryFee(config.deliveryFee);
+          await db.connect();
+          const [session, hasSeenOnboarding, resList, config] = await Promise.all([
+            db.getSession(),
+            db.hasSeenOnboarding(),
+            db.getRestaurants(),
+            db.getSystemConfig()
+          ]);
+          
+          setRestaurants(resList);
+          setDeliveryFee(config.deliveryFee);
 
-        if (session) {
-          await loadUserData(session);
-          setScreen(session.role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : session.role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
-        } else {
-          setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
+          if (session) {
+            await loadUserData(session);
+            setScreen(session.role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : session.role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
+          } else {
+            setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
+          }
+        } catch (err: any) {
+          console.warn('Backend connection issue, falling back to local storage', err.message);
+          (db as any).ENV.USE_REAL_BACKEND = false;
+          const [session, hasSeenOnboarding, resList, config] = await Promise.all([
+            db.getSession(),
+            db.hasSeenOnboarding(),
+            db.getRestaurants(),
+            db.getSystemConfig()
+          ]);
+          setRestaurants(resList);
+          setDeliveryFee(config.deliveryFee);
+          if (session) {
+            await loadUserData(session);
+            setScreen(session.role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : session.role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
+          } else {
+            setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
+          }
         }
       } catch (err: any) {
-        // on any failure connecting to backend, fall back to offline mode
-        console.warn('Backend unreachable, switching to offline mode', err.message);
-        (db as any).ENV.USE_REAL_BACKEND = false;
-        const [session, hasSeenOnboarding, resList, config] = await Promise.all([
-          db.getSession(),
-          db.hasSeenOnboarding(),
-          db.getRestaurants(),
-          db.getSystemConfig()
-        ]);
-        setRestaurants(resList);
-        setDeliveryFee(config.deliveryFee);
-        if (session) {
-          await loadUserData(session);
-          setScreen(session.role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : session.role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
-        } else {
-          setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
-        }
-      }
-      } catch (err: any) {
-        setSyncError(err.message || "Failed to connect to Ayoo Nodes");
+        setSyncError(err.message || "Unable to connect to Ayoo");
       } finally {
         setTimeout(() => setIsConnecting(false), 2000);
       }
@@ -124,18 +123,15 @@ const App: React.FC = () => {
     });
   }, [loadUserData]);
 
+  // Logic for logout, login, etc remains same...
   const handleSetRole = async (role: UserRole) => {
     setActiveRole(role);
     if (currentUser) {
       const updated = await db.updateProfile(currentUser.email, { role });
       if (updated) setCurrentUser(updated);
-
       const seen = updated?.manualsSeen || [];
-      if (!seen.includes(role)) {
-        setScreen('MANUAL');
-      } else {
-        setScreen(role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
-      }
+      if (!seen.includes(role)) setScreen('MANUAL');
+      else setScreen(role === 'MERCHANT' ? 'MERCHANT_DASHBOARD' : role === 'RIDER' ? 'RIDER_DASHBOARD' : 'HOME');
     }
   };
 
@@ -185,7 +181,6 @@ const App: React.FC = () => {
       }
       return found!;
     });
-
     const subtotal = orderDetails.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
     const finalTotal = subtotal + deliveryFee - (appliedVoucher ? (appliedVoucher.type === 'percent' ? (subtotal * appliedVoucher.discount / 100) : appliedVoucher.discount) : 0);
 
@@ -195,7 +190,7 @@ const App: React.FC = () => {
       items: orderDetails,
       total: Math.max(0, finalTotal),
       status: 'PENDING',
-      restaurantName: selectedRestaurant?.name || 'Jollibee Iligan',
+      restaurantName: selectedRestaurant?.name || 'Ayoo Merchant',
       customerEmail: currentUser.email,
       customerName: currentUser.name,
       deliveryAddress: `Tibanga, ${deliveryCity}`,
@@ -223,11 +218,11 @@ const App: React.FC = () => {
 
   const renderScreen = () => {
     if (syncError) return (
-      <div className="h-screen bg-black flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
-         <div className="w-24 h-24 ayoo-gradient rounded-[40px] flex items-center justify-center text-5xl mb-10 shadow-[0_0_60px_rgba(255,0,204,0.3)] animate-pulse">📡</div>
-         <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">Cloud Sync Fault</h2>
-         <p className="text-gray-400 font-bold text-sm mb-12 leading-relaxed px-4">Server unreachable. Switching back to simulation mode.</p>
-         <Button onClick={() => window.location.reload()}>Re-Ping Nodes</Button>
+      <div className="h-screen bg-white flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
+         <div className="w-24 h-24 rounded-[40px] flex items-center justify-center text-5xl mb-10 shadow-lg animate-bounce" style={{ backgroundColor: COLORS.primaryBg }}>📵</div>
+         <h2 className="text-3xl font-black uppercase tracking-tighter mb-4" style={{ color: COLORS.black }}>Connection Issue</h2>
+         <p className="text-gray-500 font-medium text-sm mb-12 leading-relaxed px-4">We're having trouble reaching our servers. Please check your internet connection and try again.</p>
+         <Button onClick={() => window.location.reload()}>Try Again</Button>
       </div>
     );
 
@@ -251,7 +246,7 @@ const App: React.FC = () => {
       case 'PROFILE': return <Profile onBack={() => setScreen('HOME')} user={currentUser} onLogout={handleLogout} onNavigate={(s) => setScreen(s)} onUpdateUser={setCurrentUser} onSetRole={handleSetRole} />;
       case 'ADDRESSES': return <AddressesScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} currentCity={deliveryCity} />;
       case 'PAYMENTS': return <PaymentsScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} />;
-      case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name || 'Tatay\'s Grill'} />;
+      case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name || 'Ayoo Merchant'} />;
       case 'RIDER_DASHBOARD': return <RiderDashboard />;
       case 'ADMIN_PANEL': return <AdminPanel onBack={() => setScreen('PROFILE')} restaurants={restaurants} onUpdateRestaurants={setRestaurants} />;
       default: return null;
@@ -264,18 +259,16 @@ const App: React.FC = () => {
         <div className="max-w-md mx-auto h-screen bg-white flex flex-col items-center justify-center p-12">
           <Logo size="lg" withSubtext={false} />
           <div className="mt-12 flex flex-col items-center">
-             <div className="w-48 h-1 bg-gray-100 rounded-full overflow-hidden relative">
-                <div className="absolute inset-0 bg-[#FF00CC] animate-progress"></div>
+             <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden relative">
+                <div className="absolute inset-0 animate-progress" style={{ backgroundColor: COLORS.primary }}></div>
              </div>
-             <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-[#FF00CC]/40 animate-pulse text-center">Securing Ayoo Cloud Connection...</p>
+             <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400 animate-pulse text-center">Getting things ready...</p>
           </div>
         </div>
       ) : (
         <>
           <SystemStatus />
           {renderScreen()}
-          
-          {/* GLOBAL AI ASSISTANT: Only show after onboarding */}
           {screen !== 'ONBOARDING' && (
             <AIChat 
               restaurants={restaurants}

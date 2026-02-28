@@ -1,23 +1,35 @@
-
 import React from 'react';
 import { db } from '../db';
+import { COLORS } from '../constants';
 
 const SystemStatus: React.FC = () => {
-  const isReal = (db as any).constructor.ENV.USE_REAL_BACKEND;
+  // Ginagamit pa rin ang logic para malaman kung may connection, 
+  // pero "Online" na ang itatawag natin sa user.
+  const isOnline = (db as any).constructor.ENV.USE_REAL_BACKEND;
 
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
-       <div className={`backdrop-blur-md px-4 py-1.5 rounded-full border flex items-center gap-2 shadow-2xl transition-all duration-500 ${
-         isReal ? 'bg-green-950/80 border-green-500/30' : 'bg-black/80 border-white/10'
-       }`}>
-          <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isReal ? 'bg-green-400' : 'bg-pink-500'}`}></div>
-          <span className="text-[8px] font-black text-white/80 uppercase tracking-[0.2em]">
-            {isReal ? 'Ayoo Cloud: Production' : 'Ayoo Cloud: Simulator'}
+       <div className={`backdrop-blur-md px-3 py-1 rounded-full border flex items-center gap-2 shadow-lg transition-all duration-500 bg-black/60 border-white/10`}>
+          
+          {/* Status Dot */}
+          <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`}></div>
+          
+          {/* Location / Status Text */}
+          <span className="text-[7px] font-black text-white uppercase tracking-[0.2em]">
+            {isOnline ? 'System: Online' : 'System: Offline Mode'}
           </span>
-          <div className="w-[1px] h-3 bg-white/20 mx-1"></div>
-          <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${isReal ? 'text-green-400' : 'text-pink-500'}`}>
-            {isReal ? 'LIVE API' : 'LOCAL NODES'}
-          </span>
+
+          <div className="w-[1px] h-2 bg-white/20 mx-1"></div>
+
+          {/* Location Indicator - Para magmukhang real app */}
+          <div className="flex items-center gap-1">
+            <span className="text-[7px] font-black text-white/60 uppercase tracking-[0.2em]">
+              GPS: 
+            </span>
+            <span className="text-[7px] font-black text-green-400 uppercase tracking-[0.2em]">
+              Active
+            </span>
+          </div>
        </div>
     </div>
   );

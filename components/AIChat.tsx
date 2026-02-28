@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Restaurant, AppScreen } from '../types';
+import { COLORS } from '../constants'; // Import brand colors
 
 interface Message {
   role: 'user' | 'model';
@@ -16,7 +17,7 @@ interface AIChatProps {
   onNavigate?: (screen: AppScreen) => void;
 }
 
-// Siguraduhin na palitan mo ito ng totoong API Key mo
+// ⚠️ PAALALA: Ilagay dito ang iyong totoong API Key mula sa Google AI Studio
 const API_KEY = "YOUR_GOOGLE_AI_API_KEY"; 
 
 const AIChat: React.FC<AIChatProps> = ({ 
@@ -36,10 +37,10 @@ const AIChat: React.FC<AIChatProps> = ({
   useEffect(() => {
     if (messages.length === 0) {
       const greeting = context === 'login help' 
-        ? "Ayoo! May problema ba sa pag-login? Tulungan kita! 🔑" 
+        ? "Ayoo! Having trouble logging in? I'm here to help! 🔑" 
         : context === 'signup help'
-        ? "Welcome sa Ayoo! Ready ka na ba mag-create ng account? 📝"
-        : "Hey! I'm Ayoo AI. Gutom ka ba? Sabihin mo lang anong hanap mo! 🍔✨";
+        ? "Welcome to Ayoo! Ready to create your account? 📝"
+        : "Hi! I'm your Ayoo Assistant. What are you craving today? 🍔✨";
       
       setMessages([{ role: 'model', text: greeting }]);
     }
@@ -52,42 +53,46 @@ const AIChat: React.FC<AIChatProps> = ({
   }, [messages, loading]);
 
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || API_KEY === "YOUR_GOOGLE_AI_API_KEY") return;
 
     const userText = input;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userText }]);
+    const updatedMessages: Message[] = [...messages, { role: 'user', text: userText }];
+    setMessages(updatedMessages);
     setLoading(true);
 
     try {
       const genAI = new GoogleGenerativeAI(API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-      const menuData = restaurants.map(r => 
-        `${r.name} (${r.cuisine}): ${r.items.map(i => `${i.name} - ₱${i.price}`).join(', ')}`
-      ).join('\n');
-
-      const systemPrompt = `
-        You are Ayoo Pro AI. Be friendly and use Taglish.
-        Context: ${context}
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: `You are the Ayoo Concierge, a helpful assistant for the Ayoo Delivery App in Iligan City. 
+        Current Context: ${context}
         Available Menu:
-        ${menuData}
-        Guideline: Recommend items from the menu above. Keep it short. Use emojis.
-      `;
+        ${restaurants.map(r => `${r.name}: ${r.items.map(i => i.name).join(', ')}`).join('\n')}
+        
+        Rules:
+        1. Be professional yet friendly (Taglish is okay).
+        2. Help users find food or navigate the app.
+        3. Keep responses concise and under 3 sentences.
+        4. Use emojis for a modern feel.`
+      });
 
+      // Prepare history without the current system instruction (already in systemInstruction param)
       const chat = model.startChat({
-        history: messages.map(m => ({
-          role: m.role === 'user' ? 'user' : 'model',
+        history: messages.slice(1).map(m => ({
+          role: m.role,
           parts: [{ text: m.text }],
         })),
       });
 
-      const fullPrompt = messages.length === 1 ? `${systemPrompt}\n\nUser: ${userText}` : userText;
-      const result = await chat.sendMessage(fullPrompt);
+      const result = await chat.sendMessage(userText);
       const response = await result.response;
-      setMessages(prev => [...prev, { role: 'model', text: response.text() }]);
+      const text = response.text();
+      
+      setMessages(prev => [...prev, { role: 'model', text }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'model', text: "Signal error. Try again! ⚡" }]);
+      console.error("AI Error:", err);
+      setMessages(prev => [...prev, { role: 'model', text: "Service temporarily unavailable. Please try again later. ⚡" }]);
     } finally {
       setLoading(false);
     }
@@ -95,45 +100,71 @@ const AIChat: React.FC<AIChatProps> = ({
 
   return (
     <>
+      {/* Floating Button */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`${floatingClass || 'fixed bottom-32 right-6'} w-16 h-16 ayoo-gradient rounded-full shadow-lg flex items-center justify-center text-3xl z-[100] active:scale-90 transition-all border-4 border-white`}
+        className={`${floatingClass || 'fixed bottom-24 right-6'} w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl z-[100] active:scale-90 transition-all border-2 border-white`}
+        style={{ backgroundColor: COLORS.primary }}
       >
-        {isOpen ? '✕' : '✨'}
+        {isOpen ? '✕' : '💬'}
       </button>
 
       {isOpen && (
-        <div className="fixed inset-x-6 bottom-52 bg-white rounded-[35px] shadow-2xl z-[100] border border-pink-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-500 max-h-[500px]">
-          <div className="bg-[#FF00CC] p-6 text-white flex items-center justify-between">
+        <div className="fixed inset-x-6 bottom-40 bg-white rounded-[30px] shadow-2xl z-[100] border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300 max-h-[450px]">
+          {/* Header */}
+          <div className="p-5 text-white flex items-center justify-between" style={{ backgroundColor: COLORS.primary }}>
             <div className="flex items-center gap-3">
-               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-xl shadow-inner">🤖</div>
-               <h4 className="font-black text-sm uppercase tracking-widest leading-none">Ayoo Pro AI</h4>
+               <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-lg">✨</div>
+               <div>
+                  <h4 className="font-black text-xs uppercase tracking-widest leading-none">Ayoo Concierge</h4>
+                  <p className="text-[8px] opacity-80 uppercase mt-1 font-bold">Online & Ready</p>
+               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="font-bold">✕</button>
+            <button onClick={() => setIsOpen(false)} className="opacity-70 hover:opacity-100">✕</button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 p-6 space-y-4 overflow-y-auto scrollbar-hide bg-gray-50/30">
+          {/* Messages Area */}
+          <div ref={scrollRef} className="flex-1 p-5 space-y-4 overflow-y-auto scrollbar-hide bg-gray-50/50">
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] p-4 rounded-[24px] text-sm font-bold shadow-sm ${
-                  m.role === 'user' ? 'bg-[#FF00CC] text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
-                }`}>
+                <div 
+                  className={`max-w-[85%] p-4 rounded-[20px] text-xs font-bold shadow-sm ${
+                    m.role === 'user' 
+                      ? 'text-white rounded-tr-none' 
+                      : 'bg-white text-gray-700 rounded-tl-none border border-gray-100'
+                  }`}
+                  style={m.role === 'user' ? { backgroundColor: COLORS.primary } : {}}
+                >
                   {m.text}
                 </div>
               </div>
             ))}
-            {loading && <div className="text-[10px] font-black text-[#FF00CC] animate-pulse">AI is thinking...</div>}
+            {loading && (
+              <div className="flex gap-1 items-center ml-1">
+                <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+              </div>
+            )}
           </div>
 
-          <div className="p-4 bg-white border-t border-gray-100 flex gap-3 items-center">
+          {/* Input Area */}
+          <div className="p-4 bg-white border-t border-gray-50 flex gap-2 items-center">
             <input 
               type="text" 
-              className="flex-1 bg-gray-100 rounded-2xl px-5 py-4 text-sm font-bold outline-none"
+              placeholder="Ask me anything..."
+              className="flex-1 bg-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:bg-gray-50 transition-colors"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
             />
-            <button onClick={sendMessage} className="w-14 h-14 bg-[#FF00CC] text-white rounded-2xl flex items-center justify-center shadow-lg">🚀</button>
+            <button 
+              onClick={sendMessage} 
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md active:scale-95 transition-all"
+              style={{ backgroundColor: COLORS.primary }}
+            >
+              <span className="text-white text-sm">🚀</span>
+            </button>
           </div>
         </div>
       )}

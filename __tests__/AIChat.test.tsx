@@ -6,10 +6,20 @@ import '@testing-library/jest-dom';
 // ensure the UI appears and can be opened/closed.
 import AIChat from '../components/AIChat';
 
-jest.mock('@google/genai', () => ({
-  GoogleGenAI: class {
+jest.mock('@google/generative-ai', () => ({
+  GoogleGenerativeAI: class {
     constructor() {}
-    models = { generateContent: jest.fn().mockResolvedValue({ text: 'hi there' }) };
+    getGenerativeModel() {
+      return {
+        startChat: () => ({
+          sendMessage: jest.fn().mockResolvedValue({
+            response: {
+              text: () => 'Hi there! How can I help?'
+            }
+          })
+        })
+      };
+    }
   }
 }));
 
@@ -24,16 +34,16 @@ const props = {
 test('AIChat toggle button appears and can open/close', async () => {
   render(<AIChat {...props} />);
 
-  const toggle = screen.getByRole('button', { name: /✨/ });
+  const toggle = screen.getByRole('button', { name: /💬|✕/ });
   expect(toggle).toBeInTheDocument();
 
   // open the chat
   fireEvent.click(toggle);
-  expect(screen.getByPlaceholderText(/Try:/i)).toBeInTheDocument();
+  expect(screen.getByPlaceholderText(/Ask me anything/i)).toBeInTheDocument();
 
   // close the chat again
   fireEvent.click(toggle);
   await waitFor(() => {
-    expect(screen.queryByPlaceholderText(/Try:/i)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Ask me anything/i)).not.toBeInTheDocument();
   });
 });

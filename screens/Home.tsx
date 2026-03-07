@@ -1,33 +1,105 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { CATEGORIES, PHILIPPINE_CITIES } from '../constants';
-import { Restaurant, UserBadge, AppScreen } from '../types';
-import { GoogleGenAI } from "@google/genai";
+import type { Restaurant, UserBadge, AppScreen, Voucher, UserAccount, OrderRecord } from '../types';
 
 interface HomeProps {
   restaurants: Restaurant[];
-  onSelectRestaurant: (restaurant: Restaurant) => void;
-  onOpenCart: () => void;
-  onNavigate: (s: AppScreen) => void;
-  cartCount: number;
-  points: number;
-  streak: number;
-  badges: UserBadge[];
+  onSelectRestaurant?: (restaurant: Restaurant) => void;
+  onOpenCart?: () => void;
+  onNavigate?: (s: AppScreen) => void;
+  cartCount?: number;
+  points?: number;
+  streak?: number;
+  badges?: UserBadge[];
   deliveryCity: string;
   onSetDeliveryCity: (city: string) => void;
+  currentUser?: UserAccount | null;
+  recentOrders?: OrderRecord[];
 }
 
-const Home: React.FC<HomeProps> = ({ 
+// Service types for the Super App
+type ServiceType = 'food' | 'groceries' | 'courier' | 'rides' | 'pabili' | 'bills' | 'dineout' | 'pharmacy';
+
+interface Service {
+  id: ServiceType;
+  name: string;
+  icon: string;
+  color: string;
+  screen: AppScreen;
+  description: string;
+}
+
+// Community member type
+interface CommunityMember {
+  id: string;
+  name: string;
+  role: 'rider' | 'merchant' | 'customer';
+  avatar: string;
+  stats: string;
+  badge: string;
+}
+
+// Sample community data
+const TOP_RIDERS: CommunityMember[] = [
+  { id: '1', name: 'Mark D.', role: 'rider', avatar: '🛵', stats: '1,234 deliveries', badge: '⭐ Top Rider' },
+  { id: '2', name: 'John P.', role: 'rider', avatar: '🛵', stats: '987 deliveries', badge: '⚡ Fast' },
+  { id: '3', name: 'Karen S.', role: 'rider', avatar: '🛵', stats: '856 deliveries', badge: '😊 Friendly' },
+];
+
+const FEATURED_MERCHANTS: CommunityMember[] = [
+  { id: '1', name: 'Mang Tomas Eatery', role: 'merchant', avatar: '🏪', stats: '4.9 ★', badge: '⭐ Featured' },
+  { id: '2', name: 'Tea Shop PH', role: 'merchant', avatar: '🧋', stats: '4.8 ★', badge: '🆕 New' },
+  { id: '3', name: 'Pizza Haven', role: 'merchant', avatar: '🍕', stats: '4.7 ★', badge: '🔥 Hot' },
+];
+
+const COMMUNITY_POSTS = [
+  { id: '1', author: 'Ayoo Team', avatar: '🚀', content: '🎉 Welcome to Ayoo! Now serving Iligan City with fast delivery!', time: '2h ago', likes: 128 },
+  { id: '2', author: 'Mang Tomas Eatery', avatar: '🏪', content: '🍜 New menu items available! Try our special silog meals now.', time: '5h ago', likes: 45 },
+  { id: '3', author: 'Ayoo Team', avatar: '🚀', content: '🛵 Become a rider and earn up to ₱500/day! Apply now.', time: '1d ago', likes: 89 },
+];
+
+// Services configuration
+const SERVICES: Service[] = [
+  { id: 'food', name: 'Food', icon: '🍔', color: '#FF1493', screen: 'SEARCH', description: 'All Restaurants & Milk Tea' },
+  { id: 'groceries', name: 'Groceries', icon: '🛒', color: '#9C27B0', screen: 'GROCERIES', description: 'Daily Essentials' },
+  { id: 'courier', name: 'Courier', icon: '📦', color: '#2196F3', screen: 'COURIER', description: 'Send Packages' },
+  { id: 'rides', name: 'Rides', icon: '🚗', color: '#4CAF50', screen: 'RIDES', description: 'Motor & Car' },
+  { id: 'pabili', name: 'Pabili', icon: '🛍️', color: '#FF9800', screen: 'PABILI', description: 'Errands' },
+  { id: 'bills', name: 'Bills & Load', icon: '💳', color: '#00BCD4', screen: 'PAYMENTS', description: 'Pay Bills & Load' },
+  { id: 'dineout', name: 'Dine Out', icon: '🍽️', color: '#E91E63', screen: 'DINE_OUT', description: 'Restaurant Reservations' },
+  { id: 'pharmacy', name: 'Pharmacy', icon: '💊', color: '#F44336', screen: 'PHARMACY', description: 'Medicines & Health' },
+];
+
+const SEARCH_CATEGORIES = [
+  { name: 'Cravings', icon: '🤤', query: '' },
+  { name: 'Places', icon: '📍', query: '' },
+  { name: 'Groceries', icon: '🛒', query: 'groceries' },
+  { name: 'Medicines', icon: '💊', query: 'medicines' },
+  { name: 'Flowers', icon: '💐', query: 'flowers' },
+  { name: 'Pet Supplies', icon: '🐕', query: 'pet' },
+];
+
+const MOODS = [
+  { name: 'Lazy', icon: '😴' },
+  { name: 'Stressed', icon: '😫' },
+  { name: 'Celebratory', icon: '🥳' },
+  { name: 'Fit', icon: '🥗' },
+  { name: 'Spicy', icon: '🌶️' }
+];
+
+const Home: React.FC<HomeProps> = ({
   restaurants,
-  onSelectRestaurant, 
-  onOpenCart, 
-  onNavigate, 
-  cartCount, 
-  points, 
-  streak, 
-  badges, 
-  deliveryCity, 
-  onSetDeliveryCity 
+  onSelectRestaurant,
+  onOpenCart,
+  onNavigate,
+  cartCount = 0,
+  points = 0,
+  streak = 0,
+  badges = [],
+  deliveryCity,
+  onSetDeliveryCity,
+  currentUser,
+  recentOrders = []
 }) => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -37,61 +109,15 @@ const Home: React.FC<HomeProps> = ({
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [geoStatus, setGeoStatus] = useState<'IDLE' | 'FETCHING' | 'ERROR'>('IDLE');
+  const [activeTab, setActiveTab] = useState<'discover' | 'community'>('discover');
 
-  const MOODS = [
-    { name: 'Lazy', icon: '😴' },
-    { name: 'Stressed', icon: '😫' },
-    { name: 'Celebratory', icon: '🥳' },
-    { name: 'Fit', icon: '🥗' },
-    { name: 'Spicy', icon: '🌶️' }
-  ];
+  // Get user role
+  const userRole = currentUser?.role || 'CUSTOMER';
 
-  const handleGetCurrentLocation = () => {
-    setGeoStatus('FETCHING');
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          onSetDeliveryCity('Iligan City');
-          setGeoStatus('IDLE');
-          setShowLocationPicker(false);
-        },
-        (error) => {
-          setGeoStatus('ERROR');
-        }
-      );
-    } else {
-      setGeoStatus('ERROR');
-    }
-  };
-
-  const askAiForMood = async (mood: string) => {
-    setSelectedMood(mood);
-    setAiLoading(true);
-    setAiSuggestion(null);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const menuContext = restaurants.map(r => 
-        `${r.name} (${r.cuisine}) offers: ${r.items.map(i => i.name).join(', ')}`
-      ).join('; ');
-
-      const prompt = `The user is feeling "${mood}". Based on these local restaurants and their menus: ${menuContext}, recommend EXACTLY one restaurant and one specific dish that fits this mood. Give a catchy 1-sentence reason. 20 words max.`;
-      
-      const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
-      const text = response.text || "Try something fresh today!";
-      setAiSuggestion(text);
-      
-      const match = restaurants.find(r => text.toLowerCase().includes(r.name.toLowerCase()));
-      if (match) setRecommendedId(match.id);
-    } catch (err) {
-      setAiSuggestion("The AI is hungry! Try browsing our top partners.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
+  // Filter restaurants
   const filteredRestaurants = useMemo(() => {
-    let list = restaurants.filter(r => 
-      r.name.toLowerCase().includes(search.toLowerCase()) || 
+    let list = restaurants.filter(r =>
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
       r.cuisine.toLowerCase().includes(search.toLowerCase())
     );
     if (selectedCategory) {
@@ -105,175 +131,503 @@ const Home: React.FC<HomeProps> = ({
     return list;
   }, [search, recommendedId, selectedCategory, restaurants]);
 
-  return (
-    <div className="flex flex-col h-screen bg-white pb-24 overflow-y-auto scroll-smooth scrollbar-hide">
-      
-      {showLocationPicker && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end justify-center">
-           <div className="bg-white w-full max-w-md rounded-t-[50px] p-10 animate-in slide-in-from-bottom-10 shadow-2xl">
-              <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-8"></div>
-              <h3 className="text-2xl font-black uppercase tracking-tighter mb-2 text-center">Ayoo GPS</h3>
-              
-              <button 
-                onClick={handleGetCurrentLocation}
-                disabled={geoStatus === 'FETCHING'}
-                className="w-full mb-6 p-6 ayoo-gradient rounded-[30px] flex items-center justify-center gap-3 text-white font-black uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all"
-              >
-                {geoStatus === 'FETCHING' ? '📡 Locating...' : '📍 Use Current Location'}
-              </button>
+  // Featured merchants (highest rated)
+  const featuredRestaurants = useMemo(() => {
+    return [...restaurants].sort((a, b) => b.rating - a.rating).slice(0, 5);
+  }, [restaurants]);
 
-              <div className="space-y-3 max-h-[30vh] overflow-y-auto scrollbar-hide pb-6 border-t border-gray-100 pt-6">
-                 {PHILIPPINE_CITIES.map(city => (
-                   <button 
-                    key={city}
-                    onClick={() => { onSetDeliveryCity(city); setShowLocationPicker(false); }}
-                    className={`w-full p-6 rounded-[30px] flex items-center justify-between border-2 transition-all ${
-                      deliveryCity === city ? 'bg-[#FF00CC]/5 border-[#FF00CC]' : 'bg-gray-50 border-gray-100'
-                    }`}
-                   >
-                     <span className={`font-black uppercase tracking-widest text-xs ${deliveryCity === city ? 'text-[#FF00CC]' : 'text-gray-900'}`}>{city}</span>
-                     {deliveryCity === city && <div className="w-6 h-6 bg-[#FF00CC] rounded-full flex items-center justify-center text-white text-[10px]">✓</div>}
-                   </button>
-                 ))}
-              </div>
-              <button onClick={() => setShowLocationPicker(false)} className="w-full py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Close</button>
-           </div>
-        </div>
-      )}
+  // New merchants
+  const newRestaurants = useMemo(() => {
+    return restaurants.filter(r => r.isPartner).slice(0, 5);
+  }, [restaurants]);
 
-      <div className="bg-[#FF00CC] p-6 rounded-b-[45px] shadow-xl sticky top-0 z-40 transition-all duration-300">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setShowLocationPicker(true)}>
-            <div className="w-14 h-14 ayoo-gradient rounded-[18px] flex items-center justify-center p-[2.5px] shadow-lg">
-                <div className="bg-white w-full h-full rounded-[16px] flex items-center justify-center font-black text-[#FF00CC] text-xl">ay</div>
-            </div>
-            <div className="text-white">
-              <p className="text-[10px] opacity-80 font-black uppercase tracking-[0.2em] mb-1">Delivering to</p>
-              <p className="font-extrabold text-xl tracking-tighter flex items-center gap-1">
-                {deliveryCity} <span className="text-[10px]">▼</span>
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-             <div className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-2xl flex flex-col items-center border border-white/20">
-                <span className="text-[8px] font-black text-white/70 uppercase mb-1">Points</span>
-                <span className="text-white font-black text-xs">🪙 {points}</span>
-             </div>
-             <button onClick={onOpenCart} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center relative text-[#FF00CC] shadow-xl active:scale-95">
-                🛒
-                {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-yellow-400 text-black text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#FF00CC]">{cartCount}</span>}
-              </button>
-          </div>
-        </div>
-        
-        <div className="relative mb-6">
-          <input type="text" placeholder="Tell Ayoo what you're craving..." className="w-full p-4 pl-12 rounded-2xl bg-white focus:outline-none font-bold text-gray-800" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2">✨</span>
-        </div>
+  // Trending items
+  const trendingItems = useMemo(() => {
+    return restaurants.flatMap(r => r.items.filter(i => i.isPopular)).slice(0, 8);
+  }, [restaurants]);
 
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.name}
-              onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)}
-              className={`flex-shrink-0 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-[0.15em] transition-all ${
-                selectedCategory === cat.name ? 'bg-white text-[#FF00CC]' : 'bg-white/10 text-white'
-              }`}
+  const handleGetCurrentLocation = () => {
+    setGeoStatus('FETCHING');
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        () => {
+          onSetDeliveryCity('Iligan City');
+          setGeoStatus('IDLE');
+          setShowLocationPicker(false);
+        },
+        () => setGeoStatus('ERROR')
+      );
+    } else {
+      setGeoStatus('ERROR');
+    }
+  };
+
+  const askAiForMood = async (mood: string) => {
+    setSelectedMood(mood);
+    setAiLoading(true);
+    setAiSuggestion(null);
+
+    const moodRecommendations: Record<string, { dish: string; reason: string }> = {
+      'Lazy': { dish: 'Chickenjoy', reason: 'Comfort food hits different when you are chilling!' },
+      'Stressed': { dish: 'Milk Tea', reason: 'Sweet treats help ease the stress away!' },
+      'Celebratory': { dish: 'Pizza', reason: 'Nothing says celebration like pizza night!' },
+      'Fit': { dish: 'Salad Bowl', reason: 'Healthy fuel for your achievements!' },
+      'Spicy': { dish: 'Kimchi Fried Rice', reason: 'Turn up the heat!' }
+    };
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const recommendation = moodRecommendations[mood];
+      if (recommendation) {
+        setAiSuggestion(`${recommendation.dish} - ${recommendation.reason}`);
+        const match = restaurants.find(r =>
+          r.items.some(i => i.name.toLowerCase().includes(recommendation.dish.toLowerCase()))
+        );
+        if (match) setRecommendedId(match.id);
+      } else {
+        setAiSuggestion("Try something fresh today!");
+      }
+    } catch (err) {
+      setAiSuggestion("The AI is hungry! Try browsing our top partners.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleServiceClick = (service: Service) => {
+    if (service.screen === 'HOME') return;
+    if (onNavigate) onNavigate(service.screen);
+  };
+
+  const handleSelectRestaurant = (res: Restaurant) => {
+    if (onSelectRestaurant) onSelectRestaurant(res);
+  };
+
+  // Render Discoveries Tab
+  const renderDiscoveries = () => (
+    <>
+      {/* Search Bar */}
+      <div
+        className="relative mb-4 cursor-pointer"
+        onClick={() => onNavigate?.('SEARCH')}
+      >
+        <div className="w-full p-5 pl-14 rounded-[25px] bg-white focus:outline-none font-bold text-gray-800 shadow-lg text-base flex items-center">
+          <span className="text-gray-400">🔍 Search for food, shops...</span>
+        </div>
+      </div>
+
+      {/* Services Grid */}
+      <div className="grid grid-cols-4 gap-3 mb-6">
+        {SERVICES.map((service) => (
+          <button
+            key={service.id}
+            onClick={() => handleServiceClick(service)}
+            className="flex flex-col items-center gap-1 py-2"
+          >
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-md bg-white border border-gray-100"
             >
-              {cat.icon} {cat.name}
+              {service.icon}
+            </div>
+            <span className="text-[9px] font-black text-gray-600 uppercase tracking-wider">{service.name}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Featured Merchants - Discoveries */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">⭐ Featured Merchants</h3>
+          <button className="text-[#FF1493] text-xs font-bold">See All</button>
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {featuredRestaurants.map((res) => (
+            <button
+              key={res.id}
+              onClick={() => handleSelectRestaurant(res)}
+              className="flex-shrink-0 w-40 bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden"
+            >
+              <div className="h-24 overflow-hidden relative">
+                <img src={res.image} alt={res.name} className="w-full h-full object-cover" />
+                <div className="absolute top-2 right-2 bg-yellow-400 text-black text-[8px] font-black px-2 py-1 rounded-full">⭐ {res.rating}</div>
+              </div>
+              <div className="p-3">
+                <p className="font-black text-sm text-gray-900 truncate">{res.name}</p>
+                <p className="text-[10px] text-gray-500">{res.cuisine}</p>
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="px-6 pt-8 flex gap-4 overflow-x-auto scrollbar-hide">
-         <div className="flex-shrink-0 bg-orange-50 p-6 rounded-[35px] border-2 border-orange-100 flex items-center gap-4 min-w-[200px]">
-            <div className="text-4xl animate-bounce">🔥</div>
-            <div>
-               <p className="text-[10px] font-black text-orange-500 uppercase leading-none mb-1 tracking-widest">Streak</p>
-               <h4 className="font-black text-gray-900 text-xl leading-none">{streak} Days</h4>
+      {/* Trending Items */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">🔥 Trending Now</h3>
+          <button className="text-[#FF1493] text-xs font-bold">See All</button>
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {trendingItems.map((item, idx) => (
+            <div key={idx} className="flex-shrink-0 w-32 bg-white rounded-2xl shadow-md border border-gray-100 p-3">
+              <div className="text-2xl mb-2">🍜</div>
+              <p className="font-bold text-xs text-gray-900 truncate">{item.name}</p>
+              <p className="text-[#FF1493] font-black text-sm">₱{item.price}</p>
             </div>
-         </div>
+          ))}
+        </div>
       </div>
 
-      <div className="px-6 pt-8">
-        <h3 className="font-black text-lg text-gray-900 mb-4 tracking-tighter uppercase">Vibe Check Suggestions 🪄</h3>
-        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+      {/* New Merchants */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">🆕 New on Ayoo</h3>
+          <button className="text-[#FF1493] text-xs font-bold">See All</button>
+        </div>
+        <div className="space-y-2">
+          {newRestaurants.slice(0, 3).map((res) => (
+            <button
+              key={res.id}
+              onClick={() => handleSelectRestaurant(res)}
+              className="w-full bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100"
+            >
+              <div className="w-12 h-12 rounded-xl overflow-hidden">
+                <img src={res.image} alt={res.name} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-black text-sm text-gray-900">{res.name}</p>
+                <p className="text-[10px] text-gray-500">{res.cuisine} • {res.deliveryTime}</p>
+              </div>
+              <span className="bg-green-100 text-green-600 text-[8px] font-black px-2 py-1 rounded-full">NEW</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">🗂️ Browse by Category</h3>
+        <div className="grid grid-cols-4 gap-2">
+          {CATEGORIES.slice(0, 8).map((cat) => (
+            <button
+              key={cat.name}
+              onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)}
+              className={`p-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${selectedCategory === cat.name ? 'bg-[#FF1493] text-white' : 'bg-white border border-gray-100'
+                }`}
+            >
+              <span className="text-xl">{cat.icon}</span>
+              <span className="text-[8px] font-black uppercase">{cat.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* AI Picks */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">🤖 AI Picks For You</h3>
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-3">
           {MOODS.map(mood => (
-            <button key={mood.name} onClick={() => askAiForMood(mood.name)} className={`flex-shrink-0 px-6 py-4 rounded-[28px] flex flex-col items-center gap-2 transition-all ${selectedMood === mood.name ? 'bg-[#FF00CC] text-white shadow-lg shadow-pink-200 ring-4 ring-pink-500/20' : 'bg-white border border-gray-100 text-gray-700'}`}>
-              <span className="text-2xl">{mood.icon}</span>
+            <button
+              key={mood.name}
+              onClick={() => askAiForMood(mood.name)}
+              className={`flex-shrink-0 px-4 py-2 rounded-full flex items-center gap-2 transition-all ${selectedMood === mood.name ? 'bg-[#FF1493] text-white' : 'bg-white border border-gray-100'
+                }`}
+            >
+              <span className="text-sm">{mood.icon}</span>
               <span className="text-[10px] font-black uppercase">{mood.name}</span>
             </button>
           ))}
         </div>
+        {(aiLoading || aiSuggestion) && (
+          <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-4 rounded-2xl border border-pink-100">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-black text-[#FF1493]">🤖 Ayoo AI</p>
+              {aiLoading && <div className="w-3 h-3 border-2 border-[#FF1493] border-t-transparent rounded-full animate-spin"></div>}
+            </div>
+            {aiSuggestion && <p className="text-gray-700 font-bold text-sm mt-1">"{aiSuggestion}"</p>}
+          </div>
+        )}
       </div>
 
-      {(aiLoading || aiSuggestion) && (
-        <div className="mx-6 mt-6 p-6 bg-pink-50 rounded-[35px] border-2 border-[#FF00CC]/10 shadow-lg animate-in zoom-in-95 ring-4 ring-pink-500/5">
-            <div className="flex items-center justify-between mb-2">
-               <p className="text-[10px] font-black text-[#FF00CC] uppercase flex items-center gap-2">
-                 <span className="animate-pulse">🤖</span> Ayoo Concierge Suggests
-               </p>
-               {aiLoading && <div className="w-3 h-3 border-2 border-[#FF00CC] border-t-transparent rounded-full animate-spin"></div>}
-            </div>
-            {aiSuggestion && <p className="text-gray-700 font-bold italic leading-snug">"{aiSuggestion}"</p>}
+      {/* Nearby Restaurants */}
+      <div className="mb-24">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">🏪 Nearby Merchants</h3>
         </div>
-      )}
-
-      <div className="px-6 pt-8 pb-10">
-        <h3 className="font-black text-2xl text-gray-900 tracking-tighter mb-6">Nearby Merchants</h3>
-        <div className="grid grid-cols-1 gap-8">
+        <div className="grid grid-cols-2 gap-3">
           {filteredRestaurants.length > 0 ? (
-            filteredRestaurants.slice(0, 15).map(res => (
-              <div key={res.id} className={`bg-white rounded-[40px] overflow-hidden shadow-sm border-2 cursor-pointer transition-all hover:shadow-xl ${res.id === recommendedId ? 'border-[#FF00CC] ring-4 ring-pink-500/5' : 'border-gray-100'}`} onClick={() => onSelectRestaurant(res)}>
-                <div className="h-56 overflow-hidden relative">
+            filteredRestaurants.slice(0, 8).map(res => (
+              <div
+                key={res.id}
+                className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100"
+                onClick={() => handleSelectRestaurant(res)}
+              >
+                <div className="h-24 overflow-hidden relative">
                   <img src={res.image} alt={res.name} className="w-full h-full object-cover" />
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-black text-[#FF00CC]">🛵 {res.deliveryTime}</div>
-                  
-                  {res.hasLiveCam && (
-                    <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1.5 rounded-xl text-[8px] font-black uppercase flex items-center gap-2 animate-pulse shadow-lg">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                      Live Prep
-                    </div>
-                  )}
-                </div>
-                <div className="p-6">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-black text-xl text-gray-900 tracking-tight">{res.name}</h4>
-                    <span className="text-yellow-400 font-black text-xs">⭐ {res.rating}</span>
+                  <div className="absolute top-2 left-2 bg-white/90 px-2 py-1 rounded-lg text-[8px] font-black">
+                    🛵 {res.deliveryTime}
                   </div>
-                  <div className="flex items-center gap-4 mt-2">
-                    <span className="text-[10px] font-black text-gray-400 uppercase">{res.cuisine}</span>
-                    <span className="text-[#FF00CC] font-black text-[10px] uppercase">View Menu →</span>
+                </div>
+                <div className="p-2">
+                  <h4 className="font-black text-xs text-gray-900 truncate">{res.name}</h4>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-[8px] text-gray-500">{res.cuisine}</span>
+                    <span className="text-yellow-500 font-black text-[8px]">⭐ {res.rating}</span>
                   </div>
                 </div>
               </div>
             ))
           ) : (
-            <div className="py-20 text-center opacity-30">
-               <span className="text-6xl mb-4">🏜️</span>
-               <p className="font-black uppercase tracking-widest text-sm">No matches found</p>
+            <div className="col-span-2 py-8 text-center opacity-50">
+              <span className="text-4xl mb-2 block">🏜️</span>
+              <p className="font-black uppercase text-xs">No restaurants found</p>
             </div>
           )}
         </div>
       </div>
+    </>
+  );
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 px-8 py-5 flex justify-around items-center max-w-md mx-auto rounded-t-[45px] shadow-[0_-15px_40px_rgba(0,0,0,0.08)] z-50">
-        <button onClick={() => onNavigate('HOME')} className="flex flex-col items-center text-[#FF00CC]">
-          <span className="text-2xl mb-1">🏠</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">Home</span>
+  // Render Community Tab
+  const renderCommunity = () => (
+    <>
+      {/* Welcome Banner */}
+      <div className="bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-2xl p-4 mb-6 text-white">
+        <h3 className="font-black text-lg">👋 Welcome to Ayoo Community!</h3>
+        <p className="text-white/80 text-xs mt-1">Connect with riders, merchants, and customers</p>
+      </div>
+
+      {/* User's Role Card */}
+      <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-full flex items-center justify-center text-2xl">
+            {userRole === 'MERCHANT' ? '🏪' : userRole === 'RIDER' ? '🛵' : '👤'}
+          </div>
+          <div className="flex-1">
+            <p className="font-black text-gray-900">{currentUser?.name || 'Guest User'}</p>
+            <p className="text-[#FF1493] text-xs font-bold uppercase">{userRole}</p>
+          </div>
+          <button
+            onClick={() => onNavigate?.('MESSAGES')}
+            className="bg-[#FF1493] text-white text-xs font-black px-4 py-2 rounded-full"
+          >
+            💬 Chat
+          </button>
+        </div>
+      </div>
+
+      {/* Top Riders Leaderboard */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">🏆 Top Riders This Month</h3>
+        <div className="space-y-2">
+          {TOP_RIDERS.map((rider, idx) => (
+            <div key={rider.id} className="bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-yellow-400 text-black' : idx === 1 ? 'bg-gray-300 text-black' : 'bg-orange-200 text-black'
+                }`}>
+                {idx + 1}
+              </div>
+              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                {rider.avatar}
+              </div>
+              <div className="flex-1">
+                <p className="font-black text-sm text-gray-900">{rider.name}</p>
+                <p className="text-[10px] text-gray-500">{rider.stats}</p>
+              </div>
+              <span className="text-[#FF1493] text-[10px] font-bold">{rider.badge}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Featured Merchants Spotlight */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">⭐ Merchant Spotlight</h3>
+        <div className="space-y-2">
+          {FEATURED_MERCHANTS.map((merchant) => (
+            <button
+              key={merchant.id}
+              className="w-full bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100"
+            >
+              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-2xl">
+                {merchant.avatar}
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-black text-sm text-gray-900">{merchant.name}</p>
+                <p className="text-[10px] text-gray-500">{merchant.stats}</p>
+              </div>
+              <span className="bg-pink-100 text-[#FF1493] text-[8px] font-black px-2 py-1 rounded-full">{merchant.badge}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Community Posts */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">📢 Community Posts</h3>
+        <div className="space-y-3">
+          {COMMUNITY_POSTS.map((post) => (
+            <div key={post.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">{post.avatar}</span>
+                <div>
+                  <p className="font-black text-xs text-gray-900">{post.author}</p>
+                  <p className="text-[8px] text-gray-400">{post.time}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-700 mb-3">{post.content}</p>
+              <div className="flex items-center gap-4">
+                <button className="flex items-center gap-1 text-gray-400 text-xs">
+                  <span>❤️</span> {post.likes}
+                </button>
+                <button className="flex items-center gap-1 text-gray-400 text-xs">
+                  <span>💬</span> Reply
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent Activity Feed */}
+      <div className="mb-24">
+        <h3 className="font-black text-gray-900 text-base mb-3">📊 Recent Activity</h3>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          {recentOrders.length > 0 ? (
+            recentOrders.slice(0, 5).map((order, idx) => (
+              <div key={idx} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                <span className="text-lg">🛵</span>
+                <div className="flex-1">
+                  <p className="font-bold text-xs text-gray-900">{order.restaurantName}</p>
+                  <p className="text-[8px] text-gray-500">{order.status} • ₱{order.total}</p>
+                </div>
+                <span className="text-[8px] text-gray-400">{order.date}</span>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-4 opacity-50">
+              <p className="text-2xl mb-2">📦</p>
+              <p className="text-xs font-black">No recent orders</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50 pb-24 overflow-y-auto scroll-smooth scrollbar-hide">
+
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end justify-center">
+          <div className="bg-white w-full max-w-md rounded-t-[50px] p-8 animate-in slide-in-from-bottom-10 shadow-2xl">
+            <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-6"></div>
+            <h3 className="text-xl font-black uppercase tracking-tighter mb-4 text-center">📍 Select Location</h3>
+            <button
+              onClick={handleGetCurrentLocation}
+              disabled={geoStatus === 'FETCHING'}
+              className="w-full mb-4 p-4 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center gap-2 text-white font-black uppercase text-sm shadow-lg"
+            >
+              {geoStatus === 'FETCHING' ? '📡 Locating...' : '📍 Use Current Location'}
+            </button>
+            <div className="space-y-2 max-h-[30vh] overflow-y-auto pb-4">
+              {PHILIPPINE_CITIES.map(city => (
+                <button
+                  key={city}
+                  onClick={() => { onSetDeliveryCity(city); setShowLocationPicker(false); }}
+                  className={`w-full p-3 rounded-2xl flex items-center justify-between border-2 transition-all ${deliveryCity === city ? 'bg-pink-50 border-[#FF1493]' : 'bg-gray-50 border-gray-100'
+                    }`}
+                >
+                  <span className={`font-bold text-sm ${deliveryCity === city ? 'text-[#FF1493]' : 'text-gray-900'}`}>{city}</span>
+                  {deliveryCity === city && <span className="text-[#FF1493]">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-gradient-to-br from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-5 pb-32 shadow-2xl rounded-b-[40px]">
+        {/* Top Row */}
+        <div className="flex justify-between items-start mb-4">
+          <div
+            className="cursor-pointer flex items-center gap-2 flex-1"
+            onClick={() => setShowLocationPicker(true)}
+          >
+            <div className="bg-white/30 backdrop-blur-md p-2 rounded-xl">
+              <span className="text-xl">📍</span>
+            </div>
+            <div>
+              <p className="text-[8px] font-bold text-white/80 uppercase tracking-widest">Delivering to</p>
+              <p className="font-black text-white text-lg flex items-center gap-1">
+                {deliveryCity} <span className="text-xs opacity-80">▼</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="bg-white/30 backdrop-blur-md px-3 py-2 rounded-xl flex items-center gap-1">
+              <span className="text-lg">🪙</span>
+              <span className="text-white font-black text-sm">{points}</span>
+            </div>
+            <button
+              onClick={() => onOpenCart?.()}
+              className="w-12 h-12 bg-white rounded-xl flex items-center justify-center relative shadow-lg"
+            >
+              <span className="text-xl">🛒</span>
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-black w-5 h-5 rounded-full flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="bg-white/20 backdrop-blur-sm rounded-full p-1 flex">
+          <button
+            onClick={() => setActiveTab('discover')}
+            className={`flex-1 py-2 px-4 rounded-full text-sm font-black uppercase tracking-wider transition-all ${activeTab === 'discover' ? 'bg-white text-[#FF1493] shadow-md' : 'text-white'
+              }`}
+          >
+            🔍 Discover
+          </button>
+          <button
+            onClick={() => setActiveTab('community')}
+            className={`flex-1 py-2 px-4 rounded-full text-sm font-black uppercase tracking-wider transition-all ${activeTab === 'community' ? 'bg-white text-[#FF1493] shadow-md' : 'text-white'
+              }`}
+          >
+            👥 Community
+          </button>
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <div className="px-4 -mt-20 relative z-10">
+        {activeTab === 'discover' ? renderDiscoveries() : renderCommunity()}
+      </div>
+
+      {/* Bottom Navigation - GRAB STYLE */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 px-6 py-3 flex justify-around items-center max-w-md mx-auto rounded-t-[40px] shadow-[0_-10px_40px_rgba(255,20,147,0.15)] z-50">
+        <button onClick={() => { }} className="flex flex-col items-center text-[#FF1493] p-2">
+          <span className="text-3xl mb-1">🏠</span>
+          <span className="text-[10px] font-black uppercase tracking-wider">Home</span>
         </button>
-        <button onClick={() => onNavigate('VOUCHERS')} className="flex flex-col items-center text-gray-300">
-          <span className="text-2xl mb-1">🎟️</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">Voucher</span>
+        <button onClick={() => onNavigate?.('MESSAGES')} className="flex flex-col items-center text-gray-400 p-2">
+          <span className="text-3xl mb-1">💬</span>
+          <span className="text-[10px] font-black uppercase tracking-wider">Messages</span>
         </button>
-        <button onClick={() => onNavigate('HISTORY')} className="flex flex-col items-center text-gray-300">
-          <span className="text-2xl mb-1">📑</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">History</span>
+        <button onClick={() => onNavigate?.('VOUCHERS')} className="flex flex-col items-center text-gray-400 p-2">
+          <span className="text-3xl mb-1">🎟️</span>
+          <span className="text-[10px] font-black uppercase tracking-wider">Voucher</span>
         </button>
-        <button onClick={() => onNavigate('PROFILE')} className="flex flex-col items-center text-gray-300">
-          <span className="text-2xl mb-1">👤</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">Profile</span>
+        <button onClick={() => onNavigate?.('HISTORY')} className="flex flex-col items-center text-gray-400 p-2">
+          <span className="text-3xl mb-1">📑</span>
+          <span className="text-[10px] font-black uppercase tracking-wider">Orders</span>
+        </button>
+        <button onClick={() => onNavigate?.('PROFILE')} className="flex flex-col items-center text-gray-400 p-2">
+          <span className="text-3xl mb-1">👤</span>
+          <span className="text-[10px] font-black uppercase tracking-wider">Profile</span>
         </button>
       </div>
     </div>
@@ -281,3 +635,4 @@ const Home: React.FC<HomeProps> = ({
 };
 
 export default Home;
+

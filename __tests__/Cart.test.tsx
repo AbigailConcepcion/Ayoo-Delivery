@@ -8,8 +8,34 @@ declare global {
   }
 }
 import Cart from '../screens/Cart';
+import { ToastProvider } from '../components/ToastContext';
+import userEvent from '@testing-library/user-event';
 
 test('renders Checkout Central header', () => {
-  render(<Cart items={[]} onBack={() => {}} onCheckout={() => {}} onUpdateQuantity={() => {}} />);
-  expect(screen.getByText(/Checkout Central/i)).toBeInTheDocument();
+  render(
+    <ToastProvider>
+      <Cart items={[]} onBack={() => {}} onCheckout={() => {}} onUpdateQuantity={() => {}} />
+    </ToastProvider>
+  );
+  expect(screen.getByText(/Checkout Central/i)).toBeDefined();
+});
+
+test('quantity buttons call update callback', () => {
+  const updateFn = jest.fn();
+  render(
+    <ToastProvider>
+      <Cart
+        items={[{ id: 'item1', quantity: 1 }]}
+        onBack={() => {}}
+        onCheckout={() => {}}
+        onUpdateQuantity={updateFn}
+      />
+    </ToastProvider>
+  );
+  const plus = screen.getByText('+');
+  const minus = screen.getByText('-');
+  userEvent.click(plus);
+  expect(updateFn).toHaveBeenCalledWith('item1', 1);
+  userEvent.click(minus);
+  expect(updateFn).toHaveBeenCalledWith('item1', -1);
 });

@@ -1,0 +1,32 @@
+<parameter name="content"># Ayoo Delivery - Implementation TODO
+
+## Phase 1: Home Screen (Discoveries & Community)
+- [ ] Transform home into discovery-focused community screen
+- [ ] Food button shows all restaurants list
+- [ ] Search bar opens full search screen when clicked
+- [ ] Search now includes: cravings, places, groceries, medicines
+
+## Phase 2: Services Screen Fixes
+- [ ] Fix overlapping/checkout UI issues
+- [ ] Rename "Bills" to "Bills & Load"
+- [ ] Rename "Flowers" to "Dine Out" 
+- [ ] Enable dine out and pharmacy features
+
+## Phase 3: Navigation Updates
+- [ ] Remove top nav bar in bills/payments screen (keep back to home)
+- [ ] Replace search bottom bar with "Messages" feature
+
+## Phase 4: Delivery Address Requirements
+- [ ] Always require delivery address before checkout
+
+## Phase 5: Profile Improvements
+- [ ] Make profile fully editable and savable
+
+## Phase 6: UI/UX Improvements
+- [ ] Production-level polish throughout
+- [ ] Fix services screen freezing issues
+
+## Implementation Status:
+- Started: [Date]
+- Completed: 
+</parameter>

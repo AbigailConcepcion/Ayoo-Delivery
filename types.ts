@@ -1,7 +1,16 @@
 
-export type AppScreen = 'ONBOARDING' | 'AUTH' | 'HOME' | 'RESTAURANT' | 'CART' | 'TRACKING' | 'VOUCHERS' | 'HISTORY' | 'PROFILE' | 'ADDRESSES' | 'PAYMENTS' | 'MERCHANT_DASHBOARD' | 'RIDER_DASHBOARD' | 'ADMIN_PANEL' | 'MANUAL';
+export type AppScreen = 'ONBOARDING' | 'AUTH' | 'SERVICES' | 'HOME' | 'SEARCH' | 'MESSAGES' | 'GROCERIES' | 'COURIER' | 'RIDES' | 'DINE_OUT' | 'PHARMACY' | 'RESTAURANT' | 'CART' | 'TRACKING' | 'VOUCHERS' | 'HISTORY' | 'PROFILE' | 'ADDRESSES' | 'PAYMENTS' | 'PABILI' | 'MERCHANT_DASHBOARD' | 'RIDER_DASHBOARD' | 'ADMIN_PANEL' | 'MANUAL';
 
-export type UserRole = 'CUSTOMER' | 'MERCHANT' | 'RIDER';
+export const USER_ROLES = {
+  CUSTOMER: 'CUSTOMER',
+  MERCHANT: 'MERCHANT',
+  RIDER: 'RIDER',
+  ADMIN: 'ADMIN',
+} as const;
+
+export const UserRole = USER_ROLES;
+
+export type UserRole = typeof UserRole[keyof typeof UserRole];
 
 export interface UserAccount {
   email: string;
@@ -9,7 +18,7 @@ export interface UserAccount {
   avatar?: string;
   password?: string;
   points: number;
-  xp: number; 
+  xp: number;
   level: number;
   streak: number;
   badges: UserBadge[];
@@ -17,7 +26,7 @@ export interface UserAccount {
   role?: UserRole;
   merchantId?: string;
   earnings?: number;
-  manualsSeen?: string[]; // Tracks which role manuals the user has viewed
+  manualsSeen?: string[];
 }
 
 export interface WalletTransaction {
@@ -72,7 +81,7 @@ export type OrderStatus = 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY_FOR_PICK
 export interface OrderRecord {
   id: string;
   date: string;
-  items: { name: string; quantity: number; price: number }[];
+  items: { name: string; quantity: number; price: number; id?: string }[];
   total: number;
   status: OrderStatus;
   restaurantName: string;
@@ -85,7 +94,7 @@ export interface OrderRecord {
   pointsEarned?: number;
   paymentMethod?: string;
   paymentId?: string;
-  isPaid?: boolean;
+  isPaid?: boolean | number;
   transactionId?: string;
   rating?: number;
   comment?: string;
@@ -112,6 +121,10 @@ export interface Address {
   label: string;
   details: string;
   city: string;
+  latitude?: number;
+  longitude?: number;
+  distanceKm?: number;
+  deliveryFee?: number;
 }
 
 export type PaymentType = 'VISA' | 'MASTERCARD' | 'GCASH' | 'MAYA' | 'CASH' | 'COD';
@@ -123,6 +136,58 @@ export interface PaymentMethod {
   expiry?: string;
   phoneNumber?: string;
   balance?: number | null;
-  // optional token or source id for card payments
   token?: string;
 }
+
+// ==================== MESSAGING TYPES ====================
+
+export type ParticipantRole = 'CUSTOMER' | 'MERCHANT' | 'RIDER';
+
+export interface ConversationParticipant {
+  email: string;
+  name: string;
+  role: ParticipantRole;
+  avatar?: string;
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderEmail: string;
+  senderName: string;
+  text: string;
+  timestamp: string;
+  read: boolean;
+}
+
+export interface Conversation {
+  id: string;
+  participants: ConversationParticipant[];
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  orderId?: string;
+  orderStatus?: string;
+}
+
+// Community Platform Types
+export type CommunityRole = 'customer' | 'merchant' | 'rider';
+
+export interface CommunityMember {
+  id: string;
+  name: string;
+  role: CommunityRole;
+  avatar?: string;
+  stats: string;
+  badge: string;
+}
+
+export interface CommunityPost {
+  id: string;
+  author: string;
+  avatar: string;
+  content: string;
+  time: string;
+  likes: number;
+}
+

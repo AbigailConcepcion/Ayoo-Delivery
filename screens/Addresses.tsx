@@ -9,9 +9,26 @@ interface AddressesProps {
   onBack: () => void;
   email: string;
   currentCity: string;
+  onSelectAddress?: (address: Address) => void;
 }
 
-const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity }) => {
+const MAP_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const STORE_HUB = { lat: 8.228, lng: 124.2452 }; // Iligan City center proxy
+
+const toRad = (value: number) => (value * Math.PI) / 180;
+const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const x = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+};
+
+const calcDeliveryFee = (distanceKm: number) => Math.min(220, Math.max(45, Math.round(45 + distanceKm * 8)));
+
+const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity, onSelectAddress }) => {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newLabel, setNewLabel] = useState('');
@@ -19,6 +36,12 @@ const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity }) => 
   const [selectedCity, setSelectedCity] = useState(currentCity);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pinLat, setPinLat] = useState<number | null>(null);
+  const [pinLng, setPinLng] = useState<number | null>(null);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [estFee, setEstFee] = useState<number | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const mapId = 'ayoo-map-picker';
 
   useEffect(() => {
     const fetch = async () => {
@@ -36,7 +59,11 @@ const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity }) => 
       id: Date.now().toString(), 
       label: newLabel, 
       details: newDetails,
-      city: selectedCity
+      city: selectedCity,
+      latitude: pinLat || undefined,
+      longitude: pinLng || undefined,
+      distanceKm: distanceKm || undefined,
+      deliveryFee: estFee || undefined
     };
     const updated = [...addresses, item];
     await db.saveAddresses(email, updated);
@@ -50,7 +77,16 @@ const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity }) => 
   const handleUpdate = async () => {
     if (!editingId || !newLabel || !newDetails) return;
     setIsLoading(true);
-    const updated = addresses.map(a => a.id === editingId ? { ...a, label: newLabel, details: newDetails, city: selectedCity } : a);
+    const updated = addresses.map(a => a.id === editingId ? {
+      ...a,
+      label: newLabel,
+      details: newDetails,
+      city: selectedCity,
+      latitude: pinLat || undefined,
+      longitude: pinLng || undefined,
+      distanceKm: distanceKm || undefined,
+      deliveryFee: estFee || undefined
+    } : a);
     await db.saveAddresses(email, updated);
     setAddresses(updated);
     setNewLabel('');
@@ -65,6 +101,10 @@ const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity }) => 
     setNewLabel(address.label);
     setNewDetails(address.details);
     setSelectedCity(address.city);
+    setPinLat(address.latitude || null);
+    setPinLng(address.longitude || null);
+    setDistanceKm(address.distanceKm || null);
+    setEstFee(address.deliveryFee || null);
     setShowForm(true);
   };
 
@@ -84,7 +124,76 @@ const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity }) => 
     setNewLabel('');
     setNewDetails('');
     setSelectedCity(currentCity);
+    setPinLat(null);
+    setPinLng(null);
+    setDistanceKm(null);
+    setEstFee(null);
   };
+
+  useEffect(() => {
+    if (!showForm || !MAP_API_KEY) return;
+    setMapReady(false);
+    const setupMap = () => {
+      const googleRef = (window as any).google;
+      const container = document.getElementById(mapId);
+      if (!googleRef || !container) return;
+      const center = {
+        lat: pinLat || STORE_HUB.lat,
+        lng: pinLng || STORE_HUB.lng
+      };
+      const map = new googleRef.maps.Map(container, {
+        center,
+        zoom: pinLat && pinLng ? 15 : 13,
+        mapTypeControl: false,
+        streetViewControl: false
+      });
+
+      let marker: any = null;
+      const setMarker = (lat: number, lng: number) => {
+        if (!marker) {
+          marker = new googleRef.maps.Marker({ map, position: { lat, lng } });
+        } else {
+          marker.setPosition({ lat, lng });
+        }
+        map.panTo({ lat, lng });
+      };
+
+      if (pinLat && pinLng) setMarker(pinLat, pinLng);
+
+      map.addListener('click', (event: any) => {
+        const lat = Number(event.latLng.lat());
+        const lng = Number(event.latLng.lng());
+        setPinLat(lat);
+        setPinLng(lng);
+        setMarker(lat, lng);
+        const km = haversineKm(STORE_HUB, { lat, lng });
+        const fee = calcDeliveryFee(km);
+        setDistanceKm(Number(km.toFixed(2)));
+        setEstFee(fee);
+        if (!newDetails.trim()) {
+          setNewDetails(`Pinned location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+        }
+      });
+      setMapReady(true);
+    };
+
+    if ((window as any).google?.maps) {
+      setupMap();
+      return;
+    }
+
+    const existing = document.getElementById('ayoo-google-maps-script') as HTMLScriptElement | null;
+    if (existing) {
+      existing.onload = () => setupMap();
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'ayoo-google-maps-script';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAP_API_KEY}`;
+    script.async = true;
+    script.onload = () => setupMap();
+    document.body.appendChild(script);
+  }, [showForm]);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
@@ -113,13 +222,20 @@ const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity }) => 
            addresses.map(a => (
              <div key={a.id} className="bg-white p-7 rounded-[40px] shadow-sm flex items-center justify-between border border-gray-50 group animate-in slide-in-from-right-5 hover:border-[#FF00CC]/30 transition-all">
                 <div className="flex-1">
-                   <div className="flex items-center gap-2 mb-2">
+                 <div className="flex items-center gap-2 mb-2">
                      <h4 className="font-black text-gray-900 tracking-tight leading-none text-lg uppercase">{a.label}</h4>
                      <span className="bg-pink-50 text-[#FF00CC] px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">{a.city}</span>
+                     {a.deliveryFee ? <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase">Fee ₱{a.deliveryFee}</span> : null}
                    </div>
                    <p className="text-xs text-gray-400 font-bold">{a.details}</p>
                 </div>
                 <div className="flex gap-2">
+                  <button
+                    onClick={() => onSelectAddress?.(a)}
+                    className="px-3 h-10 bg-gray-100 text-gray-700 rounded-xl text-[9px] font-black uppercase tracking-widest"
+                  >
+                    Use
+                  </button>
                   <button 
                     onClick={() => startEdit(a)}
                     className="w-10 h-10 bg-pink-50 text-[#FF00CC] rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-pink-100 active:scale-90"
@@ -176,6 +292,23 @@ const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity }) => 
                       className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm transition-all"
                     />
                  </div>
+                 {MAP_API_KEY ? (
+                   <div className="space-y-3">
+                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">Pin on Google Map</label>
+                     <div id={mapId} className="w-full h-64 rounded-[24px] border border-gray-100 overflow-hidden"></div>
+                     <p className="text-[10px] font-bold text-gray-500">
+                       {mapReady ? 'Tap anywhere on map to drop your exact pin.' : 'Loading Google Map...'}
+                     </p>
+                     {distanceKm !== null && estFee !== null && (
+                       <div className="bg-pink-50 p-4 rounded-2xl border border-pink-100">
+                         <p className="text-[10px] font-black uppercase tracking-widest text-pink-500">Auto Delivery Estimate</p>
+                         <p className="text-sm font-black text-gray-800 mt-1">{distanceKm.toFixed(2)} km • Fee ₱{estFee}</p>
+                       </div>
+                     )}
+                   </div>
+                 ) : (
+                   <p className="text-[10px] font-bold text-amber-600">Set `VITE_GOOGLE_MAPS_API_KEY` para gumana ang Google Map pin picker.</p>
+                 )}
                  <div className="flex flex-col gap-3 pt-4">
                     <Button onClick={editingId ? handleUpdate : handleAdd} disabled={isLoading} className="pill-shadow py-5 font-black uppercase tracking-widest text-sm">
                        {isLoading ? 'Saving...' : editingId ? 'Update Pin' : 'Pin Location'}

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppScreen, Voucher, UserAccount } from '../types';
 import { db } from '../db';
+import BottomNav from '../components/BottomNav';
 
 interface VouchersProps {
   onBack: () => void;
@@ -74,24 +75,7 @@ const Vouchers: React.FC<VouchersProps> = ({ onBack, onApply, onNavigate }) => {
         })}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 px-8 py-5 flex justify-around items-center max-w-md mx-auto rounded-t-[45px] shadow-[0_-15px_40px_rgba(0,0,0,0.08)] z-50">
-        <button onClick={() => onNavigate('HOME')} className="flex flex-col items-center text-gray-300">
-          <span className="text-2xl mb-1">🏠</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">Home</span>
-        </button>
-        <button onClick={() => onNavigate('VOUCHERS')} className="flex flex-col items-center text-[#FF00CC]">
-          <span className="text-2xl mb-1">🎟️</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">Voucher</span>
-        </button>
-        <button onClick={() => onNavigate('HISTORY')} className="flex flex-col items-center text-gray-300">
-          <span className="text-2xl mb-1">📑</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">History</span>
-        </button>
-        <button onClick={() => onNavigate('PROFILE')} className="flex flex-col items-center text-gray-300">
-          <span className="text-2xl mb-1">👤</span>
-          <span className="text-[10px] font-black uppercase tracking-widest">Profile</span>
-        </button>
-      </div>
+      <BottomNav active="VOUCHERS" onNavigate={onNavigate} mode="customer" />
     </div>
   );
 };

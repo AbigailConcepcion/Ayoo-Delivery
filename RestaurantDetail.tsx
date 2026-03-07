@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Restaurant, FoodItem, Review } from '../types';
-import Button from '../components/Button';
+import { useToast } from './components/ToastContext';
+import { Restaurant, FoodItem, Review } from './types';
 
 interface RestaurantDetailProps {
   restaurant: Restaurant;
@@ -14,8 +14,7 @@ interface RestaurantDetailProps {
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack, onAddToCart, onOpenCart, cartCount }) => {
   const [activeTab, setActiveTab] = useState<'Menu' | 'Reviews'>('Menu');
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
+  const { showToast } = useToast();
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showLiveCam, setShowLiveCam] = useState(false);
   const [newRating, setNewRating] = useState(5);
@@ -24,8 +23,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
 
   const handleAdd = (item: FoodItem) => {
     onAddToCart(item.id);
-    setToastMessage(`Added ${item.name} to cart`);
-    setShowToast(true);
+    showToast(`Added ${item.name} to cart`);
   };
 
   const handleReviewSubmit = () => {
@@ -44,20 +42,13 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
     setNewComment('');
     setNewRating(5);
     setShowReviewModal(false);
-    setToastMessage('Review posted successfully! ✨');
-    setShowToast(true);
+    showToast('Review posted successfully! ✨');
   };
 
-  useEffect(() => {
-    if (showToast) {
-      const timer = setTimeout(() => setShowToast(false), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [showToast]);
 
   const categorizedItems = useMemo(() => {
     const groups: Record<string, FoodItem[]> = {};
-    restaurant.items.forEach(item => {
+    restaurant.items.forEach((item: FoodItem) => {
       if (!groups[item.category]) groups[item.category] = [];
       groups[item.category].push(item);
     });
@@ -99,15 +90,6 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
         </div>
       )}
 
-      {/* Toast Notification */}
-      {showToast && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 w-[85%] z-[100] animate-in fade-in slide-in-from-top-4">
-          <div className="bg-white rounded-3xl p-4 shadow-xl border-2 border-[#FF00CC]/10 flex items-center gap-4">
-            <div className="w-10 h-10 ayoo-gradient rounded-xl flex items-center justify-center text-white">✓</div>
-            <p className="text-gray-900 font-bold text-sm truncate">{toastMessage}</p>
-          </div>
-        </div>
-      )}
 
       {/* Write Review Modal */}
       {showReviewModal && (
@@ -120,7 +102,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                 ))}
               </div>
               <textarea placeholder="How was the vibe?..." className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[30px] font-bold text-sm focus:outline-none focus:border-[#FF00CC] mb-8 min-h-[120px]" value={newComment} onChange={(e) => setNewComment(e.target.value)} />
-              <Button onClick={handleReviewSubmit} className="pill-shadow py-5 font-black uppercase">Post Review</Button>
+              <button onClick={handleReviewSubmit} className="w-full bg-[#FF00CC] text-white pill-shadow py-5 font-black uppercase rounded-2xl">Post Review</button>
               <button onClick={() => setShowReviewModal(false)} className="w-full mt-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Cancel</button>
            </div>
         </div>
@@ -252,10 +234,10 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
 
       {cartCount > 0 && activeTab === 'Menu' && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[85%] z-50">
-          <Button onClick={onOpenCart} className="pill-shadow py-6 text-xl font-black uppercase tracking-widest flex items-center justify-between px-10">
+          <button onClick={onOpenCart} className="w-full bg-[#FF00CC] text-white pill-shadow py-6 text-xl font-black uppercase tracking-widest flex items-center justify-between px-10 rounded-2xl">
             <span>Checkout Now</span>
             <span className="bg-white text-[#FF00CC] w-10 h-10 rounded-full flex items-center justify-center text-sm font-black">{cartCount}</span>
-          </Button>
+          </button>
         </div>
       )}
     </div>

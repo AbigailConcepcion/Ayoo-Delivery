@@ -1,15 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import Button from '../components/Button';
-import { MOCK_RESTAURANTS } from '../constants';
-import { Voucher, PaymentMethod, PaymentType } from '../types';
+import { Voucher, PaymentMethod, PaymentType, Restaurant } from '../types';
 import { db } from '../db';
 import { ayooCloud } from '../api';
+import { calculateCheckoutBreakdown } from '../src/utils/pricing';
 
 interface CartProps {
   items: { id: string; quantity: number }[];
+  restaurants: Restaurant[];
   onBack: () => void;
-  onCheckout: (paymentMethod: PaymentMethod | null, isPaid: boolean) => void;
+  onCheckout: (
+    paymentMethod: PaymentMethod | null,
+    isPaid: boolean,
+    paymentMeta?: { orderId?: string; transactionId?: string; paymentId?: string; receiptUrl?: string }
+  ) => void;
+  onNavigateToTracking?: () => void;
   onUpdateQuantity: (itemId: string, delta: number) => void;
   isGroup?: boolean;
   onStartGroup?: () => void;
@@ -17,23 +23,24 @@ interface CartProps {
   customDeliveryFee?: number;
 }
 
-const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity, isGroup, onStartGroup, appliedVoucher, customDeliveryFee = 45 }) => {
+const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onNavigateToTracking, onUpdateQuantity, isGroup, onStartGroup, appliedVoucher, customDeliveryFee = 45 }) => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
+  const [paymentFilter, setPaymentFilter] = useState<'DIGITAL' | 'CARD' | 'CASH'>('DIGITAL');
   const [isProcessing, setIsProcessing] = useState(false);
   const [payStep, setPayStep] = useState(1);
   const [handshakeLogs, setHandshakeLogs] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [checkoutOrderId, setCheckoutOrderId] = useState<string>('');
 
   useEffect(() => {
     const fetchPay = async () => {
       const email = (await db.getSession())?.email || '';
       const methods = await db.getPayments(email);
-      // always offer cash-on-delivery
-      const codOption: PaymentMethod = { id: 'COD', type: 'COD' as PaymentType, last4: '', expiry: '', phoneNumber: '', balance: null };
-      const all = [codOption, ...methods];
+      const codOption: PaymentMethod = { id: 'COD', type: 'COD' as PaymentType, balance: null };
+      const all = [...methods, codOption];
       setPaymentMethods(all);
       if (all.length > 0) setSelectedMethod(all[0]);
     };
@@ -41,7 +48,7 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
   }, []);
 
   const cartDetails = items.map(cartItem => {
-    for (const res of MOCK_RESTAURANTS) {
+    for (const res of restaurants) {
       const item = res.items.find(i => i.id === cartItem.id);
       if (item) return { ...item, quantity: cartItem.quantity };
     }
@@ -49,9 +56,19 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
   }).filter(Boolean);
 
   const subtotal = cartDetails.reduce((acc, curr) => acc + (curr?.price || 0) * (curr?.quantity || 0), 0);
-  const deliveryFee = customDeliveryFee;
-  const discountAmount = appliedVoucher ? (appliedVoucher.type === 'percent' ? (subtotal * appliedVoucher.discount / 100) : appliedVoucher.discount) : 0;
-  const total = subtotal + deliveryFee - discountAmount;
+  const {
+    deliveryFee,
+    serviceFee,
+    tax,
+    discount: discountAmount,
+    total
+  } = calculateCheckoutBreakdown(subtotal, customDeliveryFee, appliedVoucher);
+
+  const filteredPaymentMethods = paymentMethods.filter((method) => {
+    if (paymentFilter === 'CARD') return method.type === 'VISA' || method.type === 'MASTERCARD';
+    if (paymentFilter === 'CASH') return method.type === 'CASH' || method.type === 'COD';
+    return method.type === 'GCASH' || method.type === 'MAYA';
+  });
 
   const addLog = (msg: string) => setHandshakeLogs(prev => [...prev.slice(-4), msg]);
 
@@ -64,6 +81,7 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
 
     const email = (await db.getSession())?.email || '';
     const tempId = `AYO-${Math.floor(Math.random()*90000)}`;
+    setCheckoutOrderId(tempId);
 
     addLog("Connecting to Ayoo Backend API...");
     setTimeout(() => addLog("Handshaking with Payment Gateway..."), 800);
@@ -90,6 +108,18 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
     const res = await ayooCloud.processPayment(email, selectedMethod, total, tempId);
     
     if (res.success) {
+      if (res.pending && res.checkoutUrl) {
+        setIsProcessing(false);
+        window.open(res.checkoutUrl, '_blank', 'noopener,noreferrer');
+        onCheckout(selectedMethod, false, {
+          orderId: tempId,
+          transactionId: res.transactionId,
+          paymentId: res.reference,
+          receiptUrl: res.checkoutUrl
+        });
+        return;
+      }
+
       setPayStep(3);
       setReceiptData({
         ref: res.reference,
@@ -139,7 +169,7 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
               </div>
 
               <div className="flex flex-col gap-3">
-                 <Button onClick={() => onCheckout(selectedMethod, selectedMethod?.type !== 'COD')} className="pill-shadow py-5 font-black uppercase tracking-[0.1em]">Track Real-time</Button>
+                 <Button onClick={() => onCheckout(selectedMethod, selectedMethod?.type !== 'COD', { orderId: checkoutOrderId, transactionId: receiptData?.txn || '', paymentId: receiptData?.ref || '' })} className="pill-shadow py-5 font-black uppercase tracking-[0.1em]">Track Real-time</Button>
               </div>
            </div>
         </div>
@@ -208,15 +238,35 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
                   <p className="text-[10px] text-gray-400 font-bold uppercase">₱{item!.price} x {item!.quantity}</p>
                 </div>
               </div>
-              <span className="font-black text-gray-900">₱{item!.price * item!.quantity}</span>
+              <div className="flex flex-col items-end gap-2">
+                <span className="font-black text-gray-900">₱{item!.price * item!.quantity}</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => onUpdateQuantity(item!.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 font-black">-</button>
+                  <span className="text-xs font-black w-5 text-center">{item!.quantity}</span>
+                  <button onClick={() => onUpdateQuantity(item!.id, 1)} className="w-7 h-7 rounded-full bg-pink-100 text-[#FF00CC] font-black">+</button>
+                </div>
+              </div>
             </div>
           ))}
         </div>
 
         <div className="bg-white p-8 rounded-[40px] shadow-lg space-y-4">
            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Authenticated Source</h3>
+           <div className="flex gap-2 mb-4">
+              {(['DIGITAL', 'CARD', 'CASH'] as const).map(filter => (
+                <button
+                  key={filter}
+                  onClick={() => setPaymentFilter(filter)}
+                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${
+                    paymentFilter === filter ? 'bg-[#FF00CC] text-white' : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+           </div>
            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {paymentMethods.map(m => (
+              {filteredPaymentMethods.map(m => (
                 <button 
                   key={m.id} 
                   onClick={() => setSelectedMethod(m)}
@@ -227,7 +277,7 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
                   <span className={`text-[10px] font-black uppercase tracking-tighter ${
                     m.type === 'GCASH' ? 'text-[#007DFE]' : m.type === 'MAYA' ? 'text-[#00D15F]' : 'text-gray-900'
                   }`}>{m.type}</span>
-                  <span className="text-[14px] font-black tracking-tighter">₱{m.balance?.toFixed(0) || '0'}</span>
+                  <span className="text-[14px] font-black tracking-tighter">{m.balance === null || m.balance === undefined ? '—' : `₱${m.balance.toFixed(0)}`}</span>
                 </button>
               ))}
            </div>
@@ -236,12 +286,26 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
         <div className="bg-white p-8 rounded-[40px] shadow-lg space-y-4 border border-gray-50">
           <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
             <span>Subtotal</span>
-            <span>₱{subtotal}</span>
+            <span>₱{subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
             <span>Delivery</span>
-            <span className="text-green-500">₱{deliveryFee}</span>
+            <span className="text-green-500">₱{deliveryFee.toFixed(2)}</span>
           </div>
+          <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
+            <span>Service (2.5%)</span>
+            <span>₱{serviceFee.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
+            <span>VAT (12%)</span>
+            <span>₱{tax.toFixed(2)}</span>
+          </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
+              <span>Voucher</span>
+              <span className="text-[#FF00CC]">-₱{discountAmount.toFixed(2)}</span>
+            </div>
+          )}
           <div className="pt-6 border-t border-gray-100 flex justify-between items-center">
             <span className="font-black text-gray-900 text-2xl tracking-tighter uppercase leading-none">Total</span>
             <span className="font-black text-4xl text-[#FF00CC] tracking-tighter">₱{total.toFixed(0)}</span>

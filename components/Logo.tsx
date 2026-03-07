@@ -1,67 +1,94 @@
 import React from 'react';
-import { COLORS, IMAGES } from '../constants';
 
 interface LogoProps {
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  variant?: 'white' | 'colored' | 'image';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  variant?: 'icon' | 'full' | 'colored' | 'white';
   withSubtext?: boolean;
+  showWordmark?: boolean;
 }
 
-const Logo: React.FC<LogoProps> = ({ size = 'md', variant = 'colored', withSubtext = true }) => {
-  const dimensions = {
-    sm: { container: 'w-12 h-12', text: 'text-xl', imgW: 48 },
-    md: { container: 'w-20 h-20', text: 'text-3xl', imgW: 80 },
-    lg: { container: 'w-32 h-32', text: 'text-5xl', imgW: 128 },
-    xl: { container: 'w-48 h-48', text: 'text-7xl', imgW: 192 },
-  }[size];
+const sizes = {
+  sm: { container: 'w-16 h-16', text: 'text-3xl' },
+  md: { container: 'w-24 h-24', text: 'text-5xl' },
+  lg: { container: 'w-36 h-36', text: 'text-7xl' },
+  xl: { container: 'w-48 h-48', text: 'text-8xl' },
+  '2xl': { container: 'w-56 h-56', text: 'text-9xl' },
+};
 
-  // Primary style base sa bagong #FF1493
-  const primaryColor = variant === 'white' ? COLORS.white : COLORS.primary;
+const AYOO_IMAGE_URL = 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844273557_ae970a79.jpg';
+
+const getVariantClasses = (variant?: string) => {
+  switch (variant) {
+    case 'white':
+      return 'bg-white/10 backdrop-blur-md';
+    case 'colored':
+      return 'bg-gradient-to-br from-pink-500 via-purple-500 to-pink-400';
+    default:
+      return 'bg-transparent';
+  }
+};
+
+const getTextColor = (variant?: string) => {
+  switch (variant) {
+    case 'white':
+      return 'text-white';
+    case 'colored':
+      return 'text-white drop-shadow-md';
+    default:
+      return 'text-white';
+  }
+};
+
+export const Logo: React.FC<LogoProps> = ({
+  size = 'md',
+  variant = 'full',
+  withSubtext = true,
+  showWordmark = true
+}) => {
+  const sizeConfig = sizes[size];
+  const variantClass = getVariantClasses(variant);
+  const textColor = getTextColor(variant);
+
+  // For icon variant
+  if (variant === 'icon') {
+    return (
+      <div className={`${sizeConfig.container} rounded-[30px] bg-gradient-to-br from-pink-500 via-purple-500 to-pink-400 flex items-center justify-center shadow-xl overflow-hidden`}>
+        <img
+          src={AYOO_IMAGE_URL}
+          alt="Ayoo Icon"
+          className="w-full h-full object-contain"
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col items-center justify-center">
-      <div className={`relative group transition-transform duration-300 hover:scale-105`}>
-        
-        {/* Actual Image Logo Option */}
-        <div className={`${dimensions.container} overflow-hidden rounded-[30%] shadow-lg border-2 border-white`}>
-          <img 
-            src={IMAGES.logoPink} 
-            alt="Ayoo Logo" 
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Decorative Bubbles gamit ang bagong Secondary/Accent colors */}
-        <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#FFD700] rounded-full border-2 border-white shadow-sm animate-bounce"></div>
-        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-[#7B2FF7] rounded-full border border-white"></div>
+    <div className="flex flex-col items-center">
+      {/* Glassmorphism Icon Container */}
+      <div className={`relative ${sizeConfig.container} ${variantClass} rounded-[30px] flex items-center justify-center shadow-xl overflow-hidden`}>
+        <img
+          src={AYOO_IMAGE_URL}
+          alt="Ayoo Icon"
+          className="w-full h-full object-contain drop-shadow-2xl"
+        />
       </div>
-      
-      <div className="flex flex-col items-center mt-3">
-        <h1 
-          className="font-black tracking-tighter leading-none italic"
-          style={{ 
-            color: primaryColor, 
-            fontSize: dimensions.text === 'text-xl' ? '1.25rem' : 
-                      dimensions.text === 'text-3xl' ? '2rem' : '3.5rem' 
-          }}
-        >
+
+      {/* Text Branding */}
+      {showWordmark && (
+        <h1 className={`${sizeConfig.text} ${textColor} font-black tracking-tight leading-none mt-2 drop-shadow-md`}>
           ayoo
         </h1>
-        
-        {withSubtext && (
-          <p 
-            className="mt-1 font-bold tracking-[0.2em] uppercase"
-            style={{ 
-                color: variant === 'white' ? 'rgba(255,255,255,0.8)' : COLORS.gray500,
-                fontSize: size === 'sm' ? '8px' : '10px'
-            }}
-          >
-            Food • Delivery • More
-          </p>
-        )}
-      </div>
+      )}
+
+      {/* Subtext / Tagline */}
+      {withSubtext && (
+        <p className="text-white/90 text-xs md:text-sm font-bold uppercase tracking-wider mt-2 drop-shadow-md">
+          #1 Tatak Pinoy Food Delivery in the Philippines
+        </p>
+      )}
     </div>
   );
 };
 
 export default Logo;
+

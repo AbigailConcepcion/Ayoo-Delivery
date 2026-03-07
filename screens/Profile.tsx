@@ -1,11 +1,13 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AppScreen, UserAccount, UserRole, WalletTransaction } from '../types';
 import { db } from '../db';
 import { PHILIPPINE_CITIES } from '../constants';
 import Button from '../components/Button';
+import BottomNav from '../components/BottomNav';
 
 const OWNER_EMAIL = 'ayoo.admin@gmail.com'; 
+const PROFILE_SETTINGS_KEY = 'ayoo_profile_settings_v1';
 
 interface ProfileProps {
   onBack: () => void;
@@ -29,6 +31,11 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
+  const [settings, setSettings] = useState({
+    pushAlerts: true,
+    autoSync: true,
+    compactMode: false
+  });
 
   useEffect(() => {
     if (user) {
@@ -36,6 +43,21 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
       setEditName(user.name);
       setEditAvatar(user.avatar || '');
       setEditCity(user.preferredCity || 'Iligan City');
+      const raw = localStorage.getItem(`${PROFILE_SETTINGS_KEY}_${user.email.toLowerCase()}`);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            setSettings({
+              pushAlerts: parsed.pushAlerts !== false,
+              autoSync: parsed.autoSync !== false,
+              compactMode: parsed.compactMode === true
+            });
+          }
+        } catch {
+          // keep defaults if local settings are malformed
+        }
+      }
     }
   }, [user]);
 
@@ -53,6 +75,41 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
   };
 
   const isOwner = user.email.toLowerCase() === OWNER_EMAIL.toLowerCase();
+
+  const updateSetting = (key: 'pushAlerts' | 'autoSync' | 'compactMode', value: boolean) => {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    localStorage.setItem(`${PROFILE_SETTINGS_KEY}_${user.email.toLowerCase()}`, JSON.stringify(next));
+  };
+
+  const levelProgress = useMemo(() => {
+    const xp = Number(user.xp || 0);
+    const level = Number(user.level || 1);
+    const prevFloor = Math.max(0, (level - 1) * 1000);
+    const nextFloor = level * 1000;
+    const ratio = Math.min(1, Math.max(0, (xp - prevFloor) / Math.max(1, nextFloor - prevFloor)));
+    return {
+      percent: Math.round(ratio * 100),
+      nextXp: nextFloor,
+      remaining: Math.max(0, nextFloor - xp)
+    };
+  }, [user.level, user.xp]);
+
+  const ledgerStats = useMemo(() => {
+    const credit = ledger
+      .filter(entry => entry.type === 'CREDIT')
+      .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const debit = ledger
+      .filter(entry => entry.type === 'DEBIT')
+      .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const pending = ledger.filter(entry => entry.status === 'PENDING').length;
+    return {
+      credit,
+      debit,
+      pending,
+      net: credit - debit
+    };
+  }, [ledger]);
   
   const handleAvatarClick = () => {
     if (!isOwner) return;
@@ -175,25 +232,133 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
       </div>
 
       <div className="p-10 space-y-6">
-         <div className="bg-gray-50 rounded-[40px] p-8 space-y-4 border border-gray-100">
-            <h3 className="font-black text-[10px] uppercase tracking-widest text-gray-400 mb-2">Ayoo Perspective</h3>
-            <div className="grid grid-cols-3 gap-3">
-               {(['CUSTOMER', 'MERCHANT', 'RIDER'] as UserRole[]).map(r => (
-                 <button key={r} onClick={() => onSetRole(r)} className={`py-4 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all ${user.role === r ? 'bg-[#FF00CC] text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100'}`}>{r}</button>
-               ))}
+         <div className="grid grid-cols-3 gap-3">
+            <div className="bg-gray-50 rounded-2xl p-4 text-center">
+              <p className="text-[8px] font-black uppercase text-gray-400">Points</p>
+              <p className="text-lg font-black text-[#FF00CC]">{user.points || 0}</p>
+            </div>
+            <div className="bg-gray-50 rounded-2xl p-4 text-center">
+              <p className="text-[8px] font-black uppercase text-gray-400">XP</p>
+              <p className="text-lg font-black text-[#FF00CC]">{Math.floor(user.xp || 0)}</p>
+            </div>
+            <div className="bg-gray-50 rounded-2xl p-4 text-center">
+              <p className="text-[8px] font-black uppercase text-gray-400">Role</p>
+              <p className="text-xs font-black text-[#FF00CC]">{user.role || 'CUSTOMER'}</p>
             </div>
          </div>
+
+         <div className="bg-gray-50 rounded-[32px] p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Level Progress</p>
+              <p className="text-[10px] font-black uppercase text-[#FF00CC]">{levelProgress.percent}%</p>
+            </div>
+            <div className="w-full h-3 bg-white rounded-full overflow-hidden border border-gray-100">
+              <div className="h-full ayoo-gradient rounded-full transition-all" style={{ width: `${levelProgress.percent}%` }}></div>
+            </div>
+            <p className="text-[10px] font-bold text-gray-500 mt-3">
+              {levelProgress.remaining} XP to reach {levelProgress.nextXp.toLocaleString()} XP.
+            </p>
+         </div>
+
+         <div className="bg-gray-50 rounded-[32px] p-6 border border-gray-100 space-y-4">
+           <h3 className="font-black text-[10px] uppercase tracking-widest text-gray-400">Settings</h3>
+           <button
+             onClick={() => updateSetting('pushAlerts', !settings.pushAlerts)}
+             className="w-full p-4 bg-white rounded-2xl border border-gray-100 flex items-center justify-between"
+           >
+             <span className="text-xs font-black text-gray-700">Push Alerts</span>
+             <span className={`text-[10px] font-black uppercase ${settings.pushAlerts ? 'text-green-600' : 'text-gray-400'}`}>
+               {settings.pushAlerts ? 'On' : 'Off'}
+             </span>
+           </button>
+           <button
+             onClick={() => updateSetting('autoSync', !settings.autoSync)}
+             className="w-full p-4 bg-white rounded-2xl border border-gray-100 flex items-center justify-between"
+           >
+             <span className="text-xs font-black text-gray-700">Auto Sync</span>
+             <span className={`text-[10px] font-black uppercase ${settings.autoSync ? 'text-green-600' : 'text-gray-400'}`}>
+               {settings.autoSync ? 'On' : 'Off'}
+             </span>
+           </button>
+           <button
+             onClick={() => updateSetting('compactMode', !settings.compactMode)}
+             className="w-full p-4 bg-white rounded-2xl border border-gray-100 flex items-center justify-between"
+           >
+             <span className="text-xs font-black text-gray-700">Compact Cards</span>
+             <span className={`text-[10px] font-black uppercase ${settings.compactMode ? 'text-green-600' : 'text-gray-400'}`}>
+               {settings.compactMode ? 'On' : 'Off'}
+             </span>
+           </button>
+         </div>
+
+         <div className="bg-gray-50 rounded-[32px] p-6 border border-gray-100">
+           <h3 className="font-black text-[10px] uppercase tracking-widest text-gray-400 mb-3">Wallet Snapshot</h3>
+           <div className="grid grid-cols-2 gap-3">
+             <div className="bg-white rounded-2xl p-4 border border-gray-100">
+               <p className="text-[9px] font-black uppercase text-gray-400">Total Spend</p>
+               <p className="text-sm font-black text-red-500">₱{ledgerStats.debit.toFixed(2)}</p>
+             </div>
+             <div className="bg-white rounded-2xl p-4 border border-gray-100">
+               <p className="text-[9px] font-black uppercase text-gray-400">Total Credit</p>
+               <p className="text-sm font-black text-green-600">₱{ledgerStats.credit.toFixed(2)}</p>
+             </div>
+             <div className="bg-white rounded-2xl p-4 border border-gray-100">
+               <p className="text-[9px] font-black uppercase text-gray-400">Net</p>
+               <p className={`text-sm font-black ${ledgerStats.net >= 0 ? 'text-green-600' : 'text-red-500'}`}>₱{ledgerStats.net.toFixed(2)}</p>
+             </div>
+             <div className="bg-white rounded-2xl p-4 border border-gray-100">
+               <p className="text-[9px] font-black uppercase text-gray-400">Pending</p>
+               <p className="text-sm font-black text-amber-500">{ledgerStats.pending}</p>
+             </div>
+           </div>
+         </div>
+
+         {isOwner && (
+           <div className="bg-gray-50 rounded-[40px] p-8 space-y-4 border border-gray-100">
+              <h3 className="font-black text-[10px] uppercase tracking-widest text-gray-400 mb-2">Ayoo Perspective</h3>
+              <div className="grid grid-cols-3 gap-3">
+                 {(['CUSTOMER', 'MERCHANT', 'RIDER'] as UserRole[]).map(r => (
+                   <button key={r} onClick={() => onSetRole(r)} className={`py-4 rounded-2xl text-[9px] font-black uppercase tracking-tighter transition-all ${user.role === r ? 'bg-[#FF00CC] text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100'}`}>{r}</button>
+                 ))}
+              </div>
+           </div>
+         )}
 
          <button onClick={resetManual} className="w-full p-8 bg-black rounded-[35px] text-left relative overflow-hidden group shadow-xl transition-all active:scale-95">
             <div className="absolute top-0 right-0 bottom-0 w-32 ayoo-gradient opacity-10"></div>
             <div className="flex items-center justify-between">
                <div className="flex items-center gap-4">
                   <span className="text-2xl">📖</span>
-                  <h3 className="text-white font-black text-lg tracking-tighter uppercase">Review Protocol</h3>
+                  <h3 className="text-white font-black text-lg tracking-tighter uppercase">Ayoo Manual</h3>
                </div>
                <span className="text-white opacity-40 text-[9px] font-black uppercase tracking-widest">Play</span>
             </div>
          </button>
+
+         <button onClick={() => setShowLedger(!showLedger)} className="w-full p-6 bg-gray-50 rounded-[28px] text-left border border-gray-100">
+           <div className="flex items-center justify-between">
+             <h3 className="font-black text-sm uppercase tracking-widest text-gray-700">Transaction Summary</h3>
+             <span className="text-xs font-black text-[#FF00CC]">{showLedger ? 'Hide' : 'Show'}</span>
+           </div>
+         </button>
+
+         {showLedger && (
+           <div className="bg-gray-50 rounded-[28px] p-6 border border-gray-100 space-y-3">
+             {ledger.length === 0 ? (
+               <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">No transactions yet</p>
+             ) : ledger.slice(0, 8).map((entry) => (
+               <div key={entry.id} className="flex justify-between items-center bg-white rounded-xl p-3 border border-gray-100">
+                 <div>
+                   <p className="text-xs font-black">{entry.description}</p>
+                   <p className="text-[9px] font-bold uppercase text-gray-400">{new Date(entry.timestamp).toLocaleString()}</p>
+                 </div>
+                 <p className={`text-sm font-black ${entry.type === 'DEBIT' ? 'text-red-500' : 'text-green-500'}`}>
+                   {entry.type === 'DEBIT' ? '-' : '+'}₱{entry.amount.toFixed(2)}
+                 </p>
+               </div>
+             ))}
+           </div>
+         )}
 
          <div className="space-y-3">
             <button onClick={() => onNavigate('ADDRESSES')} className="w-full p-8 bg-gray-50 rounded-[35px] flex items-center justify-between group hover:bg-[#FF00CC] transition-all">
@@ -210,6 +375,13 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
             </button>
          </div>
       </div>
+
+      <BottomNav
+        active="PROFILE"
+        onNavigate={onNavigate}
+        mode={isOwner ? 'operations' : 'customer'}
+        showAdmin={isOwner}
+      />
     </div>
   );
 };

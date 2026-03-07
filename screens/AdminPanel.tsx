@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Restaurant, FoodItem, UserAccount, OrderRecord } from '../types';
+import { Restaurant, FoodItem, UserAccount, OrderRecord, AppScreen } from '../types';
 import { db } from '../db';
 import { ayooCloud } from '../api';
 import { GLOBAL_REGISTRY_KEY } from '../constants';
 import Button from '../components/Button';
+import BottomNav from '../components/BottomNav';
 
 interface AdminPanelProps {
   onBack: () => void;
+  onNavigate: (screen: AppScreen) => void;
   restaurants: Restaurant[];
   onUpdateRestaurants: (list: Restaurant[]) => void;
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRestaurants }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, onNavigate, restaurants, onUpdateRestaurants }) => {
   const [editingRes, setEditingRes] = useState<Restaurant | null>(null);
   const [registeredUsers, setRegisteredUsers] = useState<UserAccount[]>([]);
   const [liveOrders, setLiveOrders] = useState<OrderRecord[]>([]);
@@ -105,11 +107,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white p-8 pb-32 overflow-y-auto scrollbar-hide">
       <div className="flex justify-between items-center mb-10">
-        <div>
+        <div className="flex flex-col">
           <h2 className="text-4xl font-black uppercase tracking-tighter text-[#FF00CC]">Owner HQ</h2>
           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">Logistics Engine</p>
         </div>
-        <button onClick={onBack} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-all">✕</button>
+        {/* explicit return button with arrow and label */}
+        <button onClick={onBack} className="flex items-center gap-2 px-4 h-12 bg-white/5 rounded-2xl text-white border border-white/10 active:scale-90 transition-all">
+          ← Back
+        </button>
       </div>
 
       {!editingRes && (
@@ -205,7 +210,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
       ) : (
         /* BRAND FORGE: MENU EDITOR */
         <div className="animate-in slide-in-from-right-10 duration-500 pb-20">
-          <button onClick={() => setEditingRes(null)} className="text-[#FF00CC] font-black text-xs uppercase tracking-widest mb-10 flex items-center gap-2">← Discard Changes</button>
+          <button onClick={() => setEditingRes(null)} className="text-[#FF00CC] font-black text-xs uppercase tracking-widest mb-10 flex items-center gap-2">
+            ← Return to list
+          </button>
           
           <div className="bg-[#1A1A1A] p-10 rounded-[50px] border border-white/10 space-y-8 mb-10 shadow-2xl">
             <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-[#FF00CC] text-center">Merchant Brand Identity</h3>
@@ -288,6 +295,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, restaurants, onUpdateRe
           )}
         </div>
       )}
+
+      <BottomNav active="ADMIN_PANEL" onNavigate={onNavigate} mode="operations" showAdmin />
     </div>
   );
 };

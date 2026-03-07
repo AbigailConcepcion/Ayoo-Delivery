@@ -14,7 +14,11 @@ export function createServer() {
   const app = express();
   app.use(cors({ origin: true }));
   app.use(morgan('combined'));
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req: any, _res: any, buf: Buffer) => {
+      req.rawBody = buf.toString('utf8');
+    }
+  }));
 
   // initialize database
   initDb();

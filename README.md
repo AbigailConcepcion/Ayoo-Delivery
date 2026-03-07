@@ -34,6 +34,10 @@ This repository is split into two parts:
    ```bash
    npm run dev
    ```
+   Or run both client and API together from root:
+   ```bash
+   npm run dev:full
+   ```
 
 ### Back-end
 

@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useToast } from '../components/ToastContext';
 import { Restaurant, FoodItem, Review, OrderRecord } from '../types';
 import Button from '../components/Button';
 import { streamHub, ayooCloud } from '../api';
@@ -16,8 +17,8 @@ interface RestaurantDetailProps {
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack, onAddToCart, onOpenCart, cartCount }) => {
   const [activeTab, setActiveTab] = useState<'Menu' | 'Reviews'>('Menu');
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
+  const [qtyDraft, setQtyDraft] = useState<Record<string, number>>({});
+  const { showToast } = useToast();
   
   const [showLiveCam, setShowLiveCam] = useState(false);
   const [liveFrame, setLiveFrame] = useState<string | null>(null);
@@ -25,6 +26,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
   const [intercomStatus, setIntercomStatus] = useState<string>('Ready');
   
   const [localReviews] = useState<Review[]>(restaurant.reviews || []);
+  const menuItems = restaurant.items || [];
 
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -37,9 +39,10 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
   }, [showLiveCam]);
 
   const handleAdd = (item: FoodItem) => {
-    onAddToCart(item.id);
-    setToastMessage(`Added ${item.name} to cart`);
-    setShowToast(true);
+    const toAdd = qtyDraft[item.id] || 1;
+    for (let i = 0; i < toAdd; i++) onAddToCart(item.id);
+    setQtyDraft((prev) => ({ ...prev, [item.id]: 1 }));
+    showToast(`${item.name} x${toAdd} added`);
   };
 
   // MANUAL AUDIO HELPERS PER GUIDELINES
@@ -151,13 +154,15 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
     setIntercomStatus('Offline');
   };
 
+  const categories = useMemo(() => ['All', ...Array.from(new Set(menuItems.map(i => i.category)))], [menuItems]);
+
   const displayEntries = Object.entries(activeCategory === 'All' ? 
-    (restaurant.items.reduce((acc, curr) => {
+    (menuItems.reduce((acc, curr) => {
       if(!acc[curr.category]) acc[curr.category] = [];
       acc[curr.category].push(curr);
       return acc;
     }, {} as Record<string, FoodItem[]>)) : 
-    { [activeCategory]: restaurant.items.filter(i => i.category === activeCategory) }
+    { [activeCategory]: menuItems.filter(i => i.category === activeCategory) }
   ) as [string, FoodItem[]][];
 
   return (
@@ -246,6 +251,20 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
       <div className="p-8">
         {activeTab === 'Menu' ? (
           <div className="space-y-12">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                    activeCategory === cat ? 'bg-[#FF00CC] text-white' : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
             {displayEntries.map(([category, items]) => (
               <div key={category}>
                  <h3 className="font-black text-2xl text-gray-900 tracking-tighter uppercase mb-6">{category}</h3>
@@ -255,8 +274,16 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                         <img src={item.image} className="w-24 h-24 rounded-3xl object-cover shadow-md" alt={item.name} />
                         <div className="flex-1">
                           <h4 className="font-black text-lg text-gray-900 leading-none mb-1">{item.name}</h4>
+                          <p className="text-[11px] text-gray-500 mb-1">{item.description}</p>
                           <p className="text-[10px] text-gray-400 font-bold mb-3">₱{item.price}</p>
-                          <button onClick={() => handleAdd(item)} className="bg-gray-100 text-[#FF00CC] px-6 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-pink-50 transition-colors">Add +</button>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 bg-gray-100 rounded-xl p-1">
+                              <button onClick={() => setQtyDraft(prev => ({ ...prev, [item.id]: Math.max(1, (prev[item.id] || 1) - 1) }))} className="w-6 h-6 rounded-lg bg-white text-xs font-black">-</button>
+                              <span className="w-5 text-center text-xs font-black">{qtyDraft[item.id] || 1}</span>
+                              <button onClick={() => setQtyDraft(prev => ({ ...prev, [item.id]: (prev[item.id] || 1) + 1 }))} className="w-6 h-6 rounded-lg bg-white text-xs font-black">+</button>
+                            </div>
+                            <button onClick={() => handleAdd(item)} className="bg-gray-100 text-[#FF00CC] px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-pink-50 transition-colors">Add +</button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -265,9 +292,25 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
             ))}
           </div>
         ) : (
-          <div className="py-24 text-center">
-             <span className="text-5xl mb-4 inline-block">💬</span>
-             <p className="font-black text-gray-300 uppercase tracking-widest text-xs">Community reviews encrypted</p>
+          <div className="space-y-4">
+            {localReviews.length === 0 ? (
+              <div className="py-24 text-center">
+                <span className="text-5xl mb-4 inline-block">💬</span>
+                <p className="font-black text-gray-300 uppercase tracking-widest text-xs">No reviews yet</p>
+              </div>
+            ) : localReviews.map((review) => (
+              <div key={review.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50">
+                <div className="flex items-center gap-3 mb-2">
+                  <img src={review.userAvatar} alt={review.userName} className="w-9 h-9 rounded-full object-cover" />
+                  <div className="flex-1">
+                    <p className="font-black text-sm">{review.userName}</p>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase">{review.date}</p>
+                  </div>
+                  <p className="text-xs font-black">⭐ {review.rating}/5</p>
+                </div>
+                <p className="text-sm text-gray-600">{review.comment}</p>
+              </div>
+            ))}
           </div>
         )}
       </div>

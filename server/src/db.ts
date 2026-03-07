@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { DEFAULT_RESTAURANTS } from './seed.js';
 
 /**
  * Ayoo Delivery - Database Configuration
@@ -89,7 +90,11 @@ export function initDb() {
         email TEXT,
         label TEXT,
         details TEXT,
-        city TEXT
+        city TEXT,
+        latitude REAL,
+        longitude REAL,
+        distanceKm REAL,
+        deliveryFee REAL
       );
 
       CREATE TABLE IF NOT EXISTS payments (
@@ -130,7 +135,45 @@ export function initDb() {
         status TEXT,
         PRIMARY KEY(ownerId, id)
       );
+
+      CREATE TABLE IF NOT EXISTS system_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        deliveryFee REAL DEFAULT 45,
+        masterPin TEXT DEFAULT '1234'
+      );
     `);
+
+    const configRow = db.prepare('SELECT id FROM system_config WHERE id = 1').get();
+    if (!configRow) {
+      db.prepare('INSERT INTO system_config (id, deliveryFee, masterPin) VALUES (1, 45, ?)').run('1234');
+    }
+
+    const countRow = db.prepare('SELECT COUNT(*) as count FROM restaurants').get() as { count: number };
+    if (countRow.count === 0) {
+      const insertRestaurant = db.prepare(`
+        INSERT INTO restaurants (id,name,rating,deliveryTime,image,cuisine,items,isPartner,address,hasLiveCam,reviews)
+        VALUES (@id,@name,@rating,@deliveryTime,@image,@cuisine,@items,@isPartner,@address,@hasLiveCam,@reviews)
+      `);
+      const tx = db.transaction((rows: any[]) => {
+        for (const row of rows) {
+          insertRestaurant.run({
+            ...row,
+            items: JSON.stringify(row.items || []),
+            reviews: JSON.stringify(row.reviews || []),
+            isPartner: row.isPartner || 0,
+            hasLiveCam: row.hasLiveCam || 0
+          });
+        }
+      });
+      tx(DEFAULT_RESTAURANTS);
+      console.log(`✅ Seeded ${DEFAULT_RESTAURANTS.length} restaurants.`);
+    }
+
+    const addressCols = (db.prepare(`PRAGMA table_info(addresses)`).all() as any[]).map((c: any) => c.name);
+    if (!addressCols.includes('latitude')) db.exec('ALTER TABLE addresses ADD COLUMN latitude REAL');
+    if (!addressCols.includes('longitude')) db.exec('ALTER TABLE addresses ADD COLUMN longitude REAL');
+    if (!addressCols.includes('distanceKm')) db.exec('ALTER TABLE addresses ADD COLUMN distanceKm REAL');
+    if (!addressCols.includes('deliveryFee')) db.exec('ALTER TABLE addresses ADD COLUMN deliveryFee REAL');
 
     console.log("✅ Database schema is up to date.");
     return db;

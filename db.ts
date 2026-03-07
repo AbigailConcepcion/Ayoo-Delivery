@@ -1,5 +1,5 @@
 
-import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem } from './types';
+import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem, Conversation, Message } from './types';
 import { MOCK_RESTAURANTS, GLOBAL_REGISTRY_KEY } from './constants';
 
 // allow access to Vite env vars without TS errors
@@ -44,7 +44,7 @@ class AyooDatabase {
     return res.json();
   }
 
-  async connect() { 
+  async connect() {
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       // ensure server is reachable
       await this.request('/config');
@@ -110,11 +110,11 @@ class AyooDatabase {
 
     const registry = this.getRegistry();
     const user = registry.find((u: any) => u.email.toLowerCase() === cleanEmail && u.password === cleanPass);
-    
+
     if (user) {
       // Set the active session
       localStorage.setItem(this.STORAGE_KEYS.USER_PROFILE, JSON.stringify(user));
-      
+
       // Persist credentials if "Remember Me" is checked
       if (remember) {
         localStorage.setItem(this.STORAGE_KEYS.REMEMBERED, JSON.stringify({ email: cleanEmail, password: pass }));
@@ -157,22 +157,22 @@ class AyooDatabase {
     if (registry.some((u: any) => u.email.toLowerCase() === cleanEmail)) {
       return { success: false, message: 'Identity conflict: Email already exists in cloud vault.' };
     }
-    
-    const newUser = { 
-      ...user, 
-      email: cleanEmail, 
+
+    const newUser = {
+      ...user,
+      email: cleanEmail,
       manualsSeen: user.manualsSeen || [],
       earnings: 0,
       points: 500 // Welcome gift
     };
-    
+
     registry.push(newUser);
     this.saveRegistry(registry);
-    
+
     return { success: true, message: 'Registry synchronized successfully.' };
   }
 
-  async getRemembered() { 
+  async getRemembered() {
     const raw = localStorage.getItem(this.STORAGE_KEYS.REMEMBERED);
     return raw ? JSON.parse(raw) : null;
   }
@@ -186,7 +186,7 @@ class AyooDatabase {
     localStorage.removeItem(this.STORAGE_KEYS.USER_PROFILE);
   }
 
-  async getUserByEmail(email: string): Promise<UserAccount | null> { 
+  async getUserByEmail(email: string): Promise<UserAccount | null> {
     const cleanEmail = email.toLowerCase().trim();
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       try {
@@ -226,19 +226,19 @@ class AyooDatabase {
 
     const registry = this.getRegistry();
     const idx = registry.findIndex((u: any) => u.email.toLowerCase() === cleanEmail);
-    
+
     if (idx === -1) return null;
     const updated = { ...registry[idx], ...updates };
     registry[idx] = updated;
-    
+
     this.saveRegistry(registry);
-    
+
     // If the updated user is the current session, update it too
     const session = await this.getSession();
     if (session && session.email.toLowerCase() === cleanEmail) {
       localStorage.setItem(this.STORAGE_KEYS.USER_PROFILE, JSON.stringify(updated));
     }
-    
+
     return updated;
   }
 
@@ -282,7 +282,7 @@ class AyooDatabase {
     const clean = email.toLowerCase();
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       try {
-        const result: any = await this.request(`/orders/${clean}`);
+        const result: any = await this.request(`/orders/customer/${clean}`);
         return result.orders || [];
       } catch (err) {
         console.error('getHistory failed', err);
@@ -352,6 +352,15 @@ class AyooDatabase {
   }
 
   async getLedger(ownerId: string): Promise<WalletTransaction[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/ledger/${ownerId.toLowerCase()}`);
+        return result.ledger || [];
+      } catch (err) {
+        console.error('getLedger failed', err);
+        return [];
+      }
+    }
     const ledger = JSON.parse(localStorage.getItem('ayoo_financial_ledger_v2') || '{}');
     return ledger[ownerId.toLowerCase()] || [];
   }
@@ -410,7 +419,7 @@ class AyooDatabase {
     const clean = email.toLowerCase();
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       try {
-        const result: any = await this.request(`/payments/${clean}`);
+        const result: any = await this.request(`/payments/methods/${clean}`);
         return result.payments || [];
       } catch (err) {
         console.error('getPayments failed', err);
@@ -423,7 +432,7 @@ class AyooDatabase {
     const clean = email.toLowerCase();
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       try {
-        await Promise.all(p.map(pm => this.request(`/payments/${clean}`, {
+        await Promise.all(p.map(pm => this.request(`/payments/methods/${clean}`, {
           method: 'POST',
           body: JSON.stringify(pm)
         })));
@@ -437,7 +446,7 @@ class AyooDatabase {
     const clean = email.toLowerCase();
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       try {
-        await this.request(`/payments/${clean}/${mid}/balance`, {
+        await this.request(`/payments/methods/${clean}/${mid}/balance`, {
           method: 'PUT',
           body: JSON.stringify({ balance: bal })
         });
@@ -454,7 +463,7 @@ class AyooDatabase {
     const clean = email.toLowerCase();
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       try {
-        const result: any = await this.request(`/payments/${clean}/topup`, {
+        const result: any = await this.request(`/payments/methods/${clean}/topup`, {
           method: 'POST',
           body: JSON.stringify({ methodId: mid, amount })
         });
@@ -603,7 +612,190 @@ class AyooDatabase {
         body: JSON.stringify({ token, amount, orderId })
       });
     }
-    return { success: true, charge: { id: 'LOCAL-'+Math.random().toString(36).substr(2,9) } };
+    return { success: true, charge: { id: 'LOCAL-' + Math.random().toString(36).substr(2, 9) } };
+  }
+
+  // ==================== MESSAGING METHODS ====================
+
+  private readonly MESSAGING_KEYS = {
+    CONVERSATIONS: 'ayoo_conversations_v1',
+    MESSAGES: 'ayoo_messages_v1',
+  };
+
+  private getAllConversations(): Conversation[] {
+    const raw = localStorage.getItem(this.MESSAGING_KEYS.CONVERSATIONS);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  private saveAllConversations(conversations: Conversation[]) {
+    localStorage.setItem(this.MESSAGING_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+  }
+
+  private getAllMessages(): Message[] {
+    const raw = localStorage.getItem(this.MESSAGING_KEYS.MESSAGES);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  private saveAllMessages(messages: Message[]) {
+    localStorage.setItem(this.MESSAGING_KEYS.MESSAGES, JSON.stringify(messages));
+  }
+
+  async getConversations(email: string): Promise<Conversation[]> {
+    const cleanEmail = email.toLowerCase();
+    const allConversations = this.getAllConversations();
+
+    // Filter conversations where the user is a participant
+    const userConversations = allConversations.filter(convo =>
+      convo.participants.some(p => p.email.toLowerCase() === cleanEmail)
+    );
+
+    // Sort by last message time (newest first)
+    return userConversations.sort((a, b) =>
+      new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+    );
+  }
+
+  async getMessages(conversationId: string): Promise<Message[]> {
+    const allMessages = this.getAllMessages();
+    return allMessages
+      .filter(m => m.conversationId === conversationId)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }
+
+  async sendMessage(
+    conversationId: string,
+    senderEmail: string,
+    senderName: string,
+    text: string
+  ): Promise<Message> {
+    const newMessage: Message = {
+      id: `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      conversationId,
+      senderEmail,
+      senderName,
+      text,
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+
+    // Save the message
+    const allMessages = this.getAllMessages();
+    allMessages.push(newMessage);
+    this.saveAllMessages(allMessages);
+
+    // Update conversation's last message
+    const allConversations = this.getAllConversations();
+    const convoIndex = allConversations.findIndex(c => c.id === conversationId);
+
+    if (convoIndex !== -1) {
+      const convo = allConversations[convoIndex];
+      convo.lastMessage = text;
+      convo.lastMessageTime = newMessage.timestamp;
+
+      // Update unread count for other participants
+      convo.unreadCount = convo.participants
+        .filter(p => p.email.toLowerCase() !== senderEmail.toLowerCase())
+        .reduce((sum, p) => sum + 1, 0);
+
+      allConversations[convoIndex] = convo;
+      this.saveAllConversations(allConversations);
+    }
+
+    // Notify other tabs/browsers via BroadcastChannel
+    new BroadcastChannel('ayoo_messaging_v1').postMessage({
+      type: 'NEW_MESSAGE',
+      message: newMessage
+    });
+
+    return newMessage;
+  }
+
+  async createConversation(
+    participants: { email: string; name: string; role: 'CUSTOMER' | 'MERCHANT' | 'RIDER'; avatar?: string }[],
+    orderId?: string,
+    orderStatus?: string
+  ): Promise<Conversation> {
+    const allConversations = this.getAllConversations();
+
+    // Check if conversation already exists between these participants
+    const existingConvo = allConversations.find(convo => {
+      const participantEmails = convo.participants.map(p => p.email.toLowerCase()).sort();
+      const newParticipantEmails = participants.map(p => p.email.toLowerCase()).sort();
+      return JSON.stringify(participantEmails) === JSON.stringify(newParticipantEmails);
+    });
+
+    if (existingConvo) {
+      return existingConvo;
+    }
+
+    const newConversation: Conversation = {
+      id: `CONVO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      participants,
+      lastMessage: '',
+      lastMessageTime: new Date().toISOString(),
+      unreadCount: 0,
+      orderId,
+      orderStatus,
+    };
+
+    allConversations.push(newConversation);
+    this.saveAllConversations(allConversations);
+
+    return newConversation;
+  }
+
+  async markConversationAsRead(conversationId: string, email: string): Promise<void> {
+    const allMessages = this.getAllMessages();
+    const updatedMessages = allMessages.map(m =>
+      m.conversationId === conversationId && m.senderEmail.toLowerCase() !== email.toLowerCase()
+        ? { ...m, read: true }
+        : m
+    );
+    this.saveAllMessages(updatedMessages);
+
+    // Update unread count in conversation
+    const allConversations = this.getAllConversations();
+    const convoIndex = allConversations.findIndex(c => c.id === conversationId);
+
+    if (convoIndex !== -1) {
+      const convo = allConversations[convoIndex];
+      convo.unreadCount = 0;
+      allConversations[convoIndex] = convo;
+      this.saveAllConversations(allConversations);
+    }
+  }
+
+  async getOrCreateConversation(
+    user1Email: string,
+    user1Name: string,
+    user1Role: 'CUSTOMER' | 'MERCHANT' | 'RIDER',
+    user2Email: string,
+    user2Name: string,
+    user2Role: 'CUSTOMER' | 'MERCHANT' | 'RIDER',
+    orderId?: string,
+    orderStatus?: string
+  ): Promise<Conversation> {
+    const allConversations = this.getAllConversations();
+
+    // Look for existing conversation
+    const existingConvo = allConversations.find(convo => {
+      const emails = convo.participants.map(p => p.email.toLowerCase());
+      return emails.includes(user1Email.toLowerCase()) && emails.includes(user2Email.toLowerCase());
+    });
+
+    if (existingConvo) {
+      return existingConvo;
+    }
+
+    // Create new conversation
+    return this.createConversation(
+      [
+        { email: user1Email, name: user1Name, role: user1Role },
+        { email: user2Email, name: user2Name, role: user2Role },
+      ],
+      orderId,
+      orderStatus
+    );
   }
 }
 

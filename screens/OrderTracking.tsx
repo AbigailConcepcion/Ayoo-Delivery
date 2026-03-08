@@ -1,9 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../components/ToastContext';
 import Button from '../components/Button';
 import { Restaurant, OrderRecord, OrderStatus, UserAccount } from '../types';
 import { ayooCloud } from '../api';
 import { db } from '../db';
+import MapItinerary from '../components/MapItinerary';
+import NotificationPanel from '../components/NotificationPanel';
+import {
+  notifyOrderAccepted,
+  notifyOrderPreparing,
+  notifyOrderReady,
+  notifyOrderPickedUp,
+  notifyOrderDelivered,
+  notifyStatusUpdate,
+  getRandomRider,
+  RiderProfile,
+  SAMPLE_LOCATIONS,
+  MapCoordinates
+} from '../src/utils/notifications';
 
 interface OrderTrackingProps {
   onBack: () => void;
@@ -17,6 +31,51 @@ interface OrderTrackingProps {
   onReorder?: (items: { id: string; quantity: number }[]) => void;
 }
 
+// Mock realistic orders for demonstration
+const MOCK_ACTIVE_ORDERS: OrderRecord[] = [
+  {
+    id: 'AYO-78452',
+    date: new Date().toLocaleDateString(),
+    items: [
+      { name: 'Chicken Joy Bucket', quantity: 2, price: 189, id: '1' },
+      { name: 'Jolly Spaghetti', quantity: 1, price: 99, id: '2' },
+      { name: 'Burger Steak', quantity: 1, price: 149, id: '3' }
+    ],
+    total: 626,
+    status: 'OUT_FOR_DELIVERY',
+    restaurantName: 'Jollibee - Iligan',
+    customerEmail: 'user@ayoo.ph',
+    customerName: 'John Doe',
+    riderName: 'Marco Reyes',
+    riderEmail: 'rider.marco@ayoo.ph',
+    deliveryAddress: 'Tibanga, Iligan City',
+    paymentMethod: 'GCASH',
+    isPaid: true,
+    transactionId: 'TXN-2024-78452',
+    pointsEarned: 62
+  },
+  {
+    id: 'AYO-89231',
+    date: new Date().toLocaleDateString(),
+    items: [
+      { name: 'Chicken Inasal', quantity: 1, price: 165, id: '4' },
+      { name: 'Pancit Canton', quantity: 2, price: 85, id: '5' }
+    ],
+    total: 335,
+    status: 'PREPARING',
+    restaurantName: 'Chicken Inasal - HD',
+    customerEmail: 'user@ayoo.ph',
+    customerName: 'John Doe',
+    riderName: 'Jenny Lopez',
+    riderEmail: 'rider.jenny@ayoo.ph',
+    deliveryAddress: 'Tibanga, Iligan City',
+    paymentMethod: 'CASH ON DELIVERY',
+    isPaid: true,
+    transactionId: 'TXN-2024-89231',
+    pointsEarned: 33
+  }
+];
+
 const OrderTracking: React.FC<OrderTrackingProps> = ({
   onBack,
   restaurant,
@@ -26,10 +85,14 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
   onOpenMessages,
   onReorder
 }) => {
-  const { showToast } = useToast();
+  const { showToast, notifications, markAsRead, markAllAsRead } = useToast();
   const [liveOrder, setLiveOrder] = useState<OrderRecord | null>(null);
+  const [activeOrders, setActiveOrders] = useState<OrderRecord[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [showOrderList, setShowOrderList] = useState(true);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [tip, setTip] = useState(0);
@@ -37,6 +100,42 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
   const [chatMsg, setChatMsg] = useState('');
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'rider', text: string }[]>([]);
   const [activeTab, setActiveTab] = useState<'LIVE' | 'SUMMARY' | 'TIMELINE'>('LIVE');
+
+  // Mock Rider Profile
+  const [riderProfile, setRiderProfile] = useState<RiderProfile | null>(null);
+
+  // Map coordinates (using Philippine locations)
+  const [restaurantLocation] = useState<MapCoordinates>(SAMPLE_LOCATIONS.tibanga);
+  const [deliveryLocation] = useState<MapCoordinates>(SAMPLE_LOCATIONS.pala_o);
+  const [riderLocation, setRiderLocation] = useState<MapCoordinates | undefined>();
+
+  // Load active orders
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        // Try to get from database first
+        const dbOrders = await db.getAllLiveOrders();
+
+        if (dbOrders && dbOrders.length > 0) {
+          // Filter for current user
+          const userOrders = dbOrders.filter(o =>
+            o.customerEmail === customerEmail &&
+            o.status !== 'DELIVERED' &&
+            o.status !== 'CANCELLED'
+          );
+          setActiveOrders(userOrders);
+        } else {
+          // Use mock orders for demonstration
+          setActiveOrders(MOCK_ACTIVE_ORDERS);
+        }
+      } catch (error) {
+        // Fallback to mock orders
+        setActiveOrders(MOCK_ACTIVE_ORDERS);
+      }
+    };
+
+    loadOrders();
+  }, [customerEmail]);
 
   const isOrderPaid = (order?: OrderRecord | null) => {
     if (!order) return false;
@@ -64,37 +163,110 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
     }
   };
 
-  // 2. ROBUST REFRESH LOGIC: Prevents "Sync Disruption" in Customer UI
-  const refresh = async () => {
-    try {
-      const allOrders = await db.getAllLiveOrders();
-      // Hanapin ang pinakabagong order na hindi pa tapos
-      const myOrder = allOrders
-        .filter(o => o.customerEmail === customerEmail && o.status !== 'DELIVERED' && o.status !== 'CANCELLED')
-        .sort((a, b) => Number(b.id) - Number(a.id))[0];
-
-      if (myOrder) {
-        if (needsPayMongoSync(myOrder)) {
-          const synced = await ayooCloud.syncPayMongoOrder(myOrder.id);
-          setLiveOrder(synced || myOrder);
-        } else {
-          setLiveOrder(myOrder);
-        }
-      } else {
-        const lastOrder = await ayooCloud.getLiveOrder(customerEmail);
-        if (lastOrder) {
-          if (needsPayMongoSync(lastOrder)) {
-            const synced = await ayooCloud.syncPayMongoOrder(lastOrder.id);
-            setLiveOrder(synced || lastOrder);
-          } else {
-            setLiveOrder(lastOrder);
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Tracking Sync Fault:", err);
+  // Get status color
+  const getStatusColor = (status?: OrderStatus) => {
+    switch (status) {
+      case 'PENDING': return 'text-amber-500';
+      case 'ACCEPTED': return 'text-blue-500';
+      case 'PREPARING': return 'text-orange-500';
+      case 'READY_FOR_PICKUP': return 'text-purple-500';
+      case 'OUT_FOR_DELIVERY': return 'text-green-500';
+      case 'DELIVERED': return 'text-green-600';
+      case 'CANCELLED': return 'text-red-500';
+      default: return 'text-gray-500';
     }
   };
+
+  // Get status icon
+  const getStatusIcon = (status?: OrderStatus) => {
+    switch (status) {
+      case 'PENDING': return '⏳';
+      case 'ACCEPTED': return '✅';
+      case 'PREPARING': return '👨‍🍳';
+      case 'READY_FOR_PICKUP': return '📦';
+      case 'OUT_FOR_DELIVERY': return '🛵';
+      case 'DELIVERED': return '🎉';
+      case 'CANCELLED': return '❌';
+      default: return '📋';
+    }
+  };
+
+  // Select an order to track
+  const selectOrder = (order: OrderRecord) => {
+    setSelectedOrderId(order.id);
+    setLiveOrder(order);
+    setShowOrderList(false);
+
+    // Assign rider if not assigned
+    if (!order.riderName) {
+      const rider = getRandomRider();
+      setRiderProfile(rider);
+    } else {
+      // Use a random rider from the pool
+      const rider = getRandomRider();
+      rider.name = order.riderName || rider.name;
+      setRiderProfile(rider);
+    }
+
+    // Simulate rider movement when out for delivery
+    if (order.status === 'OUT_FOR_DELIVERY') {
+      setRiderLocation({
+        lat: restaurantLocation.lat + (deliveryLocation.lat - restaurantLocation.lat) * 0.6,
+        lng: restaurantLocation.lng + (deliveryLocation.lng - restaurantLocation.lng) * 0.6
+      });
+    }
+  };
+
+  // Go back to order list
+  const goBackToList = () => {
+    setShowOrderList(true);
+    setSelectedOrderId(null);
+    setLiveOrder(null);
+  };
+
+  // 2. ROBUST REFRESH LOGIC: Prevents "Sync Disruption" in Customer UI
+  const refresh = useCallback(async () => {
+    if (!showOrderList && selectedOrderId) {
+      try {
+        const allOrders = await db.getAllLiveOrders();
+        const myOrder = allOrders
+          .filter(o => o.customerEmail === customerEmail && o.status !== 'DELIVERED' && o.status !== 'CANCELLED')
+          .sort((a, b) => Number(b.id) - Number(a.id))[0];
+
+        if (myOrder) {
+          if (!myOrder.riderEmail && !riderProfile) {
+            const rider = getRandomRider();
+            setRiderProfile(rider);
+            myOrder.riderName = rider.name;
+            myOrder.riderEmail = 'rider@ayoo.ph';
+          }
+
+          if (needsPayMongoSync(myOrder)) {
+            const synced = await ayooCloud.syncPayMongoOrder(myOrder.id);
+            setLiveOrder(synced || myOrder);
+          } else {
+            setLiveOrder(myOrder);
+          }
+
+          if (myOrder.status === 'OUT_FOR_DELIVERY') {
+            setRiderLocation({
+              lat: restaurantLocation.lat + (deliveryLocation.lat - restaurantLocation.lat) * 0.6,
+              lng: restaurantLocation.lng + (deliveryLocation.lng - restaurantLocation.lng) * 0.6
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Tracking Sync Fault:", err);
+      }
+    }
+  }, [customerEmail, riderProfile, restaurantLocation, deliveryLocation, showOrderList, selectedOrderId]);
+
+  // Initialize rider profile
+  useEffect(() => {
+    if (liveOrder?.riderName && !riderProfile) {
+      setRiderProfile(getRandomRider());
+    }
+  }, [liveOrder?.riderName]);
 
   useEffect(() => {
     refresh();
@@ -104,11 +276,34 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
       unsubscribe();
       clearInterval(timer);
     };
-  }, [customerEmail]);
+  }, [refresh]);
 
   useEffect(() => {
     if (liveOrder?.status === 'DELIVERED') {
       setShowFeedbackModal(true);
+      notifyOrderDelivered(liveOrder.id, liveOrder.riderName || 'Rider');
+    } else if (liveOrder?.status) {
+      notifyStatusUpdate(liveOrder.id, liveOrder.status);
+    }
+  }, [liveOrder?.status]);
+
+  // Auto-notify when status changes
+  useEffect(() => {
+    if (!liveOrder) return;
+
+    switch (liveOrder.status) {
+      case 'ACCEPTED':
+        notifyOrderAccepted(liveOrder.id, liveOrder.restaurantName);
+        break;
+      case 'PREPARING':
+        notifyOrderPreparing(liveOrder.id);
+        break;
+      case 'READY_FOR_PICKUP':
+        notifyOrderReady(liveOrder.id, liveOrder.restaurantName);
+        break;
+      case 'OUT_FOR_DELIVERY':
+        notifyOrderPickedUp(liveOrder.id, liveOrder.riderName || 'Rider');
+        break;
     }
   }, [liveOrder?.status]);
 
@@ -126,17 +321,172 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
     return map[status] ?? 0;
   };
 
-  const statusIdx = getStatusIndex(liveOrder?.status);
+  const statusIdx = liveOrder ? getStatusIndex(liveOrder.status) : 0;
   const progressMap = [10, 45, 80, 100];
   const currentProgress = progressMap[statusIdx];
 
+  // Render order list view
+  if (showOrderList) {
+    return (
+      <div className="bg-white min-h-screen flex flex-col pb-32 overflow-hidden font-sans">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-8 pb-12 rounded-b-[60px] text-white shadow-2xl relative z-20">
+          <div className="flex justify-between items-center mb-6">
+            <button onClick={onBack} className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg">←</button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowNotifications(true)}
+                className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-xl shadow-lg relative"
+              >
+                🔔
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-black flex items-center justify-center">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <h2 className="text-4xl font-black uppercase tracking-tighter leading-none drop-shadow-lg">
+            📍 My Orders
+          </h2>
+          <p className="text-white/80 mt-2 font-medium">Track your active deliveries</p>
+        </div>
+
+        {/* Active Orders List */}
+        <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+          <h3 className="text-sm font-black uppercase tracking-widest text-gray-400 mb-4">
+            Active Deliveries ({activeOrders.length})
+          </h3>
+
+          {activeOrders.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="text-6xl mb-4">📦</div>
+              <p className="text-gray-400 font-bold">No active orders</p>
+              <p className="text-gray-300 text-sm mt-2">Your orders will appear here</p>
+            </div>
+          ) : (
+            activeOrders.map((order) => (
+              <div
+                key={order.id}
+                onClick={() => selectOrder(order)}
+                className="bg-white border-2 border-gray-100 rounded-[30px] p-6 shadow-sm hover:shadow-lg hover:border-[#FF1493]/30 transition-all cursor-pointer"
+              >
+                {/* Order Header */}
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order ID</p>
+                    <p className="text-lg font-black text-gray-900">{order.id}</p>
+                  </div>
+                  <div className={`px-4 py-2 rounded-full ${getStatusColor(order.status)} bg-gray-50`}>
+                    <span className="text-lg mr-1">{getStatusIcon(order.status)}</span>
+                    <span className="text-xs font-black uppercase tracking-widest">
+                      {order.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Restaurant */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-white text-xl">
+                    🍔
+                  </div>
+                  <div>
+                    <p className="font-black text-gray-900">{order.restaurantName}</p>
+                    <p className="text-xs text-gray-400">{order.items.length} items</p>
+                  </div>
+                </div>
+
+                {/* Status & ETA */}
+                <div className="flex justify-between items-center py-3 border-t border-b border-gray-100 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">Status</p>
+                    <p className={`font-black ${getStatusColor(order.status)}`}>
+                      {order.status === 'OUT_FOR_DELIVERY' ? 'On the way' :
+                        order.status === 'PREPARING' ? 'Preparing your food' :
+                          order.status.replace('_', ' ')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider">ETA</p>
+                    <p className="font-black text-[#FF1493]">{calculateETA(order.status)}</p>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    {order.isPaid ? (
+                      <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                        ✓ Paid
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                        COD
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      {order.paymentMethod}
+                    </span>
+                  </div>
+                  <p className="text-xl font-black text-gray-900">₱{order.total}</p>
+                </div>
+
+                {/* Rider (if assigned) */}
+                {order.riderName && (
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-sm">
+                      {order.riderName[0]}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-400">Delivery Partner</p>
+                      <p className="font-bold text-gray-900">{order.riderName}</p>
+                    </div>
+                    <button className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white">
+                      📞
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Notification Panel */}
+        {showNotifications && (
+          <NotificationPanel
+            notifications={notifications}
+            onClose={() => setShowNotifications(false)}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Render detailed tracking view
   return (
     <div className="bg-white min-h-screen flex flex-col pb-32 overflow-hidden font-sans">
       {/* 3. DYNAMIC HEADER WITH ETA - ENHANCED GRAB-LIKE */}
       <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-8 pb-16 rounded-b-[60px] text-white shadow-2xl relative z-20">
         <div className="flex justify-between items-center mb-6">
-          <button onClick={onBack} className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg">←</button>
+          <button onClick={goBackToList} className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg">←</button>
           <div className="flex gap-3">
+            {/* Notification Bell */}
+            <button
+              onClick={() => setShowNotifications(true)}
+              className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-xl shadow-lg relative"
+            >
+              🔔
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-black flex items-center justify-center">
+                  {notifications.filter(n => !n.read).length}
+                </span>
+              )}
+            </button>
+
             {liveOrder && liveOrder.status && liveOrder.status !== 'DELIVERED' && liveOrder.status !== 'CANCELLED' && (
               <button onClick={async () => {
                 if (liveOrder) {
@@ -166,7 +516,6 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                 const riderName = liveOrder.riderName || 'Rider';
 
                 if (riderEmail) {
-                  // Create or get conversation with rider
                   const convo = await db.getOrCreateConversation(
                     currentUser.email,
                     currentUser.name,
@@ -194,6 +543,15 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
           {statusIdx === 3 ? '🎉 Arrived!' : '📍 Live Tracking'}
         </h2>
 
+        {/* Order ID Badge */}
+        <div className="flex items-center gap-2 mt-2">
+          <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold">
+            {liveOrder?.id}
+          </span>
+          <span className="text-white/60">•</span>
+          <span className="text-white/80 text-sm">{liveOrder?.restaurantName}</span>
+        </div>
+
         {/* ETA CARD - GRAB STYLE */}
         <div className="bg-white/20 backdrop-blur-xl p-6 mt-6 rounded-[30px] border border-white/20 flex justify-between items-center shadow-xl">
           <div>
@@ -217,7 +575,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === tab ? 'bg-white text-[#FF00CC] shadow' : 'text-gray-500'
+              className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === tab ? 'bg-white text-[#FF1493] shadow' : 'text-gray-500'
                 }`}
             >
               {tab}
@@ -225,39 +583,25 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
           ))}
         </div>
 
-        {/* 4. QUANTUM MAP VISUALS */}
+        {/* 4. REALISTIC MAP VISUALS WITH ROUTE */}
         {activeTab === 'LIVE' && (
-          <div className="relative h-64 bg-gray-50 rounded-[45px] border-2 border-gray-100 overflow-hidden shadow-inner">
-            <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(#FF00CC 0.5px, transparent 0.5px)', backgroundSize: '20px 20px' }}></div>
-
-            <div className="absolute top-1/2 left-10 right-10 h-1 bg-gray-200 rounded-full -translate-y-1/2">
-              <div className="h-full ayoo-gradient rounded-full transition-all duration-1000" style={{ width: `${currentProgress}%` }}></div>
-            </div>
-
-            <div className="absolute top-1/2 left-10 -translate-y-1/2 flex flex-col items-center">
-              <div className="w-4 h-4 bg-gray-300 rounded-full border-4 border-white shadow-md"></div>
-              <span className="text-[7px] font-black uppercase text-gray-400 mt-2 tracking-widest">Shop</span>
-            </div>
-
-            <div className="absolute top-1/2 right-10 -translate-y-1/2 flex flex-col items-center">
-              <div className={`w-10 h-10 rounded-2xl border-4 border-white shadow-md flex items-center justify-center text-sm transition-all ${statusIdx === 3 ? 'bg-green-500 scale-110' : 'bg-gray-300'}`}>
-                {statusIdx === 3 ? '🏠' : '📍'}
-              </div>
-              <span className="text-[7px] font-black uppercase text-gray-400 mt-2 tracking-widest">Home</span>
-            </div>
-
-            {/* Animated Rider */}
-            {statusIdx < 3 && (
-              <div className="absolute top-1/2 -translate-y-1/2 transition-all duration-1000 z-10" style={{ left: `calc(10px + (100% - 80px) * ${currentProgress / 100})` }}>
-                <div className="w-14 h-14 bg-white rounded-2xl shadow-xl border-2 border-[#FF00CC] flex items-center justify-center text-2xl animate-bounce">🛵</div>
-              </div>
-            )}
-          </div>
+          <MapItinerary
+            restaurantLocation={restaurantLocation}
+            deliveryLocation={deliveryLocation}
+            riderLocation={riderLocation}
+            riderProfile={riderProfile || undefined}
+            status={liveOrder?.status || 'PENDING'}
+            onRiderClick={() => {
+              if (riderProfile?.phone) {
+                showToast(`Calling ${riderProfile.name}...`);
+              }
+            }}
+          />
         )}
 
         {!liveOrder ? (
           <div className="py-20 text-center opacity-40">
-            <div className="w-12 h-1 bg-[#FF00CC]/20 mx-auto mb-4 rounded-full animate-pulse"></div>
+            <div className="w-12 h-1 bg-[#FF1493]/20 mx-auto mb-4 rounded-full animate-pulse"></div>
             <p className="font-black uppercase tracking-widest text-[9px]">Awaiting Dispatch Node...</p>
           </div>
         ) : (
@@ -268,13 +612,16 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm"><span className="font-bold text-gray-500">Order ID</span><span className="font-black">{liveOrder.id}</span></div>
                   <div className="flex justify-between text-sm"><span className="font-bold text-gray-500">Restaurant</span><span className="font-black">{liveOrder.restaurantName}</span></div>
-                  <div className="flex justify-between text-sm"><span className="font-bold text-gray-500">Payment</span><span className="font-black">{liveOrder.paymentMethod || 'COD'}</span></div>
+                  <div className="flex justify-between text-sm"><span className="font-bold text-gray-500">Payment Method</span><span className="font-black">{liveOrder.paymentMethod || 'COD'}</span></div>
                   <div className="flex justify-between text-sm">
-                    <span className="font-bold text-gray-500">Payment State</span>
+                    <span className="font-bold text-gray-500">Payment Status</span>
                     <span className={`font-black ${isOrderPaid(liveOrder) ? 'text-green-600' : liveOrder.status === 'CANCELLED' ? 'text-red-500' : 'text-amber-500'}`}>
-                      {isOrderPaid(liveOrder) ? 'SETTLED' : liveOrder.status === 'CANCELLED' ? 'FAILED' : 'PENDING CONFIRMATION'}
+                      {isOrderPaid(liveOrder) ? '✓ PAID' : liveOrder.status === 'CANCELLED' ? 'FAILED' : 'PENDING'}
                     </span>
                   </div>
+                  {liveOrder.transactionId && (
+                    <div className="flex justify-between text-sm"><span className="font-bold text-gray-500">Transaction ID</span><span className="font-black text-xs">{liveOrder.transactionId}</span></div>
+                  )}
                   <div className="flex justify-between text-sm"><span className="font-bold text-gray-500">Delivery Address</span><span className="font-black text-right max-w-[180px]">{liveOrder.deliveryAddress}</span></div>
                 </div>
               </div>
@@ -288,7 +635,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                     const done = getStatusIndex(liveOrder.status) >= getStatusIndex(status);
                     return (
                       <div key={status} className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${done ? 'bg-[#FF00CC] text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${done ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div>
                         <p className={`text-xs font-black uppercase tracking-widest ${done ? 'text-gray-900' : 'text-gray-400'}`}>{status.replaceAll('_', ' ')}</p>
                       </div>
                     );
@@ -297,14 +644,37 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
               </div>
             )}
 
-            {/* RIDER INFO */}
-            <div className="bg-gray-50 p-8 rounded-[40px] border border-gray-100 flex items-center gap-5">
-              <div className="w-16 h-16 ayoo-gradient rounded-3xl flex items-center justify-center text-white text-2xl font-black shadow-lg">
-                {liveOrder.riderName?.[0] || 'R'}
-              </div>
-              <div>
-                <h4 className="font-black text-xl text-gray-900 leading-none">{liveOrder.riderName || 'Looking for Rider'}</h4>
-                <p className="text-[10px] font-bold text-[#FF00CC] uppercase tracking-[0.2em] mt-2">Active Logistics Partner</p>
+            {/* ENHANCED RIDER INFO CARD */}
+            <div className="bg-gradient-to-br from-gray-50 to-white p-8 rounded-[40px] border-2 border-[#FF1493]/10 shadow-lg">
+              <div className="flex items-center gap-5">
+                <div className="w-20 h-20 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-3xl flex items-center justify-center text-white text-3xl font-black shadow-xl overflow-hidden">
+                  {riderProfile?.avatar ? (
+                    <img src={riderProfile.avatar} alt={riderProfile.name} className="w-full h-full object-cover" />
+                  ) : (
+                    liveOrder.riderName?.[0] || 'R'
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-black text-xl text-gray-900 leading-none">
+                    {riderProfile?.name || liveOrder.riderName || 'Looking for Rider'}
+                  </h4>
+                  {riderProfile && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-amber-400 text-sm">⭐</span>
+                      <span className="text-sm font-bold text-gray-600">{riderProfile.rating}</span>
+                      <span className="text-xs text-gray-400">•</span>
+                      <span className="text-xs font-bold text-gray-500">{riderProfile.totalDeliveries} deliveries</span>
+                    </div>
+                  )}
+                  <p className="text-[10px] font-bold text-[#FF1493] uppercase tracking-[0.2em] mt-2">
+                    {riderProfile ? `${riderProfile.vehicleColor} ${riderProfile.vehicleType} • ${riderProfile.vehiclePlate}` : 'Active Logistics Partner'}
+                  </p>
+                </div>
+                {riderProfile && (
+                  <div className="w-14 h-14 bg-green-500 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">
+                    📞
+                  </div>
+                )}
               </div>
             </div>
 
@@ -320,7 +690,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                 ))}
                 <div className="mt-6 pt-6 border-t border-gray-100 flex justify-between items-center">
                   <span className="font-black text-lg text-gray-900">Total</span>
-                  <span className="text-2xl font-black text-[#FF00CC]">₱{liveOrder.total}</span>
+                  <span className="text-2xl font-black text-[#FF1493]">₱{liveOrder.total}</span>
                 </div>
               </div>
             )}
@@ -348,7 +718,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                 setIsSubmitting(true);
                 await ayooCloud.submitFeedback(liveOrder!.id, rating, comment, tip);
                 setIsSubmitting(false);
-                onBack();
+                goBackToList();
               }}
               disabled={isSubmitting || rating === 0}
               className="py-6 text-xl font-black uppercase tracking-widest rounded-3xl"
@@ -357,6 +727,16 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Notification Panel */}
+      {showNotifications && (
+        <NotificationPanel
+          notifications={notifications}
+          onClose={() => setShowNotifications(false)}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+        />
       )}
     </div>
   );

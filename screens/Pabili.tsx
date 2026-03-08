@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Button from '../components/Button';
+import { ayooCloud } from '../api';
+import { db } from '../db';
 
 interface PabiliProps {
   onBack: () => void;
   email: string;
 }
 
-type PabiliStatus = 'LOOKING_FOR_RIDER' | 'SHOPPING' | 'ON_THE_WAY' | 'DELIVERED';
+type PabiliStatus = 'LOOKING_FOR_RIDER' | 'SHOPPING' | 'ON_THE_WAY' | 'DELIVERED' | 'CANCELLED';
 
 interface PabiliRequest {
   id: string;
@@ -32,6 +34,10 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
   const [items, setItems] = useState('');
   const [budget, setBudget] = useState('500');
   const [note, setNote] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   const quickTemplates = [
     { title: 'Medicine Run', store: 'Mercury Drug', items: 'Biogesic 500mg (1 box)\nVitamin C (1 bottle)' },
@@ -44,7 +50,8 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
     LOOKING_FOR_RIDER: 'Looking for Rider',
     SHOPPING: 'Rider Shopping',
     ON_THE_WAY: 'On the Way',
-    DELIVERED: 'Delivered'
+    DELIVERED: 'Delivered',
+    CANCELLED: 'Cancelled'
   };
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -69,7 +76,7 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
   };
 
   const activeCount = useMemo(
-    () => requests.filter(req => req.status !== 'DELIVERED').length,
+    () => requests.filter(req => req.status !== 'DELIVERED' && req.status !== 'CANCELLED').length,
     [requests]
   );
 
@@ -112,6 +119,36 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
       return req;
     });
     saveRequests(next);
+  };
+
+  const handleCancelRequest = async () => {
+    if (!selectedRequestId) return;
+    setIsCancelling(true);
+    try {
+      await ayooCloud.cancelService(selectedRequestId, cancelReason);
+      await db.cancelService(selectedRequestId, cancelReason);
+
+      // Update local state
+      const next = requests.map(req => {
+        if (req.id === selectedRequestId) {
+          return { ...req, status: 'CANCELLED' as PabiliStatus };
+        }
+        return req;
+      });
+      saveRequests(next);
+
+      setShowCancelModal(false);
+      setCancelReason('');
+      setSelectedRequestId(null);
+    } catch (err) {
+      console.error('Failed to cancel request:', err);
+    }
+    setIsCancelling(false);
+  };
+
+  const openCancelModal = (id: string) => {
+    setSelectedRequestId(id);
+    setShowCancelModal(true);
   };
 
   return (
@@ -176,7 +213,10 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
                   <h4 className="font-black text-lg leading-none">{req.title}</h4>
                   <p className="text-xs text-gray-500 font-bold mt-1">{req.store}</p>
                 </div>
-                <span className="text-[10px] font-black uppercase px-3 py-2 rounded-xl bg-[#FF1493]/10 text-[#FF1493]">{statusLabel[req.status]}</span>
+                <span className={`text-[10px] font-black uppercase px-3 py-2 rounded-xl ${req.status === 'DELIVERED' ? 'bg-green-50 text-green-600' :
+                  req.status === 'CANCELLED' ? 'bg-red-50 text-red-500' :
+                    'bg-[#FF1493]/10 text-[#FF1493]'
+                  }`}>{statusLabel[req.status]}</span>
               </div>
               <p className="text-xs text-gray-600 whitespace-pre-line">{req.items}</p>
               <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-gray-500">
@@ -184,10 +224,18 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
                 <span>Fee ₱{req.deliveryFee.toFixed(2)}</span>
               </div>
               {req.note && <p className="text-[11px] text-gray-500">Note: {req.note}</p>}
-              {req.status !== 'DELIVERED' && (
-                <Button onClick={() => advanceStatus(req.id)} className="py-3 text-xs font-black uppercase tracking-widest">
-                  Simulate Status Update
-                </Button>
+              {req.status !== 'DELIVERED' && req.status !== 'CANCELLED' && (
+                <div className="flex gap-2">
+                  <Button onClick={() => advanceStatus(req.id)} className="flex-1 py-3 text-xs font-black uppercase tracking-widest">
+                    Simulate Status Update
+                  </Button>
+                  <button
+                    onClick={() => openCancelModal(req.id)}
+                    className="px-4 py-3 rounded-xl bg-red-50 text-red-500 text-xs font-black uppercase tracking-widest"
+                  >
+                    Cancel
+                  </button>
+                </div>
               )}
             </div>
           ))
@@ -197,6 +245,48 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
       {!showForm && (
         <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-6 bg-white border-t border-gray-100 rounded-t-[40px] z-40">
           <Button onClick={() => setShowForm(true)} className="py-5 text-sm font-black uppercase tracking-[0.12em]">Create Pabili Request</Button>
+        </div>
+      )}
+
+      {/* CANCEL REQUEST MODAL */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[400] bg-black/80 backdrop-blur-2xl flex items-center justify-center p-8">
+          <div className="bg-white rounded-[40px] p-8 w-full max-w-sm text-center space-y-6 shadow-2xl">
+            <div className="w-20 h-20 mx-auto bg-red-100 rounded-full flex items-center justify-center text-4xl">
+              ❌
+            </div>
+            <div>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-gray-900">Cancel Request?</h3>
+              <p className="text-sm font-bold text-gray-500 mt-2">Are you sure you want to cancel this pabili request?</p>
+            </div>
+            <div className="space-y-3">
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Reason for cancellation (optional)"
+                className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold text-sm min-h-[80px]"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleCancelRequest}
+                disabled={isCancelling}
+                className="w-full py-4 text-base font-black uppercase bg-red-500 text-white rounded-2xl"
+              >
+                {isCancelling ? 'Cancelling...' : 'Yes, Cancel Request'}
+              </Button>
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelReason('');
+                  setSelectedRequestId(null);
+                }}
+                className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest"
+              >
+                No, Keep Request
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -69,7 +69,13 @@ const App: React.FC = () => {
 
   const handleNavigate = (nextScreen: string) => {
     const rawTarget = nextScreen as AppScreen;
-    const target = activeRole === 'CUSTOMER' && rawTarget === 'SERVICES' ? 'HOME' : rawTarget;
+    let target = activeRole === 'CUSTOMER' && rawTarget === 'SERVICES' ? 'HOME' : rawTarget;
+
+    // Redirect TRACKING to HISTORY for backward compatibility
+    if (target === 'TRACKING') {
+      target = 'HISTORY';
+    }
+
     if (!currentUser && target !== 'AUTH' && target !== 'ONBOARDING') {
       setScreen('AUTH');
       return;

@@ -6,6 +6,15 @@ import { db } from '../db';
 import { GLOBAL_REGISTRY_KEY } from '../constants';
 import Button from '../components/Button';
 import BottomNav from '../components/BottomNav';
+import NotificationPanel from '../components/NotificationPanel';
+import { useToast } from '../components/ToastContext';
+import {
+  notifyOrderReady,
+  notifyOrderPickedUp,
+  notifyOrderDelivered,
+  MOCK_RIDERS,
+  RiderProfile
+} from '../src/utils/notifications';
 
 interface RiderDashboardProps {
   onBack: () => void;
@@ -14,6 +23,8 @@ interface RiderDashboardProps {
 }
 
 const RiderDashboard: React.FC<RiderDashboardProps> = ({ onBack, onNavigate, isOwner = false }) => {
+  const { showToast, notifications, markAsRead, markAllAsRead } = useToast();
+  const [showNotifications, setShowNotifications] = useState(false);
   const [marketTasks, setMarketTasks] = useState<OrderRecord[]>([]);
   const [myDuty, setMyDuty] = useState<OrderRecord[]>([]);
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
@@ -58,6 +69,19 @@ const RiderDashboard: React.FC<RiderDashboardProps> = ({ onBack, onNavigate, isO
         riderEmail: currentUser.email
       });
     }
+
+    // Send notifications based on status
+    const task = myDuty.find(t => t.id === id);
+    if (task) {
+      if (status === 'OUT_FOR_DELIVERY') {
+        notifyOrderPickedUp(id, currentUser.name);
+        showToast('Picked up! Customer notified.');
+      } else if (status === 'DELIVERED') {
+        notifyOrderDelivered(id, currentUser.name);
+        showToast('Delivery complete! Great job!');
+      }
+    }
+
     refresh();
   };
 
@@ -89,6 +113,18 @@ const RiderDashboard: React.FC<RiderDashboardProps> = ({ onBack, onNavigate, isO
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="px-5 h-12 bg-white/10 rounded-2xl text-white border border-white/10 active:scale-90 transition-all font-bold text-sm">
             ← Back
+          </button>
+          {/* Notification Bell */}
+          <button
+            onClick={() => setShowNotifications(true)}
+            className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-xl shadow-lg relative border border-white/10"
+          >
+            🔔
+            {notifications.filter(n => !n.read).length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-black flex items-center justify-center">
+                {notifications.filter(n => !n.read).length}
+              </span>
+            )}
           </button>
           <div className="w-14 h-14 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-3xl shadow-xl shadow-pink-900/30">🛵</div>
         </div>
@@ -158,6 +194,16 @@ const RiderDashboard: React.FC<RiderDashboardProps> = ({ onBack, onNavigate, isO
       )}
 
       <BottomNav active="RIDER_DASHBOARD" onNavigate={onNavigate} mode="operations" showAdmin={isOwner} />
+
+      {/* Notification Panel */}
+      {showNotifications && (
+        <NotificationPanel
+          notifications={notifications}
+          onClose={() => setShowNotifications(false)}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+        />
+      )}
     </div>
   );
 };

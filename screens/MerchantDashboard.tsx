@@ -4,6 +4,9 @@ import { OrderRecord, FoodItem, Restaurant, AppScreen } from '../types';
 import { db } from '../db';
 import Button from '../components/Button';
 import BottomNav from '../components/BottomNav';
+import NotificationPanel from '../components/NotificationPanel';
+import { useToast } from '../components/ToastContext';
+import { notifyOrderAccepted, notifyOrderPreparing, notifyOrderReady } from '../src/utils/notifications';
 
 interface MerchantDashboardProps {
   restaurantName: string;
@@ -13,6 +16,8 @@ interface MerchantDashboardProps {
 }
 
 const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, onBack, onNavigate, isOwner = false }) => {
+  const { showToast, notifications, markAsRead, markAllAsRead } = useToast();
+  const [showNotifications, setShowNotifications] = useState(false);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'wallet' | 'live'>('orders');
   const [myRes, setMyRes] = useState<Restaurant | null>(null);
@@ -153,6 +158,18 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
           <button onClick={onBack} className="px-5 h-12 bg-white/10 rounded-2xl text-white border border-white/10 active:scale-90 transition-all font-bold text-sm">
             ← Back
           </button>
+          {/* Notification Bell */}
+          <button
+            onClick={() => setShowNotifications(true)}
+            className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-xl shadow-lg relative border border-white/10"
+          >
+            🔔
+            {notifications.filter(n => !n.read).length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-black flex items-center justify-center">
+                {notifications.filter(n => !n.read).length}
+              </span>
+            )}
+          </button>
           <div className="w-14 h-14 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-2xl shadow-xl shadow-pink-900/30">🏪</div>
         </div>
       </div>
@@ -205,6 +222,8 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
                     } else {
                       ayooCloud.updateOrderStatus(order.id, 'PREPARING');
                     }
+                    notifyOrderPreparing(order.id);
+                    showToast('Order marked as preparing!');
                   }} className="flex-1 py-3 bg-white/5 text-[9px] font-black tracking-widest uppercase">Prepare</Button>
                   <Button onClick={async () => {
                     if ((db as any).ENV?.USE_REAL_BACKEND) {
@@ -212,6 +231,8 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
                     } else {
                       ayooCloud.updateOrderStatus(order.id, 'READY_FOR_PICKUP');
                     }
+                    notifyOrderReady(order.id, restaurantName);
+                    showToast('Order ready! Riders notified.');
                   }} className="flex-1 py-3 bg-[#FF00CC] text-[9px] font-black tracking-widest uppercase shadow-lg shadow-pink-900/20">Ready</Button>
                 </div>
               </div>
@@ -237,6 +258,16 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
       )}
 
       <BottomNav active="MERCHANT_DASHBOARD" onNavigate={onNavigate} mode="operations" showAdmin={isOwner} />
+
+      {/* Notification Panel */}
+      {showNotifications && (
+        <NotificationPanel
+          notifications={notifications}
+          onClose={() => setShowNotifications(false)}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+        />
+      )}
     </div>
   );
 };

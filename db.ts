@@ -576,6 +576,11 @@ class AyooDatabase {
     const updated = orders.map((o: any) => o.id === orderId ? { ...o, status, ...extra } : o);
     this.saveOrders(updated);
   }
+
+  async cancelService(orderId: string, reason?: string) {
+    await this.updateOrderStatus(orderId, 'CANCELLED', { comment: reason });
+  }
+
   async getSystemConfig() {
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       try {

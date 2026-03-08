@@ -3,6 +3,8 @@ import Button from '../components/Button';
 import BottomNav from '../components/BottomNav';
 import { AppScreen } from '../types';
 import { estimateCourierEta, estimateDistanceKm } from '../src/utils/serviceEstimates';
+import { ayooCloud } from '../api';
+import { db } from '../db';
 
 interface CourierProps {
   onBack: () => void;
@@ -80,6 +82,10 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
   const [routeProgress, setRouteProgress] = useState(0);
   const [isSimulatingRoute, setIsSimulatingRoute] = useState(false);
   const [dropoffCode, setDropoffCode] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [courierId, setCourierId] = useState('');
 
   useEffect(() => {
     setPickup(pickupPreset);
@@ -254,11 +260,37 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
     await new Promise((resolve) => setTimeout(resolve, 450));
     setBookStatus('Courier matched. Preparing real-time lane...');
     await new Promise((resolve) => setTimeout(resolve, 450));
+
+    // Generate courier ID
+    const newCourierId = `COUR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    setCourierId(newCourierId);
+
     setBooking(false);
     setDropoffCode(`DROP-${Math.floor(1000 + Math.random() * 9000)}-${routeStops.length - 1}`);
     setRouteProgress(6);
     setTripStatus('MATCHED');
     setIsSimulatingRoute(true);
+  };
+
+  const handleCancelCourier = async () => {
+    if (!courierId) return;
+    setIsCancelling(true);
+    try {
+      await ayooCloud.cancelService(courierId, cancelReason);
+      await db.cancelService(courierId, cancelReason);
+      setShowCancelModal(false);
+      // Reset the courier booking
+      setRouteProgress(0);
+      setTripStatus('IDLE');
+      setBookStatus('');
+      setDropoffCode('');
+      setIsSimulatingRoute(false);
+      setCourierId('');
+      setCancelReason('');
+    } catch (err) {
+      console.error('Failed to cancel courier:', err);
+    }
+    setIsCancelling(false);
   };
 
   return (
@@ -278,13 +310,12 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-black uppercase tracking-widest text-gray-500"></h3>
             <span
-              className={`text-[9px] px-3 py-1.5 rounded-xl font-black uppercase ${
-                tripStatus === 'DELIVERED'
-                  ? 'bg-green-50 text-green-600'
-                  : routeProgress > 0
+              className={`text-[9px] px-3 py-1.5 rounded-xl font-black uppercase ${tripStatus === 'DELIVERED'
+                ? 'bg-green-50 text-green-600'
+                : routeProgress > 0
                   ? 'bg-[#FF1493]/10 text-[#FF1493]'
                   : 'bg-gray-100 text-gray-500'
-              }`}
+                }`}
             >
               {tripStatus === 'IDLE' ? 'Idle' : tripStatus.replaceAll('_', ' ')}
             </span>
@@ -309,11 +340,10 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
                 style={{ left: `${stop.x}%`, top: `${stop.y}%` }}
               >
                 <div
-                  className={`w-8 h-8 rounded-full border-2 shadow flex items-center justify-center text-[11px] font-black ${
-                    stop.kind === 'pickup'
-                      ? 'bg-[#16A34A] border-white text-white'
-                      : 'bg-white border-pink-300 text-[#FF1493]'
-                  }`}
+                  className={`w-8 h-8 rounded-full border-2 shadow flex items-center justify-center text-[11px] font-black ${stop.kind === 'pickup'
+                    ? 'bg-[#16A34A] border-white text-white'
+                    : 'bg-white border-pink-300 text-[#FF1493]'
+                    }`}
                 >
                   {stop.kind === 'pickup' ? 'P' : stop.order}
                 </div>
@@ -350,9 +380,8 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
               {['Matched', 'Pickup', 'Transit', 'Delivered'].map((stage, index) => (
                 <div
                   key={stage}
-                  className={`rounded-xl px-2 py-2 text-center text-[8px] font-black uppercase tracking-widest ${
-                    timelineStep >= index + 1 ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-400'
-                  }`}
+                  className={`rounded-xl px-2 py-2 text-center text-[8px] font-black uppercase tracking-widest ${timelineStep >= index + 1 ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-400'
+                    }`}
                 >
                   {stage}
                 </div>
@@ -432,9 +461,8 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
               <button
                 key={kind}
                 onClick={() => setParcel(kind)}
-                className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                  parcel === kind ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-500'
-                }`}
+                className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest ${parcel === kind ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-500'
+                  }`}
               >
                 {kind}
               </button>
@@ -512,6 +540,14 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
               Resume Live Map
             </button>
           )}
+          {routeProgress > 0 && tripStatus !== 'DELIVERED' && (
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="w-full py-3 rounded-xl bg-red-50 text-red-500 text-[10px] font-black uppercase tracking-widest"
+            >
+              Cancel Delivery
+            </button>
+          )}
           {tripStatus === 'DELIVERED' && (
             <button
               onClick={() => {
@@ -530,6 +566,47 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
       </div>
 
       <BottomNav active="COURIER" onNavigate={onNavigate} mode="customer" />
+
+      {/* CANCEL COURIER MODAL */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[400] bg-black/80 backdrop-blur-2xl flex items-center justify-center p-8">
+          <div className="bg-white rounded-[40px] p-8 w-full max-w-sm text-center space-y-6 shadow-2xl">
+            <div className="w-20 h-20 mx-auto bg-red-100 rounded-full flex items-center justify-center text-4xl">
+              ❌
+            </div>
+            <div>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-gray-900">Cancel Delivery?</h3>
+              <p className="text-sm font-bold text-gray-500 mt-2">Are you sure you want to cancel this courier delivery?</p>
+            </div>
+            <div className="space-y-3">
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Reason for cancellation (optional)"
+                className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold text-sm min-h-[80px]"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleCancelCourier}
+                disabled={isCancelling}
+                className="w-full py-4 text-base font-black uppercase bg-red-500 text-white rounded-2xl"
+              >
+                {isCancelling ? 'Cancelling...' : 'Yes, Cancel Delivery'}
+              </Button>
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelReason('');
+                }}
+                className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest"
+              >
+                No, Keep Delivery
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

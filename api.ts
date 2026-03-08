@@ -236,6 +236,20 @@ class AyooCloudAPI {
     await this.updateOrderStatus(orderId, 'DELIVERED', { rating, comment, tipAmount: tip });
   }
 
+  async cancelService(orderId: string, reason?: string): Promise<void> {
+    if (this.USE_BACKEND) {
+      try {
+        await this.request(`/orders/${orderId}/cancel`, {
+          method: 'PUT',
+          body: JSON.stringify({ reason })
+        });
+      } catch (err) {
+        console.error('cancelService failed', err);
+      }
+    }
+    await this.updateOrderStatus(orderId, 'CANCELLED', { comment: reason });
+  }
+
   async forceAssignOrder(orderId: string, riderEmail: string, riderName: string): Promise<void> {
     await this.updateOrderStatus(orderId, 'ACCEPTED', { riderEmail, riderName });
   }

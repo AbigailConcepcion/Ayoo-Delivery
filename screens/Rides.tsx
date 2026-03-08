@@ -3,6 +3,8 @@ import Button from '../components/Button';
 import BottomNav from '../components/BottomNav';
 import { AppScreen } from '../types';
 import { estimateDistanceKm, estimateRideEta, RideType as RideEstimateType } from '../src/utils/serviceEstimates';
+import { ayooCloud } from '../api';
+import { db } from '../db';
 
 interface RidesProps {
   onBack: () => void;
@@ -27,6 +29,10 @@ const Rides: React.FC<RidesProps> = ({ onBack, onNavigate }) => {
   const [inBooking, setInBooking] = useState(false);
   const [bookingMsg, setBookingMsg] = useState('');
   const [booked, setBooked] = useState(false);
+  const [rideId, setRideId] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const distanceEstimate = useMemo(() => estimateDistanceKm(pickup, destination, manualKm), [pickup, destination, manualKm]);
   const distance = distanceEstimate.km;
@@ -53,8 +59,29 @@ const Rides: React.FC<RidesProps> = ({ onBack, onNavigate }) => {
     await new Promise(resolve => setTimeout(resolve, 420));
     setBookingMsg('Driver confirmed. Preparing pickup pin...');
     await new Promise(resolve => setTimeout(resolve, 420));
+
+    // Generate ride ID
+    const newRideId = `RIDE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    setRideId(newRideId);
+
     setInBooking(false);
     setBooked(true);
+  };
+
+  const handleCancelRide = async () => {
+    if (!rideId) return;
+    setIsCancelling(true);
+    try {
+      await ayooCloud.cancelService(rideId, cancelReason);
+      await db.cancelService(rideId, cancelReason);
+      setShowCancelModal(false);
+      setBooked(false);
+      setRideId('');
+      setCancelReason('');
+    } catch (err) {
+      console.error('Failed to cancel ride:', err);
+    }
+    setIsCancelling(false);
   };
 
   return (
@@ -74,9 +101,17 @@ const Rides: React.FC<RidesProps> = ({ onBack, onNavigate }) => {
               <p className="text-xs font-black uppercase text-gray-400 mb-1">Pickup PIN</p>
               <p className="text-3xl font-black text-[#FF1493]">A{Math.floor(100 + Math.random() * 899)}</p>
             </div>
-            <Button onClick={() => { setBooked(false); onNavigate('TRACKING'); }} className="w-full py-5 text-base font-black uppercase bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-2xl">
-              Track Ride
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => { setBooked(false); onNavigate('TRACKING'); }} className="w-full py-5 text-base font-black uppercase bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-2xl">
+                Track Ride
+              </Button>
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest"
+              >
+                Cancel Ride
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -174,6 +209,47 @@ const Rides: React.FC<RidesProps> = ({ onBack, onNavigate }) => {
       </div>
 
       <BottomNav active="RIDES" onNavigate={onNavigate} mode="customer" />
+
+      {/* CANCEL RIDE MODAL */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-[400] bg-black/80 backdrop-blur-2xl flex items-center justify-center p-8">
+          <div className="bg-white rounded-[40px] p-8 w-full max-w-sm text-center space-y-6 shadow-2xl">
+            <div className="w-20 h-20 mx-auto bg-red-100 rounded-full flex items-center justify-center text-4xl">
+              ❌
+            </div>
+            <div>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-gray-900">Cancel Ride?</h3>
+              <p className="text-sm font-bold text-gray-500 mt-2">Are you sure you want to cancel this ride?</p>
+            </div>
+            <div className="space-y-3">
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Reason for cancellation (optional)"
+                className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold text-sm min-h-[80px]"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleCancelRide}
+                disabled={isCancelling}
+                className="w-full py-4 text-base font-black uppercase bg-red-500 text-white rounded-2xl"
+              >
+                {isCancelling ? 'Cancelling...' : 'Yes, Cancel Ride'}
+              </Button>
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelReason('');
+                }}
+                className="w-full py-3 rounded-xl bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest"
+              >
+                No, Keep Ride
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

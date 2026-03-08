@@ -22,4 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files - NEVER commit these!
+.env
+.env.local
+.env.production
+.env.*.local
 server/.env
+android/.env
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Build outputs
+android/app/build
+android/.gradle

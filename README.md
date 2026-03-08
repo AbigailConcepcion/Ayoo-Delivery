@@ -81,4 +81,4 @@ The `Dockerfile` compiles the TypeScript source and runs `dist/index.js`.
 
 ---
 
-Add additional information as project matures.
+

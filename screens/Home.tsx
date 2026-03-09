@@ -1,7 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { CATEGORIES, PHILIPPINE_CITIES } from '../constants';
-import type { Restaurant, UserBadge, AppScreen, Voucher, UserAccount, OrderRecord } from '../types';
+import type { Restaurant, UserBadge, AppScreen, Voucher, UserAccount, OrderRecord, LeaderboardEntry, LeaderboardPeriod } from '../types';
+import { db } from '../db';
+import { ayooCloud } from '../api';
 
 interface HomeProps {
   restaurants: Restaurant[];
@@ -216,6 +218,64 @@ const Home: React.FC<HomeProps> = ({
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [sharePost, setSharePost] = useState<CommunityPost | null>(null);
+
+  // Leaderboard state
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('month');
+  const [customerLeaderboard, setCustomerLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [merchantLeaderboard, setMerchantLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [riderLeaderboard, setRiderLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+
+  // Load leaderboard data based on period
+  useEffect(() => {
+    const loadLeaderboards = async () => {
+      setLeaderboardLoading(true);
+      try {
+        if ((db as any).ENV?.USE_REAL_BACKEND) {
+          setCustomerLeaderboard(await ayooCloud.getCustomerLeaderboard(leaderboardPeriod));
+          setMerchantLeaderboard(await ayooCloud.getMerchantLeaderboard(leaderboardPeriod));
+          setRiderLeaderboard(await ayooCloud.getRiderLeaderboard(leaderboardPeriod));
+        } else {
+          setCustomerLeaderboard(await db.getCustomerLeaderboard(leaderboardPeriod));
+          setMerchantLeaderboard(await db.getMerchantLeaderboard(leaderboardPeriod));
+          setRiderLeaderboard(await db.getRiderLeaderboard(leaderboardPeriod));
+        }
+      } catch (err) {
+        console.error('Failed to load leaderboards', err);
+      } finally {
+        setLeaderboardLoading(false);
+      }
+    };
+    loadLeaderboards();
+  }, [leaderboardPeriod]);
+
+  // Get the appropriate leaderboard based on user role
+  const getLeaderboardForRole = () => {
+    switch (userRole) {
+      case 'CUSTOMER':
+        return customerLeaderboard;
+      case 'MERCHANT':
+        return merchantLeaderboard;
+      case 'RIDER':
+        return riderLeaderboard;
+      default:
+        return customerLeaderboard;
+    }
+  };
+
+  // Get leaderboard title based on role
+  const getLeaderboardTitle = () => {
+    switch (userRole) {
+      case 'CUSTOMER':
+        return '🏆 Top Customers';
+      case 'MERCHANT':
+        return '🏆 Top Merchants';
+      case 'RIDER':
+        return '🏆 Top Riders';
+      default:
+        return '🏆 Leaderboard';
+    }
+  };
 
   // Get user name for commenting
   const userName = currentUser?.name || 'You';
@@ -596,19 +656,22 @@ const Home: React.FC<HomeProps> = ({
     <>
       {/* Search Bar */}
       <div className="relative mb-4 cursor-pointer" onClick={() => onNavigate?.('SEARCH')}>
-        <div className="w-full p-5 pl-14 rounded-[25px] bg-white focus:outline-none font-bold text-gray-800 shadow-lg text-base flex items-center">
-          <span className="text-gray-400">🔍 Search for food, shops...</span>
+        <div className="w-full p-4 pl-12 rounded-2xl bg-white shadow-md border border-gray-100 flex items-center gap-3">
+          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="text-gray-400 font-medium text-sm">Search for food, shops...</span>
         </div>
       </div>
 
       {/* Services Grid */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-4 gap-3 mb-5">
         {SERVICES.map((service) => (
-          <button key={service.id} onClick={() => handleServiceClick(service)} className="flex flex-col items-center gap-1 py-2">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-md bg-white border border-gray-100">
+          <button key={service.id} onClick={() => handleServiceClick(service)} className="flex flex-col items-center gap-1.5 py-2">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm bg-white border border-gray-100">
               {service.icon}
             </div>
-            <span className="text-[9px] font-black text-gray-600 uppercase tracking-wider">{service.name}</span>
+            <span className="text-[9px] font-medium text-gray-600 uppercase tracking-wider">{service.name}</span>
           </button>
         ))}
       </div>
@@ -767,27 +830,73 @@ const Home: React.FC<HomeProps> = ({
         </div>
       </div>
 
-      {/* Top Riders Leaderboard */}
+      {/* Dynamic Leaderboard Based on User Role */}
       <div className="mb-6">
-        <h3 className="font-black text-gray-900 text-base mb-3">🏆 Top Riders This Month</h3>
-        <div className="space-y-2">
-          {TOP_RIDERS.map((rider, idx) => (
-            <div key={rider.id} className="bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-yellow-400 text-black' : idx === 1 ? 'bg-gray-300 text-black' : 'bg-orange-200 text-black'}`}>
-                {idx + 1}
-              </div>
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">{rider.avatar}</div>
-              <div className="flex-1">
-                <p className="font-black text-sm text-gray-900">{rider.name}</p>
-                <p className="text-[10px] text-gray-500">{rider.stats}</p>
-              </div>
-              <span className="text-[#FF1493] text-[10px] font-bold">{rider.badge}</span>
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">{getLeaderboardTitle()}</h3>
+          {/* Period Toggle */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setLeaderboardPeriod('week')}
+              className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${leaderboardPeriod === 'week' ? 'bg-[#FF1493] text-white' : 'text-gray-500'}`}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setLeaderboardPeriod('month')}
+              className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${leaderboardPeriod === 'month' ? 'bg-[#FF1493] text-white' : 'text-gray-500'}`}
+            >
+              Month
+            </button>
+            <button
+              onClick={() => setLeaderboardPeriod('all')}
+              className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${leaderboardPeriod === 'all' ? 'bg-[#FF1493] text-white' : 'text-gray-500'}`}
+            >
+              All
+            </button>
+          </div>
         </div>
+
+        {leaderboardLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-8 h-8 border-4 border-[#FF1493] border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : getLeaderboardForRole().length > 0 ? (
+          <div className="space-y-2">
+            {getLeaderboardForRole().slice(0, 10).map((entry) => (
+              <div key={entry.userId} className="bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${entry.rank === 1 ? 'bg-yellow-400 text-black' : entry.rank === 2 ? 'bg-gray-300 text-black' : entry.rank === 3 ? 'bg-orange-200 text-black' : 'bg-gray-100 text-gray-500'}`}>
+                  {entry.rank}
+                </div>
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                  {entry.avatar || '👤'}
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-sm text-gray-900">{entry.name}</p>
+                  <p className="text-[10px] text-gray-500">
+                    {userRole === 'CUSTOMER' && `${entry.ordersCount} orders • ₱${(entry.totalSpent || 0).toFixed(0)} spent`}
+                    {userRole === 'MERCHANT' && `${entry.completedOrders} orders • ⭐ ${(entry.averageRating || 0).toFixed(1)} rating`}
+                    {userRole === 'RIDER' && `${entry.deliveriesCount} deliveries • ⭐ ${(entry.riderRating || 0).toFixed(1)} rating`}
+                    {userRole === 'ADMIN' && `${entry.ordersCount || entry.completedOrders || entry.deliveriesCount} orders`}
+                  </p>
+                </div>
+                {entry.rank <= 3 && (
+                  <span className="text-[#FF1493] text-[10px] font-bold">
+                    {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-100">
+            <p className="text-4xl mb-2">📊</p>
+            <p className="text-gray-500 text-xs font-black uppercase">No data yet for this period</p>
+          </div>
+        )}
       </div>
 
-      {/* Featured Merchants Spotlight */}
+      {/* Featured Merchants Spotlight (always visible) */}
       <div className="mb-6">
         <h3 className="font-black text-gray-900 text-base mb-3">⭐ Merchant Spotlight</h3>
         <div className="space-y-2">
@@ -889,26 +998,33 @@ const Home: React.FC<HomeProps> = ({
       )}
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-5 pb-32 shadow-2xl rounded-b-[40px]">
-        <div className="flex justify-between items-start mb-4">
+      <div className="bg-gradient-to-br from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-28 shadow-lg rounded-b-[32px]">
+        <div className="flex justify-between items-start mb-3">
           <div className="cursor-pointer flex items-center gap-2 flex-1" onClick={() => setShowLocationPicker(true)}>
             <div className="bg-white/30 backdrop-blur-md p-2 rounded-xl">
-              <span className="text-xl">📍</span>
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
             </div>
             <div>
               <p className="text-[8px] font-bold text-white/80 uppercase tracking-widest">Delivering to</p>
-              <p className="font-black text-white text-lg flex items-center gap-1">{deliveryCity} <span className="text-xs opacity-80">▼</span></p>
+              <p className="font-bold text-white text-base flex items-center gap-1">{deliveryCity} <svg className="w-3 h-3 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="bg-white/30 backdrop-blur-md px-3 py-2 rounded-xl flex items-center gap-1">
-              <span className="text-lg">🪙</span>
-              <span className="text-white font-black text-sm">{points}</span>
+            <div className="bg-white/30 backdrop-blur-md px-3 py-2 rounded-xl flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-white font-bold text-sm">{points}</span>
             </div>
-            <button onClick={() => onOpenCart?.()} className="w-12 h-12 bg-white rounded-xl flex items-center justify-center relative shadow-lg">
-              <span className="text-xl">🛒</span>
+            <button onClick={() => onOpenCart?.()} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center relative shadow-md">
+              <svg className="w-5 h-5 text-[#FF1493]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
               {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-yellow-400 text-black text-xs font-black w-5 h-5 rounded-full flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 bg-yellow-400 text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
@@ -917,12 +1033,12 @@ const Home: React.FC<HomeProps> = ({
         </div>
 
         {/* Tab Switcher */}
-        <div className="bg-white/20 backdrop-blur-sm rounded-full p-1 flex">
-          <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 px-4 rounded-full text-sm font-black uppercase tracking-wider transition-all ${activeTab === 'discover' ? 'bg-white text-[#FF1493] shadow-md' : 'text-white'}`}>
-            🔍 Discover
+        <div className="bg-white/20 backdrop-blur-sm rounded-xl p-1 flex">
+          <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'discover' ? 'bg-white text-[#FF1493] shadow-md' : 'text-white'}`}>
+            Discover
           </button>
-          <button onClick={() => setActiveTab('community')} className={`flex-1 py-2 px-4 rounded-full text-sm font-black uppercase tracking-wider transition-all ${activeTab === 'community' ? 'bg-white text-[#FF1493] shadow-md' : 'text-white'}`}>
-            👥 Community
+          <button onClick={() => setActiveTab('community')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'community' ? 'bg-white text-[#FF1493] shadow-md' : 'text-white'}`}>
+            Community
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { Conversation, Message, UserAccount, ParticipantRole } from '../types';
 import { db } from '../db';
 import { messagingHub } from '../api';
 import { COLORS } from '../constants';
+import BottomNav from '../components/BottomNav';
 
 interface MessagesProps {
     currentUser: UserAccount;
@@ -202,8 +203,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                                 >
                                     <div
                                         className={`max-w-[75%] p-3 rounded-[20px] ${isMe
-                                                ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white rounded-tr-none'
-                                                : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
+                                            ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white rounded-tr-none'
+                                            : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
                                             } shadow-sm`}
                                     >
                                         <p className="text-sm font-medium">{msg.text}</p>
@@ -292,7 +293,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
 
     // Main conversations list
     return (
-        <div className="flex flex-col h-screen bg-gray-50">
+        <div className="flex flex-col h-screen bg-gray-50 pb-24">
             {/* Header */}
             <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-6 rounded-b-[40px] shadow-lg">
                 <div className="flex items-center justify-between">

@@ -398,7 +398,7 @@ const App: React.FC = () => {
     }
   };
 
-  const hideTopNavOnScreens: AppScreen[] = ['SERVICES', 'HOME', 'GROCERIES', 'COURIER', 'RIDES', 'DINE_OUT', 'PHARMACY', 'TRACKING', 'VOUCHERS', 'HISTORY', 'PROFILE', 'PABILI', 'MERCHANT_DASHBOARD', 'RIDER_DASHBOARD', 'ADMIN_PANEL', 'MESSAGES'];
+  const hideTopNavOnScreens: AppScreen[] = ['SERVICES', 'HOME', 'GROCERIES', 'COURIER', 'RIDES', 'DINE_OUT', 'PHARMACY', 'TRACKING', 'VOUCHERS', 'HISTORY', 'PROFILE', 'PABILI', 'MERCHANT_DASHBOARD', 'RIDER_DASHBOARD', 'ADMIN_PANEL', 'MESSAGES', 'SEARCH', 'PAYMENTS', 'ADDRESSES'];
   const shouldShowTopNav = currentUser && screen !== 'AUTH' && screen !== 'ONBOARDING' && screen !== 'MANUAL' && !hideTopNavOnScreens.includes(screen);
 
   return (

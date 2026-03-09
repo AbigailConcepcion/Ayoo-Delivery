@@ -222,98 +222,102 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
         </div>
       )}
 
-      <div className="bg-white p-6 flex items-center justify-between sticky top-0 z-10 border-b border-gray-100">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="text-[#FF00CC] text-2xl font-black">←</button>
-          <h2 className="text-xl font-black uppercase tracking-tight leading-none">Checkout Central</h2>
+      <div className="bg-white p-4 flex items-center justify-between sticky top-0 z-10 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="w-9 h-9 bg-pink-50 rounded-xl flex items-center justify-center text-pink-500 font-bold">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 className="text-lg font-bold uppercase tracking-tight leading-none">Checkout Central</h2>
         </div>
       </div>
 
-      <div className="flex-1 p-6 space-y-6">
-        <div className="space-y-4">
+      <div className="flex-1 p-4 space-y-4">
+        <div className="space-y-3">
           {cartDetails.map(item => (
-            <div key={item!.id} className="bg-white p-5 rounded-[28px] flex justify-between items-center shadow-sm border border-gray-100">
-              <div className="flex items-center gap-4">
-                <img src={item!.image} className="w-16 h-16 rounded-2xl object-cover" alt={item!.name} />
+            <div key={item!.id} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3">
+                <img src={item!.image} className="w-14 h-14 rounded-xl object-cover" alt={item!.name} />
                 <div>
-                  <h4 className="font-black text-sm text-gray-900 leading-none mb-1">{item!.name}</h4>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase">₱{item!.price} x {item!.quantity}</p>
+                  <h4 className="font-bold text-sm text-gray-900 leading-none mb-1">{item!.name}</h4>
+                  <p className="text-[10px] text-gray-400 font-medium uppercase">₱{item!.price} x {item!.quantity}</p>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-2">
-                <span className="font-black text-gray-900">₱{item!.price * item!.quantity}</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => onUpdateQuantity(item!.id, -1)} className="w-7 h-7 rounded-full bg-gray-100 font-black">-</button>
-                  <span className="text-xs font-black w-5 text-center">{item!.quantity}</span>
-                  <button onClick={() => onUpdateQuantity(item!.id, 1)} className="w-7 h-7 rounded-full bg-pink-100 text-[#FF00CC] font-black">+</button>
+                <span className="font-bold text-gray-900">₱{item!.price * item!.quantity}</span>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => onUpdateQuantity(item!.id, -1)} className="w-7 h-7 rounded-lg bg-gray-100 font-bold text-gray-600 hover:bg-gray-200">-</button>
+                  <span className="text-xs font-bold w-5 text-center">{item!.quantity}</span>
+                  <button onClick={() => onUpdateQuantity(item!.id, 1)} className="w-7 h-7 rounded-lg bg-pink-100 text-pink-500 font-bold hover:bg-pink-200">+</button>
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="bg-white p-8 rounded-[40px] shadow-lg space-y-4">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Authenticated Source</h3>
-          <div className="flex gap-2 mb-4">
+        <div className="bg-white p-5 rounded-2xl shadow-md space-y-3 border border-gray-100">
+          <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Payment Method</h3>
+          <div className="flex gap-2 mb-3">
             {(['DIGITAL', 'CARD', 'CASH'] as const).map(filter => (
               <button
                 key={filter}
                 onClick={() => setPaymentFilter(filter)}
-                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${paymentFilter === filter ? 'bg-[#FF00CC] text-white' : 'bg-gray-100 text-gray-500'
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${paymentFilter === filter ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white' : 'bg-gray-100 text-gray-500'
                   }`}
               >
                 {filter}
               </button>
             ))}
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {filteredPaymentMethods.map(m => (
               <button
                 key={m.id}
                 onClick={() => setSelectedMethod(m)}
-                className={`flex-shrink-0 px-6 py-5 rounded-[28px] border-2 transition-all flex flex-col gap-1 items-center min-w-[150px] ${selectedMethod?.id === m.id ? 'border-[#FF00CC] bg-[#FF00CC]/5 scale-105 shadow-xl shadow-pink-100' : 'border-gray-100 bg-gray-50 opacity-60'
+                className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 transition-all flex flex-col gap-0.5 items-center min-w-[120px] ${selectedMethod?.id === m.id ? 'border-pink-400 bg-pink-50 scale-[1.02] shadow-md' : 'border-gray-100 bg-gray-50 opacity-60'
                   }`}
               >
-                <span className={`text-[10px] font-black uppercase tracking-tighter ${m.type === 'GCASH' ? 'text-[#007DFE]' : m.type === 'MAYA' ? 'text-[#00D15F]' : 'text-gray-900'
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${m.type === 'GCASH' ? 'text-[#007DFE]' : m.type === 'MAYA' ? 'text-[#00D15F]' : 'text-gray-900'
                   }`}>{m.type}</span>
-                <span className="text-[14px] font-black tracking-tighter">{m.balance === null || m.balance === undefined ? '—' : `₱${m.balance.toFixed(0)}`}</span>
+                <span className="text-[12px] font-bold">{m.balance === null || m.balance === undefined ? '—' : `₱${m.balance.toFixed(0)}`}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-[40px] shadow-lg space-y-4 border border-gray-50">
-          <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
+        <div className="bg-white p-5 rounded-2xl shadow-md space-y-3 border border-gray-100">
+          <div className="flex justify-between text-[11px] font-medium text-gray-500 uppercase tracking-wider">
             <span>Subtotal</span>
             <span>₱{subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
+          <div className="flex justify-between text-[11px] font-medium text-gray-500 uppercase tracking-wider">
             <span>Delivery</span>
             <span className="text-green-500">₱{deliveryFee.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
+          <div className="flex justify-between text-[11px] font-medium text-gray-500 uppercase tracking-wider">
             <span>Service (2.5%)</span>
             <span>₱{serviceFee.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
+          <div className="flex justify-between text-[11px] font-medium text-gray-500 uppercase tracking-wider">
             <span>VAT (12%)</span>
             <span>₱{tax.toFixed(2)}</span>
           </div>
           {discountAmount > 0 && (
-            <div className="flex justify-between text-[11px] font-black text-gray-400 uppercase tracking-widest">
+            <div className="flex justify-between text-[11px] font-medium text-gray-500 uppercase tracking-wider">
               <span>Voucher</span>
-              <span className="text-[#FF00CC]">-₱{discountAmount.toFixed(2)}</span>
+              <span className="text-pink-500">-₱{discountAmount.toFixed(2)}</span>
             </div>
           )}
-          <div className="pt-6 border-t border-gray-100 flex justify-between items-center">
-            <span className="font-black text-gray-900 text-2xl tracking-tighter uppercase leading-none">Total</span>
-            <span className="font-black text-4xl text-[#FF00CC] tracking-tighter">₱{total.toFixed(0)}</span>
+          <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
+            <span className="font-bold text-gray-900 text-xl tracking-tight uppercase leading-none">Total</span>
+            <span className="font-bold text-3xl text-pink-500 tracking-tight">₱{total.toFixed(0)}</span>
           </div>
         </div>
       </div>
 
-      <div className="p-8 bg-white border-t border-gray-100 fixed bottom-0 left-0 right-0 max-w-md mx-auto rounded-t-[50px] shadow-2xl z-[60]">
-        <Button onClick={handleSecureCheckout} disabled={!selectedMethod} className="pill-shadow py-6 text-xl font-black uppercase tracking-[0.1em]">
+      <div className="p-5 bg-white border-t border-gray-100 fixed bottom-0 left-0 right-0 max-w-md mx-auto rounded-t-3xl shadow-lg z-[60]">
+        <Button onClick={handleSecureCheckout} disabled={!selectedMethod} className="py-4 text-base font-bold uppercase tracking-wider">
           Execute Transaction
         </Button>
       </div>

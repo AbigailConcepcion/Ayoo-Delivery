@@ -189,5 +189,32 @@ export interface CommunityPost {
   content: string;
   time: string;
   likes: number;
+  comments: Comment[];
+  reactions: Reaction[];
+  userReaction?: string;
+}
+
+// ==================== LEADERBOARD TYPES ====================
+
+export type LeaderboardType = 'customers' | 'merchants' | 'riders';
+export type LeaderboardPeriod = 'week' | 'month' | 'all';
+
+export interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  name: string;
+  avatar?: string;
+  email?: string;
+  // Customer metrics
+  ordersCount?: number;
+  totalSpent?: number;
+  // Merchant metrics
+  restaurantName?: string;
+  completedOrders?: number;
+  averageRating?: number;
+  earnings?: number;
+  // Rider metrics
+  deliveriesCount?: number;
+  riderRating?: number;
 }
 

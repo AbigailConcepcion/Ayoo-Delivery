@@ -1,37 +1,136 @@
-import { Restaurant, Review } from './types'; // Siguraduhing may types.ts ka
+import { Restaurant, Review } from './types';
 
 export const GLOBAL_REGISTRY_KEY = 'ayoo_registry_v15';
 
+// ============================================
+// AYOO DESIGN SYSTEM - Professional & Consistent
+// ============================================
+
 export const COLORS = {
-  primary: '#FF1493',
-  primaryDark: '#E0007B',
-  primaryLight: '#FF69B4',
-  primaryBg: '#FFF0F5',
-  secondary: '#7B2FF7',
-  accent: '#FFD700',
-  success: '#00C853',
-  warning: '#FF9800',
-  error: '#F44336',
+  // Primary Brand Colors (Pink gradient based on Ayoo logo)
+  primary: '#FF1493',       // Deep Pink - main brand color
+  primaryDark: '#C71585',   // Darker pink for hover states
+  primaryLight: '#FF69B4',  // Lighter pink for accents
+  primaryBg: '#FFF0F5',     // Very light pink background
+  primaryGradient: 'linear-gradient(135deg, #FF1493 0%, #FF69B4 100%)',
+
+  // Secondary Colors
+  secondary: '#7B2FF7',     // Purple for secondary actions
+  secondaryLight: '#A855F7',
+
+  // Accent Colors
+  accent: '#FFD700',        // Gold for badges/rewards
+  accentLight: '#FFED4A',
+
+  // Status Colors
+  success: '#10B981',       // Green - success states
+  successLight: '#D1FAE5',
+  warning: '#F59E0B',       // Amber - warnings
+  warningLight: '#FEF3C7',
+  error: '#EF4444',         // Red - errors
+  errorLight: '#FEE2E2',
+  info: '#3B82F6',          // Blue - info
+
+  // Neutral Colors
   white: '#FFFFFF',
-  black: '#1A1A2E',
-  gray100: '#F8F9FA',
-  gray200: '#E9ECEF',
-  gray300: '#DEE2E6',
-  gray400: '#CED4DA',
-  gray500: '#ADB5BD',
-  gray600: '#6C757D',
-  gray700: '#495057',
-  gray800: '#343A40',
-  gray900: '#212529',
+  black: '#111827',
+  blackLight: '#1F2937',
+  gray50: '#F9FAFB',
+  gray100: '#F3F4F6',
+  gray200: '#E5E7EB',
+  gray300: '#D1D5DB',
+  gray400: '#9CA3AF',
+  gray500: '#6B7280',
+  gray600: '#4B5563',
+  gray700: '#374151',
+  gray800: '#1F2937',
+  gray900: '#111827',
 };
 
+// ============================================
+// STANDARDIZED BORDER RADIUS
+// ============================================
 export const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  full: 9999,
+  sm: '8px',      // Small elements like badges
+  md: '12px',     // Buttons, inputs
+  lg: '16px',     // Cards, modals
+  xl: '20px',     // Large cards
+  xxl: '24px',    // Extra large containers
+  full: '9999px', // Pills, avatars
+};
+
+// ============================================
+// CONSISTENT SHADOWS
+// ============================================
+export const SHADOWS = {
+  sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+  xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+  card: '0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(255, 20, 147, 0.08)',
+  cardHover: '0 4px 12px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(255, 20, 147, 0.15)',
+  pink: '0 4px 14px rgba(255, 20, 147, 0.25)',
+  button: '0 2px 8px rgba(255, 20, 147, 0.3)',
+};
+
+// ============================================
+// TYPOGRAPHY
+// ============================================
+export const TYPOGRAPHY = {
+  fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  fontSize: {
+    xs: '0.75rem',    // 12px
+    sm: '0.875rem',   // 14px
+    base: '1rem',     // 16px
+    lg: '1.125rem',   // 18px
+    xl: '1.25rem',    // 20px
+    '2xl': '1.5rem',  // 24px
+    '3xl': '1.875rem', // 30px
+    '4xl': '2.25rem', // 36px
+  },
+  fontWeight: {
+    normal: '400',
+    medium: '500',
+    semibold: '600',
+    bold: '700',
+    extrabold: '800',
+    black: '900',
+  },
+};
+
+// ============================================
+// SPACING
+// ============================================
+export const SPACING = {
+  xs: '4px',
+  sm: '8px',
+  md: '12px',
+  lg: '16px',
+  xl: '20px',
+  '2xl': '24px',
+  '3xl': '32px',
+  '4xl': '40px',
+  '5xl': '48px',
+};
+
+// ============================================
+// TRANSITIONS
+// ============================================
+export const TRANSITIONS = {
+  fast: '150ms ease',
+  normal: '200ms ease',
+  slow: '300ms ease',
+};
+
+// ============================================
+// Z-INDEX SCALE
+// ============================================
+export const Z_INDEX = {
+  dropdown: 100,
+  sticky: 200,
+  modal: 300,
+  popover: 400,
+  tooltip: 500,
 };
 
 export const IMAGES = {

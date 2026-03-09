@@ -1,4 +1,4 @@
-import { OrderRecord, OrderStatus, PaymentMethod, WalletTransaction } from './types';
+import { OrderRecord, OrderStatus, PaymentMethod, WalletTransaction, LeaderboardEntry } from './types';
 import { db } from './db';
 import { GLOBAL_REGISTRY_KEY } from './constants';
 
@@ -316,6 +316,44 @@ class AyooCloudAPI {
       console.error('syncPayMongoOrder failed', err);
       return null;
     }
+  }
+
+  // ==================== LEADERBOARD API METHODS ====================
+
+  async getCustomerLeaderboard(period: 'week' | 'month' | 'all' = 'month'): Promise<LeaderboardEntry[]> {
+    if (this.USE_BACKEND) {
+      try {
+        const result: any = await this.request(`/leaderboard/customers?period=${period}`);
+        return result.leaderboard || [];
+      } catch (err) {
+        console.error('getCustomerLeaderboard failed', err);
+      }
+    }
+    return db.getCustomerLeaderboard(period);
+  }
+
+  async getMerchantLeaderboard(period: 'week' | 'month' | 'all' = 'month'): Promise<LeaderboardEntry[]> {
+    if (this.USE_BACKEND) {
+      try {
+        const result: any = await this.request(`/leaderboard/merchants?period=${period}`);
+        return result.leaderboard || [];
+      } catch (err) {
+        console.error('getMerchantLeaderboard failed', err);
+      }
+    }
+    return db.getMerchantLeaderboard(period);
+  }
+
+  async getRiderLeaderboard(period: 'week' | 'month' | 'all' = 'month'): Promise<LeaderboardEntry[]> {
+    if (this.USE_BACKEND) {
+      try {
+        const result: any = await this.request(`/leaderboard/riders?period=${period}`);
+        return result.leaderboard || [];
+      } catch (err) {
+        console.error('getRiderLeaderboard failed', err);
+      }
+    }
+    return db.getRiderLeaderboard(period);
   }
 
   subscribe(callback: () => void) {

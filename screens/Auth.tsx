@@ -4,6 +4,7 @@ import Button from '../components/Button';
 import { UserAccount, UserRole } from '../types';
 import { db } from '../db';
 import { COLORS, IMAGES } from '../constants'; // Ginagamit ang bagong color palette
+import { generateAvatar } from '../src/utils/avatar';
 
 interface AuthProps {
   onLogin: (user: UserAccount) => void;
@@ -93,6 +94,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           name: name.trim(),
           email: cleanEmail,
           password: cleanPass,
+          avatar: generateAvatar(name.trim(), cleanEmail), // Generate initial avatar for new users
           points: 500,
           xp: 0,
           level: 1,
@@ -132,10 +134,27 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         setShowError(true);
       }
     } else {
+      // Validate password length
+      if (password.length < 6) {
+        setErrorMessage('Password must be at least 6 characters.');
+        setShowError(true);
+        setIsSubmitting(false);
+        return;
+      }
+      // Validate password and confirm password match
+      if (password !== confirmPassword) {
+        setErrorMessage('Passwords do not match.');
+        setShowError(true);
+        setIsSubmitting(false);
+        return;
+      }
       const success = await db.updatePassword(email, password);
       if (success) {
         setShowSuccess(true);
-        setTimeout(() => { setMode('LOGIN'); setShowSuccess(false); }, 1500);
+        setTimeout(() => { setMode('LOGIN'); setShowSuccess(false); setForgotStep(1); setPassword(''); setConfirmPassword(''); }, 1500);
+      } else {
+        setErrorMessage('Failed to update password. Please try again.');
+        setShowError(true);
       }
     }
     setIsSubmitting(false);
@@ -143,25 +162,25 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
   const renderLoginForm = () => (
     <div className="animate-in fade-in duration-500">
-      <h2 className="text-4xl font-black text-gray-900 mb-2 mt-2 text-center tracking-tighter uppercase leading-none">Welcome Back</h2>
-      <p className="text-gray-400 text-center mb-10 font-bold leading-relaxed px-6 text-sm uppercase tracking-widest">Login to your account</p>
+      <h2 className="text-3xl font-bold text-gray-900 mb-2 mt-2 text-center tracking-tight uppercase leading-none">Welcome Back</h2>
+      <p className="text-gray-400 text-center mb-8 font-medium leading-relaxed px-6 text-sm uppercase tracking-wider">Login to your account</p>
 
-      <form className="space-y-6" onSubmit={handleAuth}>
-        <div className="input-label-border">
-          <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">Email Address</label>
+      <form className="space-y-5" onSubmit={handleAuth}>
+        <div>
+          <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block ml-1">Email Address</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="example@gmail.com"
             disabled={isSubmitting}
-            className="w-full p-5 border border-gray-100 bg-gray-50 rounded-2xl focus:outline-none focus:border-[#FF1493] focus:bg-white transition-all text-gray-700 font-bold"
+            className="w-full p-3.5 border-2 border-gray-100 bg-gray-50 rounded-xl focus:outline-none focus:border-pink-400 focus:bg-white transition-all text-gray-700 font-medium"
             required
           />
         </div>
 
-        <div className="input-label-border">
-          <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">Password</label>
+        <div>
+          <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block ml-1">Password</label>
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
@@ -169,37 +188,43 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Your password"
               disabled={isSubmitting}
-              className="w-full p-5 border border-gray-100 bg-gray-50 rounded-2xl focus:outline-none focus:border-[#FF1493] focus:bg-white transition-all text-gray-700 font-bold"
+              className="w-full p-3.5 border-2 border-gray-100 bg-gray-50 rounded-xl focus:outline-none focus:border-pink-400 focus:bg-white transition-all text-gray-700 font-medium"
               required
             />
-            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 -translate-y-1/2 text-xl opacity-50 active:scale-90 transition-transform">
-              {showPassword ? '🙈' : '👁️'}
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {showPassword ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                )}
+              </svg>
             </button>
           </div>
         </div>
 
-        <div className="flex items-center justify-between px-2">
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-[#FF1493] border-[#FF1493]' : 'bg-white border-gray-100 group-hover:border-pink-300'}`}>
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${rememberMe ? 'bg-pink-500 border-pink-500' : 'bg-white border-gray-200 group-hover:border-pink-300'}`}>
               <input type="checkbox" className="hidden" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-              {rememberMe && <span className="text-white text-[10px] font-black">✓</span>}
+              {rememberMe && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
             </div>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Remember Me</span>
+            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Remember Me</span>
           </label>
-          <button type="button" onClick={() => { setMode('FORGOT'); setForgotStep(1); }} className="text-[10px] font-black text-[#FF1493] uppercase tracking-widest">Forgot Password?</button>
+          <button type="button" onClick={() => { setMode('FORGOT'); setForgotStep(1); }} className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">Forgot Password?</button>
         </div>
 
         <div className="pt-2">
-          <Button type="submit" disabled={isSubmitting} className="pill-shadow py-5 text-xl font-black uppercase tracking-widest" style={{ backgroundColor: COLORS.primary }}>
+          <Button type="submit" disabled={isSubmitting} className="py-4 text-base font-bold uppercase tracking-wider">
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </Button>
         </div>
       </form>
 
-      <div className="mt-8 text-center">
-        <p className="text-gray-400 font-bold text-sm">
+      <div className="mt-6 text-center">
+        <p className="text-gray-400 font-medium text-sm">
           New to Ayoo?
-          <button onClick={() => setMode('SIGNUP')} className="ml-2 text-[#FF1493] font-black hover:underline uppercase tracking-tighter">Create Account</button>
+          <button onClick={() => setMode('SIGNUP')} className="ml-2 text-pink-500 font-bold hover:underline uppercase tracking-tight">Create Account</button>
         </p>
       </div>
     </div>
@@ -208,45 +233,50 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const renderSignupForm = () => (
     <div className="animate-in fade-in duration-500">
       {/* Back Button */}
-      <button onClick={() => setMode('LOGIN')} className="w-12 h-12 bg-pink-50 rounded-2xl flex items-center justify-center text-[#FF1493] font-black mb-4 text-2xl -mt-2">←</button>
+      <button onClick={() => setMode('LOGIN')} className="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-pink-500 font-bold mb-3 -mt-1">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
 
-      <h2 className="text-4xl font-black text-gray-900 mb-2 text-center tracking-tighter uppercase leading-none">Create Account</h2>
-      <p className="text-gray-400 text-center mb-8 font-bold leading-relaxed px-6 text-sm uppercase tracking-widest">Start your journey with Ayoo</p>
+      <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center tracking-tight uppercase leading-none">Create Account</h2>
+      <p className="text-gray-400 text-center mb-6 font-medium leading-relaxed px-6 text-sm uppercase tracking-wider">Start your journey with Ayoo</p>
 
-      <div className="flex gap-2 mb-8 bg-gray-50 p-1.5 rounded-[24px] border border-gray-100">
+      {/* Role Selection */}
+      <div className="flex gap-2 mb-6 bg-gray-50 p-1.5 rounded-xl border border-gray-100">
         {(['CUSTOMER', 'MERCHANT', 'RIDER'] as UserRole[]).map(role => (
           <button
             key={role}
             type="button"
             onClick={() => setSelectedRole(role)}
-            className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${selectedRole === role ? 'bg-[#FF1493] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'
+            className={`flex-1 py-3 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all flex flex-col items-center gap-1 ${selectedRole === role ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white shadow-md' : 'text-gray-400 hover:text-gray-600'
               }`}
           >
-            {role === 'CUSTOMER' ? '🛒' : role === 'MERCHANT' ? '🏪' : '🛵'}<br />{role}
+            {role === 'CUSTOMER' ? '🛒' : role === 'MERCHANT' ? '🏪' : '🛵'}<span className="text-[8px]">{role}</span>
           </button>
         ))}
       </div>
 
-      <form className="space-y-5" onSubmit={handleAuth}>
-        <div className="input-label-border">
-          <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">{selectedRole === 'MERCHANT' ? 'Business Name' : 'Full Name'}</label>
-          <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-5 border border-gray-100 bg-gray-50 rounded-2xl focus:border-[#FF1493] font-bold outline-none" placeholder="Enter name" required />
+      <form className="space-y-4" onSubmit={handleAuth}>
+        <div>
+          <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block ml-1">{selectedRole === 'MERCHANT' ? 'Business Name' : 'Full Name'}</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-3.5 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-400 font-medium outline-none" placeholder="Enter name" required />
         </div>
-        <div className="input-label-border">
-          <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">Email Address</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 border border-gray-100 bg-gray-50 rounded-2xl focus:border-[#FF1493] font-bold outline-none" placeholder="example@gmail.com" required />
+        <div>
+          <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block ml-1">Email Address</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3.5 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-400 font-medium outline-none" placeholder="example@gmail.com" required />
         </div>
-        <div className="input-label-border">
-          <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">Password</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 border border-gray-100 bg-gray-50 rounded-2xl focus:border-[#FF1493] font-bold outline-none" placeholder="Min. 6 characters" required />
+        <div>
+          <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block ml-1">Password</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3.5 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-400 font-medium outline-none" placeholder="Min. 6 characters" required />
         </div>
-        <div className="input-label-border">
-          <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">Confirm Password</label>
-          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-5 border border-gray-100 bg-gray-50 rounded-2xl focus:border-[#FF1493] font-bold outline-none" placeholder="Repeat password" required />
+        <div>
+          <label className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block ml-1">Confirm Password</label>
+          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-3.5 border-2 border-gray-100 bg-gray-50 rounded-xl focus:border-pink-400 font-medium outline-none" placeholder="Repeat password" required />
         </div>
 
         <div className="pt-2">
-          <Button type="submit" disabled={isSubmitting} className="pill-shadow py-5 text-xl font-black uppercase tracking-widest" style={{ backgroundColor: COLORS.primary }}>
+          <Button type="submit" disabled={isSubmitting} className="py-4 text-base font-bold uppercase tracking-wider">
             {isSubmitting ? 'Creating account...' : 'Sign Up'}
           </Button>
         </div>
@@ -255,22 +285,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   );
 
   return (
-    <div className={`min-h-screen flex flex-col transition-all duration-700 ease-in-out ${mode === 'LOGIN' || mode === 'SIGNUP' ? 'bg-[#FF1493]' : 'bg-white'}`}>
+    <div className={`min-h-screen flex flex-col transition-all duration-700 ease-in-out ${mode === 'LOGIN' || mode === 'SIGNUP' ? 'bg-gradient-to-b from-[#FF1493] to-[#FF69B4]' : 'bg-white'}`}>
       {(mode === 'LOGIN' || mode === 'SIGNUP') && (
         <>
-          <div className="flex-1 relative overflow-hidden flex flex-col items-center justify-center p-8 animate-in fade-in duration-700 min-h-[45vh]">
-            <div className="absolute inset-0 bg-[#FF1493]"></div>
+          <div className="flex-1 relative overflow-hidden flex flex-col items-center justify-center p-6 animate-in fade-in duration-700 min-h-[40vh]">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#FF1493] to-[#FF69B4]"></div>
             <img
               src={IMAGES.logoPink}
               alt="Ayoo pink bg"
-              className="absolute inset-0 w-full h-full object-cover scale-[2] opacity-35"
+              className="absolute inset-0 w-full h-full object-cover opacity-20"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#FF1493]/60 via-[#FF1493]/45 to-[#FF1493]/75"></div>
+            <div className="absolute inset-0 bg-gradient-to-b from-[#FF1493]/50 via-transparent to-[#FF1493]/60"></div>
             <div className="absolute inset-0 flex items-center justify-center">
               <Logo variant="white" size="2xl" withSubtext={false} showWordmark={false} />
             </div>
           </div>
-          <div className="bg-white rounded-t-[50px] p-8 shadow-[0_-20px_50px_rgba(0,0,0,0.2)] flex flex-col -mt-10 relative z-10">
+          <div className="bg-white rounded-t-3xl p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col -mt-8 relative z-10">
             <div className="w-full max-w-sm mx-auto flex flex-col h-full">
               {mode === 'LOGIN' ? renderLoginForm() : renderSignupForm()}
             </div>
@@ -292,6 +322,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               <div className="input-label-border animate-in slide-in-from-top-4">
                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">New Password</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 border border-[#FF1493] rounded-2xl outline-none font-bold" required />
+              </div>
+            )}
+            {forgotStep === 2 && (
+              <div className="input-label-border animate-in slide-in-from-top-4">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 block ml-2">Confirm Password</label>
+                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-5 border border-[#FF1493] rounded-2xl outline-none font-bold" required />
               </div>
             )}
             <Button type="submit" disabled={isSubmitting} className="py-5 uppercase font-black tracking-widest" style={{ backgroundColor: COLORS.primary }}>

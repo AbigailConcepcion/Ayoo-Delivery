@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { AppScreen } from '../types';
+import { AppScreen, UserAccount } from '../types';
 import { db } from '../db';
+import { getDisplayAvatar, isValidAvatar, generateAvatar } from '../src/utils/avatar';
 
-// Custom SVG Icons Components
+// Custom SVG Icons Components - Consistent styling
 const HomeIcon: React.FC<{ size?: number; className?: string }> = ({ size = 22, className = '' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -70,6 +71,7 @@ interface BottomNavProps {
   mode?: 'customer' | 'operations';
   showAdmin?: boolean;
   hasActiveOrder?: boolean;
+  user?: UserAccount | null;
 }
 
 const BottomNav: React.FC<BottomNavProps> = ({
@@ -78,6 +80,7 @@ const BottomNav: React.FC<BottomNavProps> = ({
   mode = 'customer',
   showAdmin = false,
   hasActiveOrder: propHasActiveOrder,
+  user,
 }) => {
   const [hasActiveOrder, setHasActiveOrder] = useState(propHasActiveOrder || false);
 
@@ -106,65 +109,93 @@ const BottomNav: React.FC<BottomNavProps> = ({
     screen: AppScreen;
     icon: React.ReactNode;
     label: string;
+    isProfile?: boolean;
   }
 
   const customerItems: NavItem[] = [
-    { screen: 'HOME', icon: <HomeIcon size={22} />, label: 'Home' },
-    { screen: 'MESSAGES', icon: <MessageIcon size={22} />, label: 'Messages' },
-    { screen: 'VOUCHERS', icon: <TicketIcon size={22} />, label: 'Voucher' },
-    { screen: 'HISTORY', icon: <OrdersIcon size={22} />, label: 'Orders' },
-    { screen: 'PROFILE', icon: <UserIcon size={22} />, label: 'Profile' },
+    { screen: 'HOME', icon: <HomeIcon size={20} />, label: 'Home' },
+    { screen: 'MESSAGES', icon: <MessageIcon size={20} />, label: 'Messages' },
+    { screen: 'VOUCHERS', icon: <TicketIcon size={20} />, label: 'Voucher' },
+    { screen: 'HISTORY', icon: <OrdersIcon size={20} />, label: 'Orders' },
+    {
+      screen: 'PROFILE', icon: user ? (
+        <div className="w-5 h-5 rounded-full overflow-hidden">
+          <img
+            src={getDisplayAvatar(user.avatar, user.name, user.email)}
+            alt={user.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = generateAvatar(user.name, user.email);
+            }}
+          />
+        </div>
+      ) : <UserIcon size={20} />, label: 'Profile', isProfile: true
+    },
   ];
 
   const operationsItems: NavItem[] = [
-    { screen: 'HOME', icon: <HomeIcon size={22} />, label: 'Home' },
-    { screen: 'MESSAGES', icon: <MessageIcon size={22} />, label: 'Messages' },
-    { screen: 'MERCHANT_DASHBOARD', icon: <StoreIcon size={22} />, label: 'Merchant' },
-    { screen: 'RIDER_DASHBOARD', icon: <BikeIcon size={22} />, label: 'Rider' },
+    { screen: 'HOME', icon: <HomeIcon size={20} />, label: 'Home' },
+    { screen: 'MESSAGES', icon: <MessageIcon size={20} />, label: 'Messages' },
+    { screen: 'MERCHANT_DASHBOARD', icon: <StoreIcon size={20} />, label: 'Merchant' },
+    { screen: 'RIDER_DASHBOARD', icon: <BikeIcon size={20} />, label: 'Rider' },
     showAdmin
-      ? { screen: 'ADMIN_PANEL', icon: <ShieldIcon size={22} />, label: 'Admin' }
-      : { screen: 'PROFILE', icon: <UserIcon size={22} />, label: 'Profile' },
+      ? { screen: 'ADMIN_PANEL', icon: <ShieldIcon size={20} />, label: 'Admin' }
+      : {
+        screen: 'PROFILE', icon: user ? (
+          <div className="w-5 h-5 rounded-full overflow-hidden">
+            <img
+              src={getDisplayAvatar(user.avatar, user.name, user.email)}
+              alt={user.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = generateAvatar(user.name, user.email);
+              }}
+            />
+          </div>
+        ) : <UserIcon size={20} />, label: 'Profile', isProfile: true
+      },
   ];
 
   const items = mode === 'operations' ? operationsItems : customerItems;
 
-  const getIconColor = (isActive: boolean) => {
-    if (isActive) return '#FF00CC';
-    return '#9CA3AF';
-  };
+  // Use consistent color from design system
+  const activeColor = '#FF1493';
+  const inactiveColor = '#9CA3AF';
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 px-4 py-3 flex justify-around items-center max-w-md mx-auto rounded-t-[32px] shadow-[0_-15px_40px_rgba(0,0,0,0.08)] z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-2 py-2 flex justify-around items-center max-w-md mx-auto rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-50">
       {items.map((item) => {
         const isActive = active === item.screen;
         return (
           <button
             key={item.screen}
             onClick={() => onNavigate(item.screen)}
-            className={`flex flex-col items-center justify-center py-2 px-3 rounded-2xl transition-all duration-200 relative min-w-[60px] ${isActive
-              ? 'bg-gradient-to-b from-pink-50 to-white shadow-sm'
+            className={`flex flex-col items-center justify-center py-2 px-2 rounded-xl transition-all duration-200 min-w-[56px] ${isActive
+              ? 'bg-pink-50'
               : 'hover:bg-gray-50'
               }`}
           >
             <div className="relative">
               <span
                 className="block transition-transform duration-200"
-                style={{ color: getIconColor(isActive) }}
+                style={{ color: isActive ? activeColor : inactiveColor }}
               >
                 {item.icon}
               </span>
               {item.screen === 'HISTORY' && showActiveIndicator && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border-2 border-white"></span>
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-white"></span>
               )}
             </div>
             <span
-              className={`text-[9px] font-semibold mt-1.5 tracking-wide ${isActive ? 'text-[#FF00CC]' : 'text-gray-400'
+              className={`text-[10px] font-medium mt-1 ${isActive ? 'text-pink-500' : 'text-gray-400'
                 }`}
             >
               {item.label}
             </span>
             {isActive && (
-              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-[#FF00CC] rounded-full"></div>
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-full"></div>
             )}
           </button>
         );

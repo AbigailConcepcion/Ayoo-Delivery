@@ -434,23 +434,33 @@ export function setupRoutes(app: Application) {
     res.json({ user: normalizeUser(user) });
   });
 
-  app.put('/users/:email', (req: any, res: Response) => {
+  app.put('/users/:email', async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
     const current = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
     if (!current) return res.status(404).json({ error: 'Not found' });
 
     const incoming = req.body || {};
+
+    // Handle password update - hash the new password
+    let hashedPassword = current.password;
+    if (incoming.password && incoming.password.length >= 6) {
+      hashedPassword = await hashPassword(incoming.password);
+    } else if (incoming.password && incoming.password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
     const merged = {
       ...current,
       ...incoming,
       email,
+      password: hashedPassword,
       badges: JSON.stringify(Array.isArray(incoming.badges) ? incoming.badges : parseJsonField(current.badges, [])),
       manualsSeen: JSON.stringify(Array.isArray(incoming.manualsSeen) ? incoming.manualsSeen : parseJsonField(current.manualsSeen, [])),
     };
 
     db.prepare(`UPDATE users
-      SET name=@name, avatar=@avatar, points=@points, xp=@xp, level=@level, streak=@streak,
+      SET name=@name, avatar=@avatar, password=@password, points=@points, xp=@xp, level=@level, streak=@streak,
           badges=@badges, preferredCity=@preferredCity, role=@role, merchantId=@merchantId,
           earnings=@earnings, manualsSeen=@manualsSeen
       WHERE email=@email`).run(merged);

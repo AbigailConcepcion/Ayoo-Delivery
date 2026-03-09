@@ -1,5 +1,5 @@
 
-import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem, Conversation, Message } from './types';
+import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem, Conversation, Message, LeaderboardEntry } from './types';
 import { MOCK_RESTAURANTS, GLOBAL_REGISTRY_KEY } from './constants';
 
 // allow access to Vite env vars without TS errors
@@ -366,8 +366,25 @@ class AyooDatabase {
   }
 
   async updatePassword(email: string, newPass: string): Promise<boolean> {
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Use backend API if configured
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request(`/users/${cleanEmail}`, {
+          method: 'PUT',
+          body: JSON.stringify({ password: newPass })
+        });
+        return result.user ? true : false;
+      } catch (err) {
+        console.error('updatePassword failed', err);
+        return false;
+      }
+    }
+
+    // Local mode - update registry directly
     const registry = this.getRegistry();
-    const idx = registry.findIndex((u: any) => u.email.toLowerCase() === email.toLowerCase());
+    const idx = registry.findIndex((u: any) => u.email.toLowerCase() === cleanEmail);
     if (idx === -1) return false;
     registry[idx].password = newPass;
     this.saveRegistry(registry);
@@ -801,6 +818,193 @@ class AyooDatabase {
       orderId,
       orderStatus
     );
+  }
+
+  // ==================== LEADERBOARD METHODS ====================
+
+  private getAllOrders(): OrderRecord[] {
+    const orders: OrderRecord[] = [];
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('orders_')) {
+        try {
+          const arr = JSON.parse(localStorage.getItem(key) || '[]');
+          orders.push(...arr);
+        } catch {
+          // ignore malformed entries
+        }
+      }
+    });
+    return orders;
+  }
+
+  private getDateRangeForPeriod(period: 'week' | 'month' | 'all'): Date | null {
+    const now = new Date();
+    if (period === 'all') return null;
+    if (period === 'week') {
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+    if (period === 'month') {
+      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+    return null;
+  }
+
+  private filterOrdersByPeriod(orders: OrderRecord[], period: 'week' | 'month' | 'all'): OrderRecord[] {
+    const startDate = this.getDateRangeForPeriod(period);
+    if (!startDate) return orders;
+    return orders.filter(o => new Date(o.date) >= startDate);
+  }
+
+  async getCustomerLeaderboard(period: 'week' | 'month' | 'all' = 'month'): Promise<LeaderboardEntry[]> {
+    const allOrders = this.getAllOrders();
+    const filteredOrders = this.filterOrdersByPeriod(allOrders, period);
+    const registry = this.getRegistry();
+
+    // Aggregate customer stats
+    const customerStats: Record<string, { ordersCount: number; totalSpent: number }> = {};
+
+    filteredOrders.forEach(order => {
+      const email = order.customerEmail?.toLowerCase();
+      if (!email) return;
+      if (!customerStats[email]) {
+        customerStats[email] = { ordersCount: 0, totalSpent: 0 };
+      }
+      customerStats[email].ordersCount++;
+      customerStats[email].totalSpent += order.total || 0;
+    });
+
+    // Convert to leaderboard entries
+    const entries: LeaderboardEntry[] = Object.entries(customerStats).map(([email, stats], index) => {
+      const user = registry.find((u: any) => u.email?.toLowerCase() === email);
+      return {
+        rank: index + 1,
+        userId: email,
+        name: user?.name || email.split('@')[0],
+        avatar: user?.avatar,
+        email,
+        ordersCount: stats.ordersCount,
+        totalSpent: stats.totalSpent
+      };
+    });
+
+    // Sort by orders count (primary) and total spent (secondary)
+    entries.sort((a, b) => {
+      const aOrders = a.ordersCount || 0;
+      const bOrders = b.ordersCount || 0;
+      if (bOrders !== aOrders) return bOrders - aOrders;
+      return ((b.totalSpent || 0) - (a.totalSpent || 0));
+    });
+
+    // Re-assign ranks
+    return entries.map((e, i) => ({ ...e, rank: i + 1 }));
+  }
+
+  async getMerchantLeaderboard(period: 'week' | 'month' | 'all' = 'month'): Promise<LeaderboardEntry[]> {
+    const allOrders = this.getAllOrders();
+    const filteredOrders = this.filterOrdersByPeriod(allOrders, period);
+    const restaurants = await this.getRestaurants();
+
+    // Aggregate merchant stats
+    const merchantStats: Record<string, { completedOrders: number; totalRating: number; ratingCount: number; earnings: number }> = {};
+
+    filteredOrders.forEach(order => {
+      const restaurantName = order.restaurantName;
+      if (!restaurantName) return;
+      if (!merchantStats[restaurantName]) {
+        merchantStats[restaurantName] = { completedOrders: 0, totalRating: 0, ratingCount: 0, earnings: 0 };
+      }
+      if (order.status === 'DELIVERED') {
+        merchantStats[restaurantName].completedOrders++;
+        merchantStats[restaurantName].earnings += order.total * 0.85;
+      }
+      if (order.rating) {
+        merchantStats[restaurantName].totalRating += order.rating;
+        merchantStats[restaurantName].ratingCount++;
+      }
+    });
+
+    // Convert to leaderboard entries
+    const entries: LeaderboardEntry[] = Object.entries(merchantStats).map(([name, stats]) => {
+      const restaurant = restaurants.find(r => r.name === name);
+      return {
+        rank: 0,
+        userId: name,
+        name,
+        restaurantName: name,
+        completedOrders: stats.completedOrders,
+        averageRating: stats.ratingCount > 0 ? stats.totalRating / stats.ratingCount : 0,
+        earnings: stats.earnings
+      };
+    });
+
+    // Sort by completed orders (primary) and rating (secondary)
+    entries.sort((a, b) => {
+      if ((b.completedOrders || 0) !== (a.completedOrders || 0)) {
+        return (b.completedOrders || 0) - (a.completedOrders || 0);
+      }
+      return (b.averageRating || 0) - (a.averageRating || 0);
+    });
+
+    // Re-assign ranks
+    return entries.map((e, i) => ({ ...e, rank: i + 1 }));
+  }
+
+  async getRiderLeaderboard(period: 'week' | 'month' | 'all' = 'month'): Promise<LeaderboardEntry[]> {
+    const allOrders = this.getAllOrders();
+    const filteredOrders = this.filterOrdersByPeriod(allOrders, period);
+    const registry = this.getRegistry();
+
+    // Aggregate rider stats
+    const riderStats: Record<string, { deliveriesCount: number; totalRating: number; ratingCount: number; earnings: number }> = {};
+
+    filteredOrders.forEach(order => {
+      const riderEmail = order.riderEmail?.toLowerCase();
+      if (!riderEmail) return;
+      if (!riderStats[riderEmail]) {
+        riderStats[riderEmail] = { deliveriesCount: 0, totalRating: 0, ratingCount: 0, earnings: 0 };
+      }
+      if (order.status === 'DELIVERED') {
+        riderStats[riderEmail].deliveriesCount++;
+      }
+      if (order.rating) {
+        riderStats[riderEmail].totalRating += order.rating;
+        riderStats[riderEmail].ratingCount++;
+      }
+    });
+
+    // Add earnings from registry users
+    registry.filter((u: any) => u.role === 'RIDER').forEach((rider: any) => {
+      const email = rider.email?.toLowerCase();
+      if (email && riderStats[email]) {
+        riderStats[email].earnings = rider.earnings || 0;
+      }
+    });
+
+    // Convert to leaderboard entries
+    const entries: LeaderboardEntry[] = Object.entries(riderStats).map(([email, stats], index) => {
+      const user = registry.find((u: any) => u.email?.toLowerCase() === email);
+      return {
+        rank: index + 1,
+        userId: email,
+        name: user?.name || email.split('@')[0],
+        avatar: user?.avatar,
+        email,
+        deliveriesCount: stats.deliveriesCount,
+        riderRating: stats.ratingCount > 0 ? stats.totalRating / stats.ratingCount : 0,
+        earnings: stats.earnings
+      };
+    });
+
+    // Sort by deliveries count (primary) and rating (secondary)
+    entries.sort((a, b) => {
+      if ((b.deliveriesCount || 0) !== (a.deliveriesCount || 0)) {
+        return (b.deliveriesCount || 0) - (a.deliveriesCount || 0);
+      }
+      return (b.riderRating || 0) - (a.riderRating || 0);
+    });
+
+    // Re-assign ranks
+    return entries.map((e, i) => ({ ...e, rank: i + 1 }));
   }
 }
 

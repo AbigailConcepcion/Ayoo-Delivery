@@ -14,7 +14,7 @@ import { ToastProvider, useToast } from './components/ToastContext';
 const OWNER_EMAIL = 'ayoo.admin@gmail.com';
 
 const ScreenFallback: React.FC = () => (
-  <div className="h-screen bg-gradient-to-br from-[#FF1493] via-[#FF69B4] to-[#FF1493] flex items-center justify-center px-6">
+  <div className="h-screen bg-gradient-to-br from-[#C084FC] via-[#A78BFA] to-[#8B5CF6] flex items-center justify-center px-6">
     <div className="text-center">
       <Logo size="xl" variant="white" withSubtext={false} showWordmark={false} />
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/80 mt-6">Loading experience</p>
@@ -405,13 +405,13 @@ const App: React.FC = () => {
     <ToastProvider>
       <div className="max-w-md mx-auto min-h-screen relative shadow-2xl bg-gray-50 overflow-x-hidden overflow-y-auto scrollbar-hide">
         {isConnecting ? (
-          <div className="max-w-md mx-auto h-screen bg-gradient-to-b from-[#FF1493] via-[#FF69B4] to-[#FF1493] flex flex-col items-center justify-center p-8">
-            {/* AYOO LOGO - Full screen dramatic entrance with actual logo */}
+        <div className="max-w-md mx-auto h-screen bg-gradient-to-b from-[#C084FC] via-[#A78BFA] to-[#8B5CF6] flex flex-col items-center justify-center p-8">
+            {/* AYOO LOGO - Full screen dramatic entrance with new purple logo */}
             <div className="relative mb-12">
               <div className="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
               <div className="w-72 h-72 rounded-[60px] bg-white flex items-center justify-center shadow-[0_20px_60px_rgba(0,0,0,0.3)] animate-[bounce_2s_infinite] overflow-hidden">
                 <img
-                  src="https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844276236_36e2add8.jpg"
+                  src="/logo.png"
                   alt="Ayoo Logo"
                   className="w-full h-full object-cover"
                 />

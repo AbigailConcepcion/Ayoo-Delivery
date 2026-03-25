@@ -330,7 +330,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
     return (
       <div className="bg-white min-h-screen flex flex-col pb-32 overflow-hidden font-sans">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-8 pb-12 rounded-b-[60px] text-white shadow-2xl relative z-20">
+        <div className="bg-gradient-to-r from-[#C084FC] via-[#A78BFA] to-[#8B5CF6] p-8 pb-12 rounded-b-[60px] text-white shadow-2xl relative z-20">
           <div className="flex justify-between items-center mb-6">
             <button onClick={onBack} className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg">←</button>
             <div className="flex gap-3">
@@ -470,7 +470,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
   return (
     <div className="bg-white min-h-screen flex flex-col pb-32 overflow-hidden font-sans">
       {/* 3. DYNAMIC HEADER WITH ETA - ENHANCED GRAB-LIKE */}
-      <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-8 pb-16 rounded-b-[60px] text-white shadow-2xl relative z-20">
+      <div className="bg-gradient-to-r from-[#C084FC] via-[#A78BFA] to-[#8B5CF6] p-8 pb-16 rounded-b-[60px] text-white shadow-2xl relative z-20">
         <div className="flex justify-between items-center mb-6">
           <button onClick={goBackToList} className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg">←</button>
           <div className="flex gap-3">

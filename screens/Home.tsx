@@ -159,7 +159,7 @@ const REACTION_EMOJIS: Record<string, string> = {
 
 // Services configuration
 const SERVICES: Service[] = [
-  { id: 'food', name: 'Food', icon: '🍔', color: '#FF1493', screen: 'SEARCH', description: 'All Restaurants & Milk Tea' },
+  { id: 'food', name: 'Food', icon: '🍔', color: '#C084FC', screen: 'SEARCH', description: 'All Restaurants & Milk Tea' },
   { id: 'groceries', name: 'Groceries', icon: '🛒', color: '#9C27B0', screen: 'GROCERIES', description: 'Daily Essentials' },
   { id: 'courier', name: 'Courier', icon: '📦', color: '#2196F3', screen: 'COURIER', description: 'Send Packages' },
   { id: 'rides', name: 'Rides', icon: '🚗', color: '#4CAF50', screen: 'RIDES', description: 'Motor & Car' },
@@ -998,7 +998,7 @@ const Home: React.FC<HomeProps> = ({
       )}
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-28 shadow-lg rounded-b-[32px]">
+      <div className="bg-gradient-to-br from-[#C084FC] via-[#A78BFA] to-[#8B5CF6] p-4 pb-28 shadow-lg rounded-b-[32px]">
         <div className="flex justify-between items-start mb-3">
           <div className="cursor-pointer flex items-center gap-2 flex-1" onClick={() => setShowLocationPicker(true)}>
             <div className="bg-white/30 backdrop-blur-md p-2 rounded-xl">
@@ -1020,7 +1020,7 @@ const Home: React.FC<HomeProps> = ({
               <span className="text-white font-bold text-sm">{points}</span>
             </div>
             <button onClick={() => onOpenCart?.()} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center relative shadow-md">
-              <svg className="w-5 h-5 text-[#FF1493]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[#C084FC]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               {cartCount > 0 && (

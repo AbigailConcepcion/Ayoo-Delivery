@@ -122,10 +122,10 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
       {editingItem && (
         <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in-95">
           <div className="bg-[#1A1A1A] w-full max-w-sm rounded-[50px] p-8 border border-white/10 shadow-2xl space-y-5">
-            <h3 className="text-xl font-black uppercase text-[#FF1493] text-center">Edit Menu Item</h3>
+<h3 className="text-xl font-black uppercase text-[#C084FC] text-center">Edit Menu Item</h3>
 
             <div className="flex flex-col items-center">
-              <div onClick={() => fileInputRef.current?.click()} className="w-36 h-36 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-[35px] p-1 relative cursor-pointer group mb-2 shadow-xl">
+                <div onClick={() => fileInputRef.current?.click()} className="w-36 h-36 bg-gradient-to-br from-[#C084FC] to-[#A78BFA] rounded-[35px] p-1 relative cursor-pointer group mb-2 shadow-xl">
                 <img src={editingItem.image} className="w-full h-full rounded-[32px] object-cover" alt="Item Preview" />
                 <div className="absolute inset-0 bg-black/60 rounded-[32px] opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all">
                   <span className="text-3xl mb-1">📸</span>
@@ -151,7 +151,7 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
       {/* HEADER - GRAB STYLE MERCHANT */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-[#FF1493] to-[#FF69B4] bg-clip-text text-transparent">Ayoo Merchant</h2>
+  <h2 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-[#C084FC] to-[#A78BFA] bg-clip-text text-transparent">Ayoo Merchant</h2>
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{restaurantName}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -176,8 +176,8 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
 
       {/* TABS - GRAB STYLE */}
       <div className="flex gap-1 mb-8 bg-white/10 p-1 rounded-[24px] border border-white/5">
-        {['orders', 'menu', 'wallet', 'live'].map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white shadow-lg' : 'text-gray-400 hover:text-gray-300'}`}>
+{['orders', 'menu', 'wallet', 'live'].map((tab) => (
+          <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-gradient-to-r from-[#C084FC] to-[#A78BFA] text-white shadow-lg' : 'text-gray-400 hover:text-gray-300'}`}>
             {tab}
           </button>
         ))}
@@ -185,7 +185,7 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
 
       {activeTab === 'menu' ? (
         <div className="space-y-6 animate-in slide-in-from-right-5">
-          <Button onClick={handleAddItem} className="bg-white text-black py-5 font-black uppercase tracking-widest text-[10px]">Add New Menu Item +</Button>
+            <Button onClick={handleAddItem} className="bg-[#F3E8FF] text-[#C084FC] py-5 font-black uppercase tracking-widest text-[10px] border border-[#C084FC]/30">Add New Menu Item +</Button>
           <div className="grid grid-cols-1 gap-4">
             {myRes?.items.map(item => (
               <div key={item.id} className="bg-[#161616] p-6 rounded-[35px] border border-white/5 flex items-center justify-between group hover:border-[#FF00CC]/30 transition-all">

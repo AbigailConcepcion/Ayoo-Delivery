@@ -53,7 +53,7 @@ const Button: React.FC<ButtonProps> = ({
       case 'ghost':
         return {
           background: 'transparent',
-          color: COLORS.gray600,
+          color: COLORS.primary,
         };
       case 'danger':
         return {
@@ -67,7 +67,7 @@ const Button: React.FC<ButtonProps> = ({
 
   const getHoverStyles = (): React.CSSProperties => {
     if (variant === 'primary') {
-      return { boxShadow: SHADOWS.pink };
+      return { boxShadow: SHADOWS.purple };
     }
     if (variant === 'secondary' || variant === 'outline') {
       return { backgroundColor: COLORS.primaryBg };

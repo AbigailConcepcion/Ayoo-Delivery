@@ -107,7 +107,7 @@ const RiderDashboard: React.FC<RiderDashboardProps> = ({ onBack, onNavigate, isO
       {/* HEADER - GRAB STYLE RIDER */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-[#FF1493] to-[#FF69B4] bg-clip-text text-transparent">Ayoo Rider</h2>
+<h2 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-[#C084FC] to-[#A78BFA] bg-clip-text text-transparent">Ayoo Rider</h2>
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Fleet Partner</p>
         </div>
         <div className="flex items-center gap-3">
@@ -126,15 +126,15 @@ const RiderDashboard: React.FC<RiderDashboardProps> = ({ onBack, onNavigate, isO
               </span>
             )}
           </button>
-          <div className="w-14 h-14 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-3xl shadow-xl shadow-pink-900/30">🛵</div>
+          <div className="w-14 h-14 bg-gradient-to-br from-[#C084FC] to-[#A78BFA] rounded-2xl flex items-center justify-center text-3xl shadow-xl shadow-purple-500/30">🛵</div>
         </div>
       </div>
 
       {/* TABS - GRAB STYLE */}
       <div className="flex gap-1 mb-8 bg-white/10 p-1 rounded-[24px] border border-white/5">
-        <button onClick={() => setActiveTab('duty')} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'duty' ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white' : 'text-gray-400'}`}>Duty ({myDuty.length})</button>
-        <button onClick={() => setActiveTab('market')} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'market' ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white' : 'text-gray-400'}`}>Market ({marketTasks.length})</button>
-        <button onClick={() => setActiveTab('wallet')} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'wallet' ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white' : 'text-gray-400'}`}>Wallet</button>
+        <button onClick={() => setActiveTab('duty')} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'duty' ? 'bg-gradient-to-r from-[#C084FC] to-[#A78BFA] text-white' : 'text-gray-400'}`}>Duty ({myDuty.length})</button>
+        <button onClick={() => setActiveTab('market')} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'market' ? 'bg-gradient-to-r from-[#C084FC] to-[#A78BFA] text-white' : 'text-gray-400'}`}>Market ({marketTasks.length})</button>
+        <button onClick={() => setActiveTab('wallet')} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'wallet' ? 'bg-gradient-to-r from-[#C084FC] to-[#A78BFA] text-white' : 'text-gray-400'}`}>Wallet</button>
       </div>
 
       {activeTab === 'wallet' ? (

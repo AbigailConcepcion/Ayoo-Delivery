@@ -7,20 +7,20 @@ export const GLOBAL_REGISTRY_KEY = 'ayoo_registry_v15';
 // ============================================
 
 export const COLORS = {
-  // Primary Brand Colors (Pink gradient based on Ayoo logo)
-  primary: '#FF1493',       // Deep Pink - main brand color
-  primaryDark: '#C71585',   // Darker pink for hover states
-  primaryLight: '#FF69B4',  // Lighter pink for accents
-  primaryBg: '#FFF0F5',     // Very light pink background
-  primaryGradient: 'linear-gradient(135deg, #FF1493 0%, #FF69B4 100%)',
+  // Primary Brand Colors (Light Purple Ayoo theme)
+  primary: '#C084FC',       // Light Purple - main brand color
+  primaryDark: '#A855F7',   // Darker purple for hover states
+  primaryLight: '#E9D5FF',  // Lighter purple for accents
+  primaryBg: '#F3E8FF',     // Very light purple background
+  primaryGradient: 'linear-gradient(135deg, #C084FC 0%, #A78BFA 50%, #8B5CF6 100%)',
 
   // Secondary Colors
-  secondary: '#7B2FF7',     // Purple for secondary actions
-  secondaryLight: '#A855F7',
+  secondary: '#8B5CF6',     // Purple accent
+  secondaryLight: '#C084FC',
 
   // Accent Colors
-  accent: '#FFD700',        // Gold for badges/rewards
-  accentLight: '#FFED4A',
+  accent: '#D8B4FE',        // Light lavender accent for badges/rewards
+  accentLight: '#EDE9FE',
 
   // Status Colors
   success: '#10B981',       // Green - success states
@@ -67,10 +67,10 @@ export const SHADOWS = {
   md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
   lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
   xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-  card: '0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(255, 20, 147, 0.08)',
-  cardHover: '0 4px 12px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(255, 20, 147, 0.15)',
-  pink: '0 4px 14px rgba(255, 20, 147, 0.25)',
-  button: '0 2px 8px rgba(255, 20, 147, 0.3)',
+  card: '0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(192, 132, 252, 0.12)',
+  cardHover: '0 4px 12px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(192, 132, 252, 0.15)',
+  purple: '0 4px 14px rgba(192, 132, 252, 0.25)',
+  button: '0 2px 8px rgba(192, 132, 252, 0.3)',
 };
 
 // ============================================
@@ -136,8 +136,8 @@ export const Z_INDEX = {
 export const IMAGES = {
   logoHorizontal: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844265885_539cd4dd.jpg',
   logoVertical: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844270632_70df58b5.png',
-  logoPinkMascot: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844273557_ae970a79.jpg',
-  logoPink: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844276236_36e2add8.jpg',
+  logoPurple: 'logo.png',  // New local purple logo
+  logoPurpleMascot: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844273557_ae970a79.jpg',
   riders: 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844278367_59b7ebed.jpeg',
 };
 

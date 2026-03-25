@@ -31,6 +31,64 @@ class AyooStreamHub {
 export const streamHub = new AyooStreamHub();
 
 /**
+ * Ayoo Location Hub
+ * Real-time GPS tracking for orders using WebSockets (with BroadcastChannel fallback)
+ */
+class AyooLocationHub {
+  private channel = new BroadcastChannel('ayoo_location_v1');
+  private socket: WebSocket | null = null;
+  private subscribers: Map<string, ((data: any) => void)[]> = new Map();
+
+  constructor() {
+    this.channel.onmessage = (event) => {
+      const { orderId, data } = event.data;
+      if (orderId && this.subscribers.has(orderId)) {
+        this.subscribers.get(orderId)?.forEach(cb => cb(data));
+      }
+    };
+
+    if (import.meta.env.VITE_USE_REAL_BACKEND === 'true') {
+      this.connectSocket();
+    }
+  }
+
+  private connectSocket() {
+    try {
+      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:4000';
+      this.socket = new WebSocket(wsUrl);
+      this.socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'LOCATION_UPDATE' && msg.orderId && this.subscribers.has(msg.orderId)) {
+            this.subscribers.get(msg.orderId)?.forEach(cb => cb(msg.data));
+          }
+        } catch {}
+      };
+      this.socket.onclose = () => setTimeout(() => this.connectSocket(), 5000);
+    } catch (err) {
+      console.warn('WS Connection failed', err);
+    }
+  }
+
+  broadcastLocation(orderId: string, data: { lat: number; lng: number; heading?: number }) {
+    const payload = { orderId, data: { ...data, timestamp: Date.now() } };
+    this.channel.postMessage(payload);
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: 'LOCATION_UPDATE', ...payload }));
+    }
+  }
+
+  subscribe(orderId: string, callback: (data: { lat: number; lng: number; heading?: number; timestamp: number }) => void) {
+    if (!this.subscribers.has(orderId)) this.subscribers.set(orderId, []);
+    this.subscribers.get(orderId)?.push(callback);
+    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: 'SUBSCRIBE_TRACKING', orderId }));
+    return () => { this.subscribers.set(orderId, (this.subscribers.get(orderId) || []).filter(cb => cb !== callback)); };
+  }
+}
+
+export const locationHub = new AyooLocationHub();
+
+/**
  * Ayoo Messaging Hub
  * Real-time messaging between customers, merchants, and riders using BroadcastChannel
  */

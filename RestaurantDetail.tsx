@@ -101,8 +101,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                   <button key={star} onClick={() => setNewRating(star)} className={`text-4xl transition-all ${star <= newRating ? 'scale-110' : 'grayscale opacity-30'}`}>⭐</button>
                 ))}
               </div>
-              <textarea placeholder="How was the vibe?..." className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[30px] font-bold text-sm focus:outline-none focus:border-[#FF00CC] mb-8 min-h-[120px]" value={newComment} onChange={(e) => setNewComment(e.target.value)} />
-              <button onClick={handleReviewSubmit} className="w-full bg-[#FF00CC] text-white pill-shadow py-5 font-black uppercase rounded-2xl">Post Review</button>
+              <textarea placeholder="How was the vibe?..." className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[30px] font-bold text-sm focus:outline-none focus:border-[#6D28D9] mb-8 min-h-[120px]" value={newComment} onChange={(e) => setNewComment(e.target.value)} />
+              <button onClick={handleReviewSubmit} className="w-full bg-[#6D28D9] text-white pill-shadow py-5 font-black uppercase rounded-2xl">Post Review</button>
               <button onClick={() => setShowReviewModal(false)} className="w-full mt-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Cancel</button>
            </div>
         </div>
@@ -126,7 +126,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                  Live Cam
                </button>
              )}
-             <button onClick={onOpenCart} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#FF00CC] shadow-xl active:scale-90 transition-all relative">
+             <button onClick={onOpenCart} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#6D28D9] shadow-xl active:scale-90 transition-all relative">
                 🛒
                 {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-yellow-400 text-black text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">{cartCount}</span>}
              </button>
@@ -136,7 +136,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
         {/* Restaurant Info Overlay */}
         <div className="absolute bottom-12 left-8 right-8 text-white z-10">
             <div className="flex items-center gap-3 mb-3">
-                {restaurant.isPartner && <span className="bg-[#FF00CC] text-white px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-lg border border-white/20">Ayoo Partner</span>}
+                {restaurant.isPartner && <span className="bg-[#6D28D9] text-white px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-lg border border-white/20">Ayoo Partner</span>}
                 <span className="bg-yellow-400 text-black px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-lg">⭐ {restaurant.rating}</span>
             </div>
             <h2 className="text-4xl font-black tracking-tighter leading-none mb-2">{restaurant.name}</h2>
@@ -151,7 +151,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
       {/* Tabs Header */}
       <div className="bg-white sticky top-0 z-40 px-8 py-2 border-b border-gray-100 flex gap-10 justify-center">
          {['Menu', 'Reviews'].map((tab) => (
-           <button key={tab} onClick={() => setActiveTab(tab as any)} className={`py-4 text-sm font-black uppercase tracking-widest relative transition-all ${activeTab === tab ? 'text-[#FF00CC]' : 'text-gray-300'}`}>
+           <button key={tab} onClick={() => setActiveTab(tab as any)} className={`py-4 text-sm font-black uppercase tracking-widest relative transition-all ${activeTab === tab ? 'text-[#6D28D9]' : 'text-gray-300'}`}>
              {tab}
              {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 ayoo-gradient rounded-full"></div>}
            </button>
@@ -163,7 +163,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
           <>
             <div className="sticky top-14 bg-white z-30 -mx-8 px-8 py-4 mb-8 overflow-x-auto scrollbar-hide flex gap-3">
                {categories.map(cat => (
-                 <button key={cat} onClick={() => setActiveCategory(cat)} className={`flex-shrink-0 px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${activeCategory === cat ? 'bg-[#FF00CC] text-white shadow-lg shadow-pink-200' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}>
+                 <button key={cat} onClick={() => setActiveCategory(cat)} className={`flex-shrink-0 px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${activeCategory === cat ? 'bg-[#6D28D9] text-white shadow-lg shadow-purple-200' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}>
                    {cat}
                  </button>
                ))}
@@ -174,7 +174,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                 <div key={category} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                    <div className="flex justify-between items-end mb-8">
                       <h3 className="font-black text-2xl text-gray-900 tracking-tighter uppercase leading-none">{category}</h3>
-                      <div className="w-1/2 h-[3px] bg-pink-50 rounded-full mb-1"></div>
+                      <div className="w-1/2 h-[3px] bg-purple-50 rounded-full mb-1"></div>
                    </div>
                    <div className="space-y-8">
                       {items.map(item => (
@@ -190,8 +190,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                               <p className="text-[11px] text-gray-400 font-bold line-clamp-2 leading-relaxed tracking-tight">{item.description}</p>
                             </div>
                             <div className="flex justify-between items-center mt-4">
-                              <span className="font-black text-2xl text-[#FF00CC]">₱{item.price}</span>
-                              <button onClick={() => handleAdd(item)} className="bg-[#FF00CC] text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-pink-100">Add +</button>
+                              <span className="font-black text-2xl text-[#6D28D9]">₱{item.price}</span>
+                              <button onClick={() => handleAdd(item)} className="bg-[#6D28D9] text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-purple-100">Add +</button>
                             </div>
                           </div>
                         </div>
@@ -205,7 +205,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
           <div className="pb-10 space-y-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-black text-2xl text-gray-900 uppercase tracking-tighter">Community Buzz</h3>
-              <button onClick={() => setShowReviewModal(true)} className="bg-pink-50 text-[#FF00CC] px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-pink-100">Write Review ✨</button>
+              <button onClick={() => setShowReviewModal(true)} className="bg-purple-50 text-[#6D28D9] px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-purple-100">Write Review ✨</button>
             </div>
             {localReviews.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
@@ -234,9 +234,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
 
       {cartCount > 0 && activeTab === 'Menu' && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[85%] z-50">
-          <button onClick={onOpenCart} className="w-full bg-[#FF00CC] text-white pill-shadow py-6 text-xl font-black uppercase tracking-widest flex items-center justify-between px-10 rounded-2xl">
+          <button onClick={onOpenCart} className="w-full bg-[#6D28D9] text-white pill-shadow py-6 text-xl font-black uppercase tracking-widest flex items-center justify-between px-10 rounded-2xl">
             <span>Checkout Now</span>
-            <span className="bg-white text-[#FF00CC] w-10 h-10 rounded-full flex items-center justify-center text-sm font-black">{cartCount}</span>
+            <span className="bg-white text-[#6D28D9] w-10 h-10 rounded-full flex items-center justify-center text-sm font-black">{cartCount}</span>
           </button>
         </div>
       )}

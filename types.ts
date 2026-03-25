@@ -1,5 +1,5 @@
 
-export type AppScreen = 'ONBOARDING' | 'AUTH' | 'SERVICES' | 'HOME' | 'SEARCH' | 'MESSAGES' | 'GROCERIES' | 'COURIER' | 'RIDES' | 'DINE_OUT' | 'PHARMACY' | 'RESTAURANT' | 'CART' | 'TRACKING' | 'VOUCHERS' | 'HISTORY' | 'PROFILE' | 'ADDRESSES' | 'PAYMENTS' | 'PABILI' | 'MERCHANT_DASHBOARD' | 'RIDER_DASHBOARD' | 'ADMIN_PANEL' | 'MANUAL';
+export type AppScreen = 'ONBOARDING' | 'AUTH' | 'SERVICES' | 'HOME' | 'SEARCH' | 'MESSAGES' | 'GROCERIES' | 'COURIER' | 'RIDES' | 'DINE_OUT' | 'PHARMACY' | 'RESTAURANT' | 'CART' | 'TRACKING' | 'VOUCHERS' | 'HISTORY' | 'PROFILE' | 'ADDRESSES' | 'PAYMENTS' | 'PABILI' | 'MERCHANT_DASHBOARD' | 'RIDER_DASHBOARD' | 'ADMIN_PANEL' | 'MANUAL' | 'COMMUNITY';
 
 export const USER_ROLES = {
   CUSTOMER: 'CUSTOMER',
@@ -74,6 +74,8 @@ export interface Restaurant {
   address?: string;
   hasLiveCam?: boolean;
   reviews?: Review[];
+  tags?: string[];
+  deliveryFee?: number;
 }
 
 export type OrderStatus = 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY_FOR_PICKUP' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
@@ -191,3 +193,19 @@ export interface CommunityPost {
   likes: number;
 }
 
+export interface Promo {
+  id: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  bgColor: string;
+  actionUrl: string;
+}
+
+export interface ServiceCategory {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  route: string;
+}

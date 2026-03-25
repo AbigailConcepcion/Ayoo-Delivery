@@ -1,5 +1,5 @@
 
-import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem, Conversation, Message } from './types';
+import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem, Conversation, Message, Promo, ServiceCategory } from './types';
 import { MOCK_RESTAURANTS, GLOBAL_REGISTRY_KEY } from './constants';
 
 // allow access to Vite env vars without TS errors
@@ -17,6 +17,12 @@ class AyooDatabase {
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3
   };
+
+  private _isConnected = false;
+
+  public get isConnected(): boolean {
+    return this._isConnected;
+  }
 
   private readonly STORAGE_KEYS = {
     AUTH_TOKEN: 'ayoo_jwt_v2',
@@ -47,11 +53,20 @@ class AyooDatabase {
   async connect() {
     if (AyooDatabase.ENV.USE_REAL_BACKEND) {
       // ensure server is reachable
-      await this.request('/config');
-      return true;
+      try {
+        await this.request('/config');
+        this._isConnected = true;
+        return true;
+      } catch (err) {
+        this._isConnected = false;
+        throw err;
+      }
     }
     console.log("Ayoo Cloud: Establishing Node Connection...");
-    return new Promise((resolve) => setTimeout(() => resolve(true), 1000));
+    return new Promise((resolve) => setTimeout(() => {
+      this._isConnected = true;
+      resolve(true);
+    }, 1000));
   }
 
   // Fix: Added hasSeenOnboarding method to check if the user has completed the onboarding process
@@ -613,6 +628,73 @@ class AyooDatabase {
       });
     }
     return { success: true, charge: { id: 'LOCAL-' + Math.random().toString(36).substr(2, 9) } };
+  }
+
+  // ==================== GRAB-LIKE & PURPLE THEME FEATURES ====================
+
+  async getPromos(): Promise<Promo[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const result: any = await this.request('/content/promos');
+        return result.promos || [];
+      } catch (err) {
+        console.error('getPromos failed', err);
+        return [];
+      }
+    }
+    // Mock Data: Ayoo Purple Themed Promos for the Hero Carousel
+    return [
+      {
+        id: 'p1',
+        title: 'Welcome to Ayoo',
+        subtitle: 'Get 50% off your first purple order',
+        image: 'https://placehold.co/800x400/7c3aed/ffffff?text=Ayoo+Welcome',
+        bgColor: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)', // Violet-600 to Violet-400
+        actionUrl: '/food'
+      },
+      {
+        id: 'p2',
+        title: 'Free Delivery',
+        subtitle: 'On all orders above ₱500',
+        image: 'https://placehold.co/800x400/8b5cf6/ffffff?text=Free+Delivery',
+        bgColor: 'linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%)', // Violet-700 to Violet-500
+        actionUrl: '/mart'
+      },
+      {
+        id: 'p3',
+        title: 'AyooPay Deals',
+        subtitle: 'Cashback on every top-up',
+        image: 'https://placehold.co/800x400/5b21b6/ffffff?text=AyooPay',
+        bgColor: 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)', // Violet-900 to Violet-700
+        actionUrl: '/wallet'
+      }
+    ];
+  }
+
+  async getCategories(): Promise<ServiceCategory[]> {
+    // Categories for the circle grid (Grab-style)
+    return [
+      { id: 'food', label: 'Food', icon: '🍔', color: '#f3e8ff', route: '/food' }, // Purple-100 bg
+      { id: 'mart', label: 'Mart', icon: '🛍️', color: '#f3e8ff', route: '/mart' },
+      { id: 'express', label: 'Express', icon: '📦', color: '#f3e8ff', route: '/express' },
+      { id: 'load', label: 'Load', icon: '📱', color: '#f3e8ff', route: '/load' },
+      { id: 'pabili', label: 'Pabili', icon: '🏃', color: '#f3e8ff', route: '/pabili' },
+      { id: 'ride', label: 'Ride', icon: '🚗', color: '#f3e8ff', route: '/ride' },
+      { id: 'wallet', label: 'Wallet', icon: '👛', color: '#f3e8ff', route: '/wallet' },
+      { id: 'more', label: 'More', icon: '✨', color: '#f3e8ff', route: '/services' },
+    ];
+  }
+
+  async getNearbyRestaurants(lat?: number, lng?: number): Promise<Restaurant[]> {
+    const all = await this.getRestaurants();
+    // Simulate geolocation filtering by just returning a subset for now
+    return all.slice(0, 5);
+  }
+
+  async getRecommendations(): Promise<Restaurant[]> {
+    const all = await this.getRestaurants();
+    // Mock "Personalized" recommendations: Shuffle and return top 3
+    return all.sort(() => 0.5 - Math.random()).slice(0, 3);
   }
 
   // ==================== MESSAGING METHODS ====================

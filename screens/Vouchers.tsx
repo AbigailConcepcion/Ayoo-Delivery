@@ -40,24 +40,25 @@ const Vouchers: React.FC<VouchersProps> = ({ onBack, onApply, onNavigate }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 pb-24 overflow-y-auto scrollbar-hide">
-      <div className="bg-[#FF00CC] p-10 rounded-b-[50px] shadow-xl text-white text-center">
-         <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Ayoo Vouchers</h2>
-         <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">Claim your rewards below</p>
-      </div>
+    <div className="flex flex-col h-screen bg-gray-50">
+      <div className="flex-1 overflow-y-auto scrollbar-hide pb-24">
+        <div className="bg-[#6D28D9] p-10 rounded-b-[50px] shadow-xl text-white text-center">
+           <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Ayoo Vouchers</h2>
+           <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">Claim your rewards below</p>
+        </div>
 
-      <div className="px-8 pt-10 space-y-6">
+        <div className="px-8 pt-10 space-y-6">
         {availableVouchers.map(v => {
           const isClaimed = claimedIds.includes(v.id);
           return (
-            <div key={v.id} className={`bg-white p-6 rounded-[35px] border-2 border-dashed shadow-sm relative overflow-hidden group transition-all ${isClaimed ? 'border-gray-200 opacity-60' : 'border-pink-200'}`}>
+            <div key={v.id} className={`bg-white p-6 rounded-[35px] border-2 border-dashed shadow-sm relative overflow-hidden group transition-all ${isClaimed ? 'border-gray-200 opacity-60' : 'border-purple-200'}`}>
                <div className="absolute -right-4 -top-4 w-16 h-16 ayoo-gradient rounded-full opacity-10 group-hover:scale-150 transition-transform"></div>
                <div className="flex justify-between items-start mb-4">
                   <div>
                      <h3 className="text-xl font-black text-gray-900 tracking-tighter">{v.code}</h3>
                      <p className="text-[11px] font-bold text-gray-400 mt-1">{v.description}</p>
                   </div>
-                  <div className={`px-3 py-1.5 rounded-xl font-black text-[12px] ${isClaimed ? 'bg-gray-100 text-gray-400' : 'bg-pink-50 text-[#FF00CC]'}`}>
+                  <div className={`px-3 py-1.5 rounded-xl font-black text-[12px] ${isClaimed ? 'bg-gray-100 text-gray-400' : 'bg-purple-50 text-[#6D28D9]'}`}>
                      {v.type === 'percent' ? `${v.discount}%` : `₱${v.discount}`}
                   </div>
                </div>
@@ -65,7 +66,7 @@ const Vouchers: React.FC<VouchersProps> = ({ onBack, onApply, onNavigate }) => {
                  disabled={isClaimed}
                  onClick={() => handleClaim(v)}
                  className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all ${
-                   isClaimed ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#FF00CC] text-white shadow-pink-100 active:scale-95'
+                   isClaimed ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#6D28D9] text-white shadow-purple-100 active:scale-95'
                  }`}
                >
                   {isClaimed ? 'Voucher Claimed' : 'Claim & Use Now'}
@@ -73,6 +74,7 @@ const Vouchers: React.FC<VouchersProps> = ({ onBack, onApply, onNavigate }) => {
             </div>
           );
         })}
+        </div>
       </div>
 
       <BottomNav active="VOUCHERS" onNavigate={onNavigate} mode="customer" />

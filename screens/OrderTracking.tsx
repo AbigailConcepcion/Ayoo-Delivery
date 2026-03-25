@@ -131,9 +131,9 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
   const currentProgress = progressMap[statusIdx];
 
   return (
-    <div className="bg-white min-h-screen flex flex-col pb-32 overflow-hidden font-sans">
+    <div className="bg-[#F7F2FF] flex flex-col font-sans">
       {/* 3. DYNAMIC HEADER WITH ETA - ENHANCED GRAB-LIKE */}
-      <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-8 pb-16 rounded-b-[60px] text-white shadow-2xl relative z-20">
+      <div className="bg-gradient-to-r from-[#8B5CF6] via-[#A78BFA] to-[#8B5CF6] p-8 pb-16 rounded-b-[60px] text-white shadow-2xl relative z-20">
         <div className="flex justify-between items-center mb-6">
           <button onClick={onBack} className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg">←</button>
           <div className="flex gap-3">
@@ -211,13 +211,13 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 p-8 space-y-10 overflow-y-auto scrollbar-hide">
+      <div className="flex-1 p-8 space-y-10 overflow-y-auto scrollbar-hide pb-28">
         <div className="grid grid-cols-3 gap-2 bg-gray-100 p-1 rounded-2xl">
           {(['LIVE', 'SUMMARY', 'TIMELINE'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === tab ? 'bg-white text-[#FF00CC] shadow' : 'text-gray-500'
+              className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === tab ? 'bg-white text-[#6D28D9] shadow' : 'text-gray-500'
                 }`}
             >
               {tab}
@@ -227,37 +227,61 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
 
         {/* 4. QUANTUM MAP VISUALS */}
         {activeTab === 'LIVE' && (
-          <div className="relative h-64 bg-gray-50 rounded-[45px] border-2 border-gray-100 overflow-hidden shadow-inner">
-            <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(#FF00CC 0.5px, transparent 0.5px)', backgroundSize: '20px 20px' }}></div>
+          <div className="relative h-[320px] overflow-hidden rounded-[45px] border-2 border-white/70 bg-[#EEF1F9] shadow-[inset_0_2px_18px_rgba(255,255,255,0.7)]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.9),transparent_25%),linear-gradient(180deg,rgba(255,255,255,0.35),rgba(255,255,255,0))]"></div>
+            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(to right, rgba(109,40,217,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(109,40,217,0.08) 1px, transparent 1px)', backgroundSize: '42px 42px' }}></div>
 
-            <div className="absolute top-1/2 left-10 right-10 h-1 bg-gray-200 rounded-full -translate-y-1/2">
-              <div className="h-full ayoo-gradient rounded-full transition-all duration-1000" style={{ width: `${currentProgress}%` }}></div>
+            <div className="absolute left-6 top-8 rounded-full bg-white/90 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#6D28D9] shadow-lg">
+              Live map simulation
+            </div>
+            <div className="absolute right-6 top-8 rounded-full bg-[#6D28D9] px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-lg">
+              {calculateETA(liveOrder?.status)}
             </div>
 
-            <div className="absolute top-1/2 left-10 -translate-y-1/2 flex flex-col items-center">
-              <div className="w-4 h-4 bg-gray-300 rounded-full border-4 border-white shadow-md"></div>
-              <span className="text-[7px] font-black uppercase text-gray-400 mt-2 tracking-widest">Shop</span>
+            <div className="absolute inset-x-10 top-[96px] h-[3px] rounded-full bg-[#D8DDEA]"></div>
+            <div className="absolute left-[16%] top-[28%] h-[34%] w-[3px] rounded-full bg-[#D8DDEA]"></div>
+            <div className="absolute right-[18%] top-[34%] h-[36%] w-[3px] rounded-full bg-[#D8DDEA]"></div>
+
+            <div className="absolute left-[14%] top-[26%] flex flex-col items-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-[20px] border-4 border-white bg-[#6D28D9] text-xl text-white shadow-xl">🏪</div>
+              <span className="mt-2 text-[8px] font-black uppercase tracking-[0.16em] text-gray-500">Merchant</span>
             </div>
 
-            <div className="absolute top-1/2 right-10 -translate-y-1/2 flex flex-col items-center">
-              <div className={`w-10 h-10 rounded-2xl border-4 border-white shadow-md flex items-center justify-center text-sm transition-all ${statusIdx === 3 ? 'bg-green-500 scale-110' : 'bg-gray-300'}`}>
-                {statusIdx === 3 ? '🏠' : '📍'}
-              </div>
-              <span className="text-[7px] font-black uppercase text-gray-400 mt-2 tracking-widest">Home</span>
+            <div className="absolute right-[14%] bottom-[20%] flex flex-col items-center">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-[20px] border-4 border-white text-xl shadow-xl ${statusIdx === 3 ? 'bg-green-500 text-white' : 'bg-white text-[#6D28D9]'}`}>🏠</div>
+              <span className="mt-2 text-[8px] font-black uppercase tracking-[0.16em] text-gray-500">Drop-off</span>
             </div>
 
-            {/* Animated Rider */}
-            {statusIdx < 3 && (
-              <div className="absolute top-1/2 -translate-y-1/2 transition-all duration-1000 z-10" style={{ left: `calc(10px + (100% - 80px) * ${currentProgress / 100})` }}>
-                <div className="w-14 h-14 bg-white rounded-2xl shadow-xl border-2 border-[#FF00CC] flex items-center justify-center text-2xl animate-bounce">🛵</div>
+            <div className="absolute left-[16%] right-[18%] top-[30%] h-[3px] overflow-hidden rounded-full bg-[#D8DDEA]">
+              <div className="h-full rounded-full bg-gradient-to-r from-[#6D28D9] via-[#8B5CF6] to-[#C4B5FD] transition-all duration-1000" style={{ width: `${currentProgress}%` }}></div>
+            </div>
+
+{statusIdx < 3 && (
+              <div className="absolute top-[24%] z-10 transition-all duration-1000" style={{ left: `${16 + (currentProgress / 100 * 70)}%` }}>
+                <div className="flex h-14 w-14 items-center justify-center rounded-[22px] border-4 border-white bg-white text-2xl shadow-[0_18px_40px_rgba(109,40,217,0.22)]">🛵</div>
               </div>
             )}
+
+            <div className="absolute left-8 bottom-8 right-8 rounded-[28px] border border-white/80 bg-white/88 p-4 backdrop-blur-xl shadow-lg">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-purple-400">Current checkpoint</p>
+                  <p className="mt-1 text-sm font-black text-gray-900">
+                    {liveOrder?.status === 'OUT_FOR_DELIVERY' ? 'Rider is turning onto your street' : liveOrder?.status === 'READY_FOR_PICKUP' ? 'Rider is arriving at the merchant' : 'Kitchen queue and rider dispatch in progress'}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[#F4EDFF] px-3 py-2 text-right">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-purple-400">Speed</p>
+                  <p className="mt-1 text-sm font-black text-[#6D28D9]">18 km/h</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {!liveOrder ? (
           <div className="py-20 text-center opacity-40">
-            <div className="w-12 h-1 bg-[#FF00CC]/20 mx-auto mb-4 rounded-full animate-pulse"></div>
+            <div className="w-12 h-1 bg-[#6D28D9]/20 mx-auto mb-4 rounded-full animate-pulse"></div>
             <p className="font-black uppercase tracking-widest text-[9px]">Awaiting Dispatch Node...</p>
           </div>
         ) : (
@@ -288,7 +312,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                     const done = getStatusIndex(liveOrder.status) >= getStatusIndex(status);
                     return (
                       <div key={status} className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${done ? 'bg-[#FF00CC] text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${done ? 'bg-[#6D28D9] text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div>
                         <p className={`text-xs font-black uppercase tracking-widest ${done ? 'text-gray-900' : 'text-gray-400'}`}>{status.replaceAll('_', ' ')}</p>
                       </div>
                     );
@@ -304,7 +328,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
               </div>
               <div>
                 <h4 className="font-black text-xl text-gray-900 leading-none">{liveOrder.riderName || 'Looking for Rider'}</h4>
-                <p className="text-[10px] font-bold text-[#FF00CC] uppercase tracking-[0.2em] mt-2">Active Logistics Partner</p>
+                <p className="text-[10px] font-bold text-[#6D28D9] uppercase tracking-[0.2em] mt-2">Active Logistics Partner</p>
               </div>
             </div>
 
@@ -320,13 +344,15 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                 ))}
                 <div className="mt-6 pt-6 border-t border-gray-100 flex justify-between items-center">
                   <span className="font-black text-lg text-gray-900">Total</span>
-                  <span className="text-2xl font-black text-[#FF00CC]">₱{liveOrder.total}</span>
+                  <span className="text-2xl font-black text-[#6D28D9]">₱{liveOrder.total}</span>
                 </div>
               </div>
             )}
           </div>
         )}
       </div>
+
+      
 
       {/* 5. FEEDBACK MODAL (END OF FLOW) */}
       {showFeedbackModal && (

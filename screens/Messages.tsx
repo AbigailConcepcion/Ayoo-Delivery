@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Conversation, Message, UserAccount, ParticipantRole } from '../types';
 import { db } from '../db';
 import { messagingHub } from '../api';
-import { COLORS } from '../constants';
+import BottomNav from '../components/BottomNav';
 
 interface MessagesProps {
     currentUser: UserAccount;
@@ -161,9 +161,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
         const otherUser = getOtherParticipant(selectedConversation);
 
         return (
-            <div className="flex flex-col h-screen bg-gray-50">
+            <div className="flex flex-col h-screen bg-[#F7F2FF]">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-6 rounded-b-[40px] shadow-lg">
+                <div className="bg-gradient-to-r from-[#8B5CF6] via-[#A78BFA] to-[#8B5CF6] p-4 pb-6 rounded-b-[40px] shadow-lg">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setSelectedConversation(null)}
@@ -185,7 +185,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-4">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-28">
                     {messages.length === 0 ? (
                         <div className="text-center py-12 opacity-50">
                             <p className="text-4xl mb-4">💬</p>
@@ -202,7 +202,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                                 >
                                     <div
                                         className={`max-w-[75%] p-3 rounded-[20px] ${isMe
-                                                ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white rounded-tr-none'
+                                                ? 'bg-gradient-to-r from-[#8B5CF6] to-[#A78BFA] text-white rounded-tr-none'
                                                 : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
                                             } shadow-sm`}
                                     >
@@ -219,7 +219,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                 </div>
 
                 {/* Input */}
-                <div className="p-4 bg-white border-t border-gray-100">
+                <div className="border-t border-gray-100 bg-white px-4 py-4 pb-28">
                     <div className="flex gap-2 items-center">
                         <input
                             type="text"
@@ -227,17 +227,18 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                             onChange={(e) => setNewMessage(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                             placeholder="Type a message..."
-                            className="flex-1 bg-gray-100 rounded-full px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[#FF00CC]/30"
+                            className="flex-1 bg-gray-100 rounded-full px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[#6D28D9]/30"
                         />
                         <button
                             onClick={handleSendMessage}
                             disabled={!newMessage.trim() || isLoading}
-                            className="w-12 h-12 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-full flex items-center justify-center text-white font-black shadow-lg disabled:opacity-50"
+                            className="w-12 h-12 bg-gradient-to-r from-[#8B5CF6] to-[#A78BFA] rounded-full flex items-center justify-center text-white font-black shadow-lg disabled:opacity-50"
                         >
                             ➤
                         </button>
                     </div>
                 </div>
+                {onNavigate && <BottomNav active="MESSAGES" onNavigate={onNavigate as any} mode="customer" />}
             </div>
         );
     }
@@ -245,8 +246,8 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
     // Show new chat modal
     if (showNewChat) {
         return (
-            <div className="flex flex-col h-screen bg-gray-50">
-                <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-6 rounded-b-[40px] shadow-lg">
+            <div className="flex flex-col h-screen bg-[#F7F2FF]">
+                <div className="bg-gradient-to-r from-[#8B5CF6] via-[#A78BFA] to-[#8B5CF6] p-4 pb-6 rounded-b-[40px] shadow-lg">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setShowNewChat(false)}
@@ -258,7 +259,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                     </div>
                 </div>
 
-                <div className="p-4">
+                <div className="flex-1 overflow-y-auto p-4 pb-28">
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Select a contact</p>
                     {availableUsers.length === 0 ? (
                         <div className="text-center py-8 opacity-50">
@@ -286,15 +287,16 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                         </div>
                     )}
                 </div>
+                {onNavigate && <BottomNav active="MESSAGES" onNavigate={onNavigate as any} mode="customer" />}
             </div>
         );
     }
 
     // Main conversations list
     return (
-        <div className="flex flex-col h-screen bg-gray-50">
+        <div className="flex flex-col h-screen bg-[#F7F2FF]">
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-6 rounded-b-[40px] shadow-lg">
+            <div className="bg-gradient-to-r from-[#8B5CF6] via-[#A78BFA] to-[#8B5CF6] p-4 pb-6 rounded-b-[40px] shadow-lg">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button
@@ -305,7 +307,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                         </button>
                         <h2 className="text-white font-black text-xl">Messages</h2>
                         {totalUnread > 0 && (
-                            <span className="bg-white text-[#FF00CC] text-xs font-black px-2 py-1 rounded-full">
+                            <span className="bg-white text-[#6D28D9] text-xs font-black px-2 py-1 rounded-full">
                                 {totalUnread}
                             </span>
                         )}
@@ -323,7 +325,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
             </div>
 
             {/* Conversations List */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 pb-28">
                 {conversations.length === 0 ? (
                     <div className="text-center py-12 opacity-50">
                         <p className="text-6xl mb-4">💬</p>
@@ -333,7 +335,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                         </p>
                         <button
                             onClick={() => { loadAvailableUsers(); setShowNewChat(true); }}
-                            className="mt-6 px-6 py-3 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white font-black text-sm rounded-full shadow-lg"
+                            className="mt-6 px-6 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#A78BFA] text-white font-black text-sm rounded-full shadow-lg"
                         >
                             Start New Chat
                         </button>
@@ -353,7 +355,7 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                                             {otherUser ? getRoleIcon(otherUser.role) : '💬'}
                                         </div>
                                         {convo.unreadCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FF00CC] text-white text-[10px] font-black rounded-full flex items-center justify-center">
+                                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#6D28D9] text-white text-[10px] font-black rounded-full flex items-center justify-center">
                                                 {convo.unreadCount}
                                             </span>
                                         )}
@@ -378,9 +380,9 @@ const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) 
                     </div>
                 )}
             </div>
+            {onNavigate && <BottomNav active="MESSAGES" onNavigate={onNavigate as any} mode="customer" />}
         </div>
     );
 };
 
 export default Messages;
-

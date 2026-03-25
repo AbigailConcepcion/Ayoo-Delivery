@@ -40,7 +40,7 @@ const BASE_SERVICES: ServiceCard[] = [
     fastBadge: 'Quick Meals',
     valueBadge: 'Budget Bundles',
     valueHint: 'Best vouchers + shared bills',
-    gradient: 'from-[#FF1493] to-[#FF66C4]',
+    gradient: 'from-[#8B5CF6] to-[#FF66C4]',
     speedRank: 2,
     valueRank: 2,
     defaultRank: 1
@@ -104,7 +104,7 @@ const BASE_SERVICES: ServiceCard[] = [
     fastBadge: 'Auto Match',
     valueBadge: 'Smart Budget',
     valueHint: 'Templates + rider status simulation',
-    gradient: 'from-[#FF1493] to-[#FF79C8]',
+    gradient: 'from-[#8B5CF6] to-[#FF79C8]',
     speedRank: 5,
     valueRank: 5,
     defaultRank: 5
@@ -136,7 +136,7 @@ const BASE_SERVICES: ServiceCard[] = [
     fastBadge: 'Quick Book',
     valueBadge: 'Exclusive Deals',
     valueHint: 'Reserve your favorite restaurants',
-    gradient: 'from-[#E91E63] to-[#F06292]',
+    gradient: 'from-[#7C3AED] to-[#F06292]',
     speedRank: 7,
     valueRank: 7,
     defaultRank: 7
@@ -201,7 +201,7 @@ const Services: React.FC<ServicesProps> = ({ user, deliveryCity, onNavigate }) =
 
   return (
     <div className="min-h-screen bg-[#FFF5FB] flex flex-col pb-24 overflow-y-auto scrollbar-hide">
-      <header className="bg-gradient-to-br from-[#FF1493] via-[#FF2FA8] to-[#FF63BF] text-white px-5 pt-5 pb-7 rounded-b-[30px] shadow-xl sticky top-0 z-20">
+      <header className="bg-gradient-to-br from-[#8B5CF6] via-[#FF2FA8] to-[#FF63BF] text-white px-5 pt-5 pb-7 rounded-b-[30px] shadow-xl sticky top-0 z-20">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-20 h-20 rounded-[28px] overflow-hidden bg-white/20 border border-white/30 shadow-xl flex items-center justify-center text-5xl">
@@ -214,7 +214,7 @@ const Services: React.FC<ServicesProps> = ({ user, deliveryCity, onNavigate }) =
           </div>
           <button
             onClick={() => onNavigate('PROFILE')}
-            className="w-12 h-12 rounded-2xl bg-white text-[#FF1493] flex items-center justify-center shadow-lg"
+            className="w-12 h-12 rounded-2xl bg-white text-[#8B5CF6] flex items-center justify-center shadow-lg"
             title="Account"
           >
             ⚙️
@@ -243,7 +243,7 @@ const Services: React.FC<ServicesProps> = ({ user, deliveryCity, onNavigate }) =
         <section className="bg-white rounded-[24px] border border-gray-100 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[11px] font-black uppercase tracking-widest text-gray-500">Dispatch Priority</h2>
-            <span className="text-[9px] font-black uppercase tracking-widest text-[#FF1493]">One-tap personalization</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-[#8B5CF6]">One-tap personalization</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {([
@@ -254,7 +254,7 @@ const Services: React.FC<ServicesProps> = ({ user, deliveryCity, onNavigate }) =
               <button
                 key={lane.key}
                 onClick={() => setPriority(lane.key)}
-                className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${priority === lane.key ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-500'
+                className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${priority === lane.key ? 'bg-[#8B5CF6] text-white' : 'bg-gray-100 text-gray-500'
                   }`}
               >
                 {lane.label}
@@ -266,7 +266,7 @@ const Services: React.FC<ServicesProps> = ({ user, deliveryCity, onNavigate }) =
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[11px] font-black uppercase tracking-widest text-gray-500">Services</h2>
-            <span className="text-[9px] font-black uppercase tracking-widest text-[#FF1493]">Distance-aware ETA</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-[#8B5CF6]">Distance-aware ETA</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {services.map((service) => (
@@ -282,7 +282,7 @@ const Services: React.FC<ServicesProps> = ({ user, deliveryCity, onNavigate }) =
                 </div>
                 <h3 className="text-sm font-black mt-2 tracking-tight text-gray-900">{service.title}</h3>
                 <p className="text-[11px] text-gray-500 font-bold mt-1 leading-tight">{service.subtitle}</p>
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#FF1493] mt-2">{service.etaHint}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#8B5CF6] mt-2">{service.etaHint}</p>
                 <p className="text-[10px] text-gray-500 font-bold mt-1">{service.valueHint}</p>
               </button>
             ))}

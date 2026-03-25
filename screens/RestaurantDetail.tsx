@@ -14,6 +14,12 @@ interface RestaurantDetailProps {
   cartCount: number;
 }
 
+const PLACEHOLDER_RESTAURANT = 'https://placehold.co/400x300/6D28D9/FFFFFF/png?text=Restaurant&font=roboto';
+
+const PLACEHOLDER_ITEM = 'https://placehold.co/200x150/6D28D9/FFFFFF/png?text=Dish&font=roboto';
+
+const PLACEHOLDER_AVATAR = 'https://i.pravatar.cc/150?img=1';
+
 const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack, onAddToCart, onOpenCart, cartCount }) => {
   const [activeTab, setActiveTab] = useState<'Menu' | 'Reviews'>('Menu');
   const [activeCategory, setActiveCategory] = useState<string>('All');
@@ -110,7 +116,8 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
         callbacks: {
           onopen: () => setIntercomStatus('LIVE'),
           onmessage: async (msg) => {
-            const audioB64 = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+            const parts = msg.serverContent?.modelTurn?.parts;
+            const audioB64 = parts?.[0]?.inlineData?.data;
             if (audioB64 && audioContextRef.current) {
               const buffer = await decodeAudioData(decode(audioB64), audioContextRef.current, 24000, 1);
               const source = audioContextRef.current.createBufferSource();
@@ -192,7 +199,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                  <div className="bg-black/60 backdrop-blur-xl p-6 rounded-[35px] border border-white/10">
                     <div className="flex justify-between items-center mb-4">
                        <div>
-                          <p className="text-[10px] font-black text-[#FF00CC] uppercase mb-1">Kitchen Intercom</p>
+                          <p className="text-[10px] font-black text-[#6D28D9] uppercase mb-1">Kitchen Intercom</p>
                           <h4 className="text-white font-black text-lg tracking-tighter uppercase leading-none">{intercomStatus}</h4>
                        </div>
                        {isIntercomActive && <div className="w-3 h-3 bg-red-500 rounded-full animate-ping"></div>}
@@ -207,13 +214,13 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                     </button>
                  </div>
               </div>
-              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-[#FF00CC]/10 to-transparent animate-scan pointer-events-none"></div>
+              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-[#6D28D9]/10 to-transparent animate-scan pointer-events-none"></div>
            </div>
         </div>
       )}
 
       <div className="relative h-80">
-        <img src={restaurant.image} className="w-full h-full object-cover" alt={restaurant.name} />
+        <img src={restaurant.image || PLACEHOLDER_RESTAURANT} className="w-full h-full object-cover" alt={restaurant.name} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
         <div className="absolute top-8 left-6 right-6 flex justify-between items-center z-20">
           <button onClick={onBack} className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 active:scale-90 transition-all">←</button>
@@ -227,7 +234,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                  Live Cam
                </button>
              )}
-             <button onClick={onOpenCart} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#FF00CC] shadow-xl active:scale-90 transition-all relative">
+             <button onClick={onOpenCart} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#6D28D9] shadow-xl active:scale-90 transition-all relative">
                 🛒
                 {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-yellow-400 text-black text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">{cartCount}</span>}
              </button>
@@ -241,7 +248,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
 
       <div className="bg-white sticky top-0 z-40 px-8 py-2 border-b border-gray-100 flex gap-10 justify-center">
          {['Menu', 'Reviews'].map((tab) => (
-           <button key={tab} onClick={() => setActiveTab(tab as any)} className={`py-4 text-sm font-black uppercase tracking-widest relative transition-all ${activeTab === tab ? 'text-[#FF00CC]' : 'text-gray-300'}`}>
+           <button key={tab} onClick={() => setActiveTab(tab as any)} className={`py-4 text-sm font-black uppercase tracking-widest relative transition-all ${activeTab === tab ? 'text-[#6D28D9]' : 'text-gray-300'}`}>
              {tab}
              {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 ayoo-gradient rounded-full"></div>}
            </button>
@@ -257,7 +264,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                    activeCategory === cat ? 'bg-[#FF00CC] text-white' : 'bg-gray-100 text-gray-500'
+                    activeCategory === cat ? 'bg-[#6D28D9] text-white' : 'bg-gray-100 text-gray-500'
                   }`}
                 >
                   {cat}
@@ -271,7 +278,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                  <div className="space-y-6">
                     {items.map(item => (
                       <div key={item.id} className="flex gap-6 items-center">
-                        <img src={item.image} className="w-24 h-24 rounded-3xl object-cover shadow-md" alt={item.name} />
+                        <img src={item.image || PLACEHOLDER_ITEM} className="w-24 h-24 rounded-3xl object-cover shadow-md" alt={item.name} />
                         <div className="flex-1">
                           <h4 className="font-black text-lg text-gray-900 leading-none mb-1">{item.name}</h4>
                           <p className="text-[11px] text-gray-500 mb-1">{item.description}</p>
@@ -282,7 +289,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                               <span className="w-5 text-center text-xs font-black">{qtyDraft[item.id] || 1}</span>
                               <button onClick={() => setQtyDraft(prev => ({ ...prev, [item.id]: (prev[item.id] || 1) + 1 }))} className="w-6 h-6 rounded-lg bg-white text-xs font-black">+</button>
                             </div>
-                            <button onClick={() => handleAdd(item)} className="bg-gray-100 text-[#FF00CC] px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-pink-50 transition-colors">Add +</button>
+                            <button onClick={() => handleAdd(item)} className="bg-gray-100 text-[#6D28D9] px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-purple-50 transition-colors">Add +</button>
                           </div>
                         </div>
                       </div>
@@ -293,24 +300,49 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
           </div>
         ) : (
           <div className="space-y-4">
-            {localReviews.length === 0 ? (
+{localReviews.length === 0 ? (
               <div className="py-24 text-center">
                 <span className="text-5xl mb-4 inline-block">💬</span>
                 <p className="font-black text-gray-300 uppercase tracking-widest text-xs">No reviews yet</p>
               </div>
-            ) : localReviews.map((review) => (
-              <div key={review.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50">
-                <div className="flex items-center gap-3 mb-2">
-                  <img src={review.userAvatar} alt={review.userName} className="w-9 h-9 rounded-full object-cover" />
-                  <div className="flex-1">
-                    <p className="font-black text-sm">{review.userName}</p>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase">{review.date}</p>
+            ) : (
+              <>
+                {localReviews.map((review) => (
+                  <div key={review.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50 mb-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <img src={review.userAvatar || PLACEHOLDER_AVATAR} alt={review.userName} className="w-9 h-9 rounded-full object-cover" />
+                      <div className="flex-1">
+                        <p className="font-black text-sm">{review.userName}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">{review.date}</p>
+                      </div>
+                      <p className="text-xs font-black">⭐ {review.rating}/5</p>
+                    </div>
+                    <p className="text-sm text-gray-600">{review.comment}</p>
                   </div>
-                  <p className="text-xs font-black">⭐ {review.rating}/5</p>
+                ))}
+                {/* WRITE REVIEW FORM */}
+                <div className="grab-card p-6 mt-8">
+                  <h3 className="text-lg font-black text-gray-900 mb-4 uppercase tracking-tight">Your Review</h3>
+                  <div className="flex items-center gap-2 mb-4">
+                    {[1,2,3,4,5].map((star) => (
+                      <button key={star} className="text-2xl">⭐</button>
+                    ))}
+                  </div>
+                  <textarea 
+                    placeholder="What did you think about your experience?"
+                    className="w-full p-4 rounded-[24px] border border-gray-200 font-semibold focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200 resize-none h-24 mb-4"
+                  />
+                  <div className="flex gap-3">
+                    <button className="flex-1 btn-primary text-sm uppercase tracking-wider font-black py-3">
+                      Submit Review
+                    </button>
+                    <button className="px-6 py-3 rounded-[20px] border border-gray-200 font-black text-sm uppercase tracking-wider">
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600">{review.comment}</p>
-              </div>
-            ))}
+              </>
+            )}
           </div>
         )}
       </div>

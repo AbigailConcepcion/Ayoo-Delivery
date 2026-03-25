@@ -82,7 +82,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
       onTouchEnd={onTouchEnd}
     >
       <div className="w-full flex justify-end z-20">
-        <button onClick={onFinish} className="text-[#FF00CC] font-black text-lg px-2 pt-2 active:opacity-50 uppercase tracking-tighter">
+        <button onClick={onFinish} className="text-[#6D28D9] font-black text-lg px-2 pt-2 active:opacity-50 uppercase tracking-tighter">
           Skip
         </button>
       </div>
@@ -125,7 +125,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
             <div
               key={i}
               onClick={() => setStep(i)}
-              className={`h-4 w-4 rounded-full cursor-pointer transition-all duration-300 ${i === step ? 'bg-[#FF00CC] w-10' : 'bg-gray-200 hover:bg-gray-300'}`}
+              className={`h-4 w-4 rounded-full cursor-pointer transition-all duration-300 ${i === step ? 'bg-[#6D28D9] w-10' : 'bg-gray-200 hover:bg-gray-300'}`}
             />
           ))}
         </div>
@@ -138,7 +138,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
         </Button>
       </div>
 
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-pink-50 rounded-full blur-[120px] opacity-60 pointer-events-none"></div>
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-purple-50 rounded-full blur-[120px] opacity-60 pointer-events-none"></div>
     </div>
   );
 };

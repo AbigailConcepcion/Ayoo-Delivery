@@ -48,7 +48,7 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
     <div className="bg-gray-50 min-h-screen flex flex-col pb-32 overflow-y-auto scrollbar-hide">
       <div className="bg-white p-6 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="text-[#FF00CC] text-2xl font-black">←</button>
+          <button onClick={onBack} className="text-[#6D28D9] text-2xl font-black">←</button>
           <h2 className="text-xl font-black uppercase tracking-tight">Your Cart</h2>
         </div>
         {!isSquadMode && items.length > 0 && (
@@ -112,9 +112,9 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center bg-gray-50 rounded-2xl p-1">
-                       <button onClick={() => onUpdateQuantity(item!.id, -1)} className="w-8 h-8 rounded-xl flex items-center justify-center text-[#FF00CC] font-black">-</button>
+                       <button onClick={() => onUpdateQuantity(item!.id, -1)} className="w-8 h-8 rounded-xl flex items-center justify-center text-[#6D28D9] font-black">-</button>
                        <span className="w-6 text-center font-black text-sm text-gray-900">{item!.quantity}</span>
-                       <button onClick={() => onUpdateQuantity(item!.id, 1)} className="w-8 h-8 rounded-xl flex items-center justify-center text-[#FF00CC] font-black">+</button>
+                       <button onClick={() => onUpdateQuantity(item!.id, 1)} className="w-8 h-8 rounded-xl flex items-center justify-center text-[#6D28D9] font-black">+</button>
                     </div>
                     <span className="font-black text-gray-900 text-md min-w-[60px] text-right">₱{item!.price * item!.quantity}</span>
                   </div>
@@ -132,14 +132,14 @@ const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity
                 <span className="text-green-500">₱{deliveryFee}</span>
               </div>
               {appliedVoucher && (
-                <div className="flex justify-between text-[11px] font-black text-[#FF00CC] uppercase tracking-widest">
+                <div className="flex justify-between text-[11px] font-black text-[#6D28D9] uppercase tracking-widest">
                   <span>Voucher: {appliedVoucher.code}</span>
                   <span>- ₱{discountAmount}</span>
                 </div>
               )}
               <div className="pt-6 border-t border-gray-100 flex justify-between items-center">
                 <span className="font-black text-gray-900 text-2xl tracking-tighter uppercase leading-none">Total</span>
-                <span className="font-black text-4xl text-[#FF00CC] tracking-tighter">₱{Math.max(0, total)}</span>
+                <span className="font-black text-4xl text-[#6D28D9] tracking-tighter">₱{Math.max(0, total)}</span>
               </div>
             </div>
           </>

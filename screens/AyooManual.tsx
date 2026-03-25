@@ -65,12 +65,12 @@ const AyooManual: React.FC<AyooManualProps> = ({ role, onFinish }) => {
            <div className="w-24 h-24 ayoo-gradient rounded-[40px] flex items-center justify-center text-5xl mb-6 shadow-2xl mx-auto">
              {currentManual.icon}
            </div>
-           <h2 className="text-3xl font-black uppercase tracking-tighter text-[#FF00CC]">{currentManual.title}</h2>
+           <h2 className="text-3xl font-black uppercase tracking-tighter text-[#6D28D9]">{currentManual.title}</h2>
            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{currentManual.subtitle}</p>
         </div>
 
         <div className="w-full max-w-sm bg-[#161616] rounded-[50px] p-10 border border-white/5 shadow-2xl relative">
-           <div className="absolute top-0 right-10 -mt-4 bg-[#FF00CC] text-white px-4 py-1 rounded-full text-[8px] font-black uppercase">
+           <div className="absolute top-0 right-10 -mt-4 bg-[#6D28D9] text-white px-4 py-1 rounded-full text-[8px] font-black uppercase">
              Step {step + 1} / {currentManual.steps.length}
            </div>
            
@@ -81,7 +81,7 @@ const AyooManual: React.FC<AyooManualProps> = ({ role, onFinish }) => {
 
            <div className="flex gap-2 mt-10">
               {currentManual.steps.map((_, i) => (
-                <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i === step ? 'bg-[#FF00CC]' : 'bg-white/10'}`}></div>
+                <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i === step ? 'bg-[#6D28D9]' : 'bg-white/10'}`}></div>
               ))}
            </div>
         </div>

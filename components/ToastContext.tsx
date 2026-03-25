@@ -23,10 +23,12 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {message && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 w-[85%] z-[100] animate-in fade-in slide-in-from-top-4">
-          <div className="bg-white rounded-3xl p-4 shadow-xl border-2 border-[#FF00CC]/10 flex items-center gap-4">
-            <div className="w-10 h-10 ayoo-gradient rounded-xl flex items-center justify-center text-white">✓</div>
-            <p className="text-gray-900 font-bold text-sm truncate">{message}</p>
+        <div className="fixed top-24 left-1/2 z-[100] w-[85%] -translate-x-1/2 animate-in">
+          <div className="flex items-center gap-4 rounded-[28px] border border-purple-200 bg-white/95 p-4 shadow-[0_18px_45px_rgba(109,40,217,0.18)] backdrop-blur-md">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-700 via-purple-500 to-purple-300 text-white shadow-lg">
+              ✓
+            </div>
+            <p className="truncate text-sm font-bold text-purple-950">{message}</p>
           </div>
         </div>
       )}

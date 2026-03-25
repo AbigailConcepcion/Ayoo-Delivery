@@ -3,8 +3,8 @@
   "name": "Ayoo Super App",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FF1493",
-  "theme_color": "#FF1493",
+  "background_color": "#8B5CF6",
+  "theme_color": "#8B5CF6",
   "description": "Ayoo Super App - Food, Rides, Delivery & More",
   "icons": [
     {

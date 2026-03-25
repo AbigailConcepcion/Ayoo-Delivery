@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { ayooCloud, streamHub } from '../api';
 import { OrderRecord, FoodItem, Restaurant, AppScreen } from '../types';
 import { db } from '../db';
@@ -73,7 +73,7 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
     setEditingItem(newItem);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && editingItem) {
       const reader = new FileReader();
@@ -108,19 +108,21 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
         }
       }, 150);
       return () => clearInterval(interval);
-    } catch (err) { alert("Camera required."); }
+    } catch (err) { 
+      alert("Camera required.");
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white p-6 pb-32 overflow-y-auto scrollbar-hide">
-
+      {/* Modal for editing item */}
       {editingItem && (
         <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 animate-in zoom-in-95">
           <div className="bg-[#1A1A1A] w-full max-w-sm rounded-[50px] p-8 border border-white/10 shadow-2xl space-y-5">
-            <h3 className="text-xl font-black uppercase text-[#FF1493] text-center">Edit Menu Item</h3>
+<h3 className="text-xl font-black uppercase text-primaryDark text-center">Edit Menu Item</h3>
 
             <div className="flex flex-col items-center">
-              <div onClick={() => fileInputRef.current?.click()} className="w-36 h-36 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-[35px] p-1 relative cursor-pointer group mb-2 shadow-xl">
+              <div onClick={() => fileInputRef.current?.click()} className="w-36 h-36 bg-gradient-to-br from-primaryDark via-primary to-primaryLight rounded-[35px] p-1 relative cursor-pointer group mb-2 shadow-xl shadow-purple-500/25">
                 <img src={editingItem.image} className="w-full h-full rounded-[32px] object-cover" alt="Item Preview" />
                 <div className="absolute inset-0 bg-black/60 rounded-[32px] opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-all">
                   <span className="text-3xl mb-1">📸</span>
@@ -132,56 +134,113 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
             </div>
 
             <div className="space-y-3">
-              <input value={editingItem.name} onChange={e => setEditingItem({ ...editingItem, name: e.target.value })} className="w-full p-4 bg-black border border-white/10 rounded-2xl font-bold text-sm text-white" placeholder="Item Name" />
-              <input type="number" value={editingItem.price} onChange={e => setEditingItem({ ...editingItem, price: Number(e.target.value) })} className="w-full p-4 bg-black border border-white/10 rounded-2xl font-bold text-sm text-white" placeholder="Price (₱)" />
-              <textarea value={editingItem.description} onChange={e => setEditingItem({ ...editingItem, description: e.target.value })} className="w-full p-4 bg-black border border-white/10 rounded-2xl font-bold text-xs h-20 text-white" placeholder="Description" />
+              <input 
+                value={editingItem.name} 
+                onChange={e => setEditingItem({ ...editingItem, name: e.target.value })} 
+                className="w-full p-4 bg-black border border-white/10 rounded-2xl font-bold text-sm text-white" 
+                placeholder="Item Name" 
+              />
+              <input 
+                type="number" 
+                value={editingItem.price} 
+                onChange={e => setEditingItem({ ...editingItem, price: Number(e.target.value) })} 
+                className="w-full p-4 bg-black border border-white/10 rounded-2xl font-bold text-sm text-white" 
+                placeholder="Price (₱)" 
+              />
+              <textarea 
+                value={editingItem.description} 
+                onChange={e => setEditingItem({ ...editingItem, description: e.target.value })} 
+                className="w-full p-4 bg-black border border-white/10 rounded-2xl font-bold text-xs h-20 text-white" 
+                placeholder="Description" 
+              />
             </div>
 
-            <Button onClick={handleUpdateItem} className="bg-gradient-to-r from-[#FF1493] to-[#FF69B4]">Save Changes</Button>
-            <button onClick={() => setEditingItem(null)} className="w-full py-3 text-xs font-bold uppercase text-gray-400">Cancel</button>
+            <Button onClick={handleUpdateItem} className="bg-gradient-to-r from-primaryDark via-primary to-primaryLight">
+              Save Changes
+            </Button>
+            <button onClick={() => setEditingItem(null)} className="w-full py-3 text-xs font-bold uppercase text-gray-400">
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
-      {/* HEADER - GRAB STYLE MERCHANT */}
-      <div className="flex justify-between items-center mb-8">
+      {/* Header */}
+            <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-black uppercase tracking-tighter bg-gradient-to-r from-[#FF1493] to-[#FF69B4] bg-clip-text text-transparent">Ayoo Merchant</h2>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{restaurantName}</p>
+        <h2 className="bg-gradient-to-br bg-clip-text text-transparent text-2xl font-black uppercase tracking-tighter" style={{backgroundImage: 'linear-gradient(135deg, var(--primaryDark), var(--primary), var(--primaryLight))'}}>
+            Ayoo Merchant
+          </h2>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">
+            {restaurantName}
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="px-5 h-12 bg-white/10 rounded-2xl text-white border border-white/10 active:scale-90 transition-all font-bold text-sm">
+          <button 
+            onClick={onBack} 
+            className="px-5 h-12 bg-white/10 rounded-2xl text-white border border-white/10 active:scale-90 transition-all font-bold text-sm"
+          >
             ← Back
           </button>
-          <div className="w-14 h-14 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-2xl shadow-xl shadow-pink-900/30">🏪</div>
+          <div className="w-14 h-14 bg-gradient-to-br from-primaryDark via-primary to-primaryLight rounded-2xl flex items-center justify-center text-2xl shadow-xl shadow-purple-500/30">
+            🏪
+          </div>
         </div>
       </div>
 
-      {/* TABS - GRAB STYLE */}
+      {/* Tabs */}
       <div className="flex gap-1 mb-8 bg-white/10 p-1 rounded-[24px] border border-white/5">
-        {['orders', 'menu', 'wallet', 'live'].map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white shadow-lg' : 'text-gray-400 hover:text-gray-300'}`}>
+{['orders', 'menu', 'wallet', 'live'].map((tab) => (
+          <button 
+            key={tab} 
+            onClick={() => setActiveTab(tab as any)} 
+            className={`flex-1 py-3.5 rounded-[18px] text-[9px] font-black uppercase tracking-widest transition-all ${
+              activeTab === tab 
+                ? 'bg-gradient-to-r from-primaryDark via-primary to-primaryLight text-white shadow-lg shadow-purple-500/25' 
+                : 'text-gray-400 hover:text-gray-300'
+            }`} 
+          >
             {tab}
           </button>
         ))}
       </div>
 
+      {/* Content */}
       {activeTab === 'menu' ? (
         <div className="space-y-6 animate-in slide-in-from-right-5">
-          <Button onClick={handleAddItem} className="bg-white text-black py-5 font-black uppercase tracking-widest text-[10px]">Add New Menu Item +</Button>
+          <Button 
+            onClick={handleAddItem} 
+            className="bg-white text-black py-5 font-black uppercase tracking-widest text-[10px]"
+          >
+            Add New Menu Item +
+          </Button>
           <div className="grid grid-cols-1 gap-4">
-            {myRes?.items.map(item => (
-              <div key={item.id} className="bg-[#161616] p-6 rounded-[35px] border border-white/5 flex items-center justify-between group hover:border-[#FF00CC]/30 transition-all">
+            {myRes?.items.map((item: FoodItem, i: number) => (
+              <div key={item.id} className="bg-[#161616] p-6 rounded-[35px] border border-white/5 flex items-center justify-center group hover:border-primary/30 transition-all">
                 <div className="flex items-center gap-4">
-                  <img src={item.image} className="w-14 h-14 rounded-2xl object-cover border border-white/10" alt={item.name} />
+                  <img 
+                    src={item.image} 
+                    className="w-14 h-14 rounded-2xl object-cover border border-white/10" 
+                    alt={item.name} 
+                  />
                   <div>
                     <h4 className="font-black text-sm tracking-tight">{item.name}</h4>
-                    <p className="text-[10px] text-[#FF00CC] font-black uppercase">₱{item.price}</p>
+                    <p className="text-[10px] text-primaryDark font-black uppercase">₱{item.price}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setEditingItem(item)} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-[#FF00CC] transition-all">✎</button>
-                  <button onClick={() => handleDeleteItem(item.id)} className="w-10 h-10 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 transition-all">✕</button>
+                  <button 
+                    onClick={() => setEditingItem(item)} 
+                    className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-[#6D28D9] transition-all"
+                  >
+                    ✎
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteItem(item.id)} 
+                    className="w-10 h-10 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 transition-all"
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
             ))}
@@ -190,29 +249,49 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
       ) : activeTab === 'orders' ? (
         <div className="space-y-6">
           {orders.length === 0 ? (
-            <div className="py-24 text-center opacity-30 font-black uppercase text-xs tracking-widest">Awaiting fresh orders...</div>
+            <div className="py-24 text-center opacity-30 font-black uppercase text-xs tracking-widest">
+              Awaiting fresh orders...
+            </div>
           ) : (
-            orders.map(order => (
+              orders.map((order: OrderRecord, i: number) => (
               <div key={order.id} className="bg-[#161616] rounded-[40px] p-8 border border-white/5 animate-in slide-in-from-bottom-5">
                 <div className="flex justify-between mb-4">
-                  <h3 className="font-black text-xl leading-none uppercase tracking-tighter">{order.customerName}</h3>
-                  <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase ${order.status === 'DELIVERED' ? 'bg-green-500/10 text-green-500' : 'bg-[#FF00CC]/10 text-[#FF00CC]'}`}>{order.status}</span>
+                  <h3 className="font-black text-xl leading-none uppercase tracking-tighter">
+                    {order.customerName}
+                  </h3>
+                  <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase ${
+                    order.status === 'DELIVERED' 
+                      ? 'bg-green-500/10 text-green-500' 
+                      : 'bg-[#6D28D9]/10 text-[#6D28D9]'
+                  }`}>
+                    {order.status}
+                  </span>
                 </div>
                 <div className="flex gap-2 mt-6">
-                  <Button onClick={async () => {
-                    if ((db as any).ENV?.USE_REAL_BACKEND) {
-                      await db.updateOrderStatus(order.id, 'PREPARING');
-                    } else {
-                      ayooCloud.updateOrderStatus(order.id, 'PREPARING');
-                    }
-                  }} className="flex-1 py-3 bg-white/5 text-[9px] font-black tracking-widest uppercase">Prepare</Button>
-                  <Button onClick={async () => {
-                    if ((db as any).ENV?.USE_REAL_BACKEND) {
-                      await db.updateOrderStatus(order.id, 'READY_FOR_PICKUP');
-                    } else {
-                      ayooCloud.updateOrderStatus(order.id, 'READY_FOR_PICKUP');
-                    }
-                  }} className="flex-1 py-3 bg-[#FF00CC] text-[9px] font-black tracking-widest uppercase shadow-lg shadow-pink-900/20">Ready</Button>
+                  <Button 
+                    onClick={async () => {
+                      if ((db as any).ENV?.USE_REAL_BACKEND) {
+                        await db.updateOrderStatus(order.id, 'PREPARING');
+                      } else {
+                        ayooCloud.updateOrderStatus(order.id, 'PREPARING');
+                      }
+                    }} 
+                    className="flex-1 py-3 bg-white/5 text-[9px] font-black tracking-widest uppercase"
+                  >
+                    Prepare
+                  </Button>
+                  <Button 
+                    onClick={async () => {
+                      if ((db as any).ENV?.USE_REAL_BACKEND) {
+                        await db.updateOrderStatus(order.id, 'READY_FOR_PICKUP');
+                      } else {
+                        ayooCloud.updateOrderStatus(order.id, 'READY_FOR_PICKUP');
+                      }
+                    }} 
+                    className="flex-1 py-3 bg-[#6D28D9] text-[9px] font-black tracking-widest uppercase shadow-lg shadow-purple-900/20"
+                  >
+                    Ready
+                  </Button>
                 </div>
               </div>
             ))
@@ -227,13 +306,26 @@ const MerchantDashboard: React.FC<MerchantDashboardProps> = ({ restaurantName, o
                 Prep Cam
               </div>
             </div>
-            <video ref={videoRef} autoPlay playsInline muted className="w-full aspect-video bg-black rounded-3xl mb-8 border border-white/5" />
+            <video 
+              ref={videoRef} 
+              autoPlay 
+              playsInline 
+              muted 
+              className="w-full aspect-video bg-black rounded-3xl mb-8 border border-white/5" 
+            />
             <canvas ref={canvasRef} className="hidden" />
-            <Button onClick={startStreaming} className={isLive ? 'bg-red-500 font-black' : 'ayoo-gradient font-black'}>{isLive ? 'Stop Broadcast' : 'Go Live Now'}</Button>
+            <Button 
+              onClick={startStreaming} 
+              className={isLive ? 'bg-red-500 font-black' : 'ayoo-gradient font-black'}
+            >
+              {isLive ? 'Stop Broadcast' : 'Go Live Now'}
+            </Button>
           </div>
         </div>
       ) : (
-        <div className="py-20 text-center opacity-40 uppercase font-black text-xs tracking-[0.3em]">Vault Management Encrypted</div>
+        <div className="py-20 text-center opacity-40 uppercase font-black text-xs tracking-[0.3em]">
+          Vault Management Encrypted
+        </div>
       )}
 
       <BottomNav active="MERCHANT_DASHBOARD" onNavigate={onNavigate} mode="operations" showAdmin={isOwner} />

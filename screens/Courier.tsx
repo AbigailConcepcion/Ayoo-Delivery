@@ -265,7 +265,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
     <div className="min-h-screen bg-gray-50 flex flex-col pb-24 overflow-y-auto scrollbar-hide">
       <div className="bg-white p-6 border-b border-gray-100 sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-[#FF1493] text-2xl font-black">←</button>
+          <button onClick={onBack} className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-[#8B5CF6] text-2xl font-black">←</button>
           <div>
             <h2 className="text-xl font-black uppercase tracking-tight">Courier / Express</h2>
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Live route map with multi-drop pins</p>
@@ -282,7 +282,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
                 tripStatus === 'DELIVERED'
                   ? 'bg-green-50 text-green-600'
                   : routeProgress > 0
-                  ? 'bg-[#FF1493]/10 text-[#FF1493]'
+                  ? 'bg-[#8B5CF6]/10 text-[#8B5CF6]'
                   : 'bg-gray-100 text-gray-500'
               }`}
             >
@@ -299,7 +299,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
               <path d="M50 104 L64 0" stroke="#E2E8F0" strokeWidth="1.7" />
               <path d="M78 104 L94 0" stroke="#E2E8F0" strokeWidth="1.7" />
               <polyline points={fullRoutePoints} stroke="#FDA4AF" strokeWidth="3.4" strokeDasharray="6 4" fill="none" />
-              <polyline points={completedRoutePoints} stroke="#FF1493" strokeWidth="3.7" fill="none" />
+              <polyline points={completedRoutePoints} stroke="#8B5CF6" strokeWidth="3.7" fill="none" />
             </svg>
 
             {mapStops.map((stop) => (
@@ -312,7 +312,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
                   className={`w-8 h-8 rounded-full border-2 shadow flex items-center justify-center text-[11px] font-black ${
                     stop.kind === 'pickup'
                       ? 'bg-[#16A34A] border-white text-white'
-                      : 'bg-white border-pink-300 text-[#FF1493]'
+                      : 'bg-white border-purple-300 text-[#8B5CF6]'
                   }`}
                 >
                   {stop.kind === 'pickup' ? 'P' : stop.order}
@@ -322,7 +322,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
 
             {routeProgress > 0 && (
               <div className="absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-700" style={{ left: `${routeMarker.x}%`, top: `${routeMarker.y}%` }}>
-                <div className="w-10 h-10 rounded-2xl bg-[#FF1493] text-white flex items-center justify-center shadow-lg animate-bounce">🛵</div>
+                <div className="w-10 h-10 rounded-2xl bg-[#8B5CF6] text-white flex items-center justify-center shadow-lg animate-bounce">🛵</div>
               </div>
             )}
 
@@ -335,7 +335,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
           </div>
           <div className="mt-4 space-y-2">
             <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
-              <div className="h-full bg-[#FF1493] transition-all duration-500" style={{ width: `${routeProgress}%` }}></div>
+              <div className="h-full bg-[#8B5CF6] transition-all duration-500" style={{ width: `${routeProgress}%` }}></div>
             </div>
             <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
               <span>Distance basis: {distanceSource === 'coords' ? 'Coordinates' : distanceSource === 'place' ? 'Known places' : 'Fallback'}</span>
@@ -351,7 +351,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
                 <div
                   key={stage}
                   className={`rounded-xl px-2 py-2 text-center text-[8px] font-black uppercase tracking-widest ${
-                    timelineStep >= index + 1 ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-400'
+                    timelineStep >= index + 1 ? 'bg-[#8B5CF6] text-white' : 'bg-gray-100 text-gray-400'
                   }`}
                 >
                   {stage}
@@ -365,7 +365,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
           <div className="grid grid-cols-2 gap-3">
             <div className="input-label-border">
               <label>Pickup Place</label>
-              <select value={pickupPreset} onChange={(e) => setPickupPreset(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold appearance-none">
+              <select value={pickupPreset} onChange={(e) => setPickupPreset(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#8B5CF6] outline-none font-bold appearance-none">
                 {LOCATION_CHOICES.map((place) => (
                   <option key={place} value={place}>{place}</option>
                 ))}
@@ -373,7 +373,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
             </div>
             <div className="input-label-border">
               <label>Main Drop Place</label>
-              <select value={dropoffPreset} onChange={(e) => setDropoffPreset(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold appearance-none">
+              <select value={dropoffPreset} onChange={(e) => setDropoffPreset(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#8B5CF6] outline-none font-bold appearance-none">
                 {LOCATION_CHOICES.map((place) => (
                   <option key={place} value={place}>{place}</option>
                 ))}
@@ -383,22 +383,22 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
 
           <div className="input-label-border">
             <label>Pickup Address</label>
-            <input value={pickup} onChange={(e) => setPickup(e.target.value)} placeholder="e.g. Tibanga, Iligan City" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold" />
+            <input value={pickup} onChange={(e) => setPickup(e.target.value)} placeholder="e.g. Tibanga, Iligan City" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#8B5CF6] outline-none font-bold" />
           </div>
           <div className="input-label-border">
             <label>Dropoff Address</label>
-            <input value={dropoff} onChange={(e) => setDropoff(e.target.value)} placeholder="e.g. Pala-o, Iligan City" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold" />
+            <input value={dropoff} onChange={(e) => setDropoff(e.target.value)} placeholder="e.g. Pala-o, Iligan City" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#8B5CF6] outline-none font-bold" />
           </div>
 
-          <div className="bg-[#FFF6FB] border border-pink-100 rounded-2xl p-3 space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#FF1493]">Additional Drop Pins</p>
+          <div className="bg-[#FFF6FB] border border-purple-100 rounded-2xl p-3 space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#8B5CF6]">Additional Drop Pins</p>
             <div className="flex gap-2">
-              <select value={nextDropPin} onChange={(e) => setNextDropPin(e.target.value)} className="flex-1 p-3 bg-white rounded-xl border border-gray-100 focus:border-[#FF1493] outline-none text-xs font-bold appearance-none">
+              <select value={nextDropPin} onChange={(e) => setNextDropPin(e.target.value)} className="flex-1 p-3 bg-white rounded-xl border border-gray-100 focus:border-[#8B5CF6] outline-none text-xs font-bold appearance-none">
                 {LOCATION_CHOICES.map((place) => (
                   <option key={place} value={place}>{place}</option>
                 ))}
               </select>
-              <button onClick={addDropPin} className="px-4 rounded-xl bg-[#FF1493] text-white text-[10px] font-black uppercase tracking-widest">Add</button>
+              <button onClick={addDropPin} className="px-4 rounded-xl bg-[#8B5CF6] text-white text-[10px] font-black uppercase tracking-widest">Add</button>
             </div>
             {extraDropPins.length > 0 ? (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -406,7 +406,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
                   <button
                     key={pin}
                     onClick={() => removeDropPin(pin)}
-                    className="px-3 py-1.5 rounded-full bg-white border border-pink-200 text-[10px] font-black text-[#FF1493]"
+                    className="px-3 py-1.5 rounded-full bg-white border border-purple-200 text-[10px] font-black text-[#8B5CF6]"
                     title="Remove drop pin"
                   >
                     {pin} ✕
@@ -419,10 +419,10 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <input value={sender} onChange={(e) => setSender(e.target.value)} placeholder="Sender name" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold" />
-            <input value={receiver} onChange={(e) => setReceiver(e.target.value)} placeholder="Receiver name" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold" />
+            <input value={sender} onChange={(e) => setSender(e.target.value)} placeholder="Sender name" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#8B5CF6] outline-none font-bold" />
+            <input value={receiver} onChange={(e) => setReceiver(e.target.value)} placeholder="Receiver name" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#8B5CF6] outline-none font-bold" />
           </div>
-          <textarea value={dropoffNote} onChange={(e) => setDropoffNote(e.target.value)} placeholder="Drop-off note (landmark / gate / contact)" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#FF1493] outline-none font-bold min-h-[84px]"></textarea>
+          <textarea value={dropoffNote} onChange={(e) => setDropoffNote(e.target.value)} placeholder="Drop-off note (landmark / gate / contact)" className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 focus:border-[#8B5CF6] outline-none font-bold min-h-[84px]"></textarea>
         </div>
 
         <div className="bg-white rounded-[30px] border border-gray-100 p-5 space-y-4">
@@ -433,7 +433,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
                 key={kind}
                 onClick={() => setParcel(kind)}
                 className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                  parcel === kind ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-500'
+                  parcel === kind ? 'bg-[#8B5CF6] text-white' : 'bg-gray-100 text-gray-500'
                 }`}
               >
                 {kind}
@@ -444,7 +444,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
           {distanceSource === 'fallback' && (
             <>
               <p className="text-[10px] font-bold text-amber-600">Some places are custom. Adjust fallback distance:</p>
-              <input type="range" min={1} max={25} value={manualKm} onChange={(e) => setManualKm(Number(e.target.value))} className="w-full accent-[#FF1493]" />
+              <input type="range" min={1} max={25} value={manualKm} onChange={(e) => setManualKm(Number(e.target.value))} className="w-full accent-[#8B5CF6]" />
             </>
           )}
         </div>
@@ -457,7 +457,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
                 <button
                   key={option}
                   onClick={() => setSpeed(option)}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${speed === option ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-500'}`}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${speed === option ? 'bg-[#8B5CF6] text-white' : 'bg-gray-100 text-gray-500'}`}
                 >
                   {option}
                 </button>
@@ -466,21 +466,21 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
           </div>
           <label className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
             <span className="text-xs font-black text-gray-700">Fragile Item Handling</span>
-            <input type="checkbox" checked={fragile} onChange={(e) => setFragile(e.target.checked)} className="w-4 h-4 accent-[#FF1493]" />
+            <input type="checkbox" checked={fragile} onChange={(e) => setFragile(e.target.checked)} className="w-4 h-4 accent-[#8B5CF6]" />
           </label>
           <label className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
             <span className="text-xs font-black text-gray-700">Insurance Protection</span>
-            <input type="checkbox" checked={insurance} onChange={(e) => setInsurance(e.target.checked)} className="w-4 h-4 accent-[#FF1493]" />
+            <input type="checkbox" checked={insurance} onChange={(e) => setInsurance(e.target.checked)} className="w-4 h-4 accent-[#8B5CF6]" />
           </label>
         </div>
 
         <div className="bg-white rounded-[30px] border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">ETA</p>
-            <p className="text-sm font-black text-[#FF1493]">{eta}</p>
+            <p className="text-sm font-black text-[#8B5CF6]">{eta}</p>
           </div>
           {dropoffCode && (
-            <div className="mb-3 px-3 py-2 rounded-xl bg-[#FF1493]/10 text-[#FF1493] text-[10px] font-black uppercase tracking-widest text-center">
+            <div className="mb-3 px-3 py-2 rounded-xl bg-[#8B5CF6]/10 text-[#8B5CF6] text-[10px] font-black uppercase tracking-widest text-center">
               Drop-off Code: {dropoffCode}
             </div>
           )}
@@ -494,7 +494,7 @@ const Courier: React.FC<CourierProps> = ({ onBack, onNavigate }) => {
           </div>
           <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
             <span className="text-base font-black uppercase">Total</span>
-            <span className="text-2xl font-black text-[#FF1493]">₱{quote.total.toFixed(2)}</span>
+            <span className="text-2xl font-black text-[#8B5CF6]">₱{quote.total.toFixed(2)}</span>
           </div>
         </div>
       </div>

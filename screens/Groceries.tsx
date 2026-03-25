@@ -123,7 +123,7 @@ const Groceries: React.FC<GroceriesProps> = ({ onBack, onNavigate }) => {
 
       <div className="bg-white p-6 border-b border-gray-100 sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-[#FF1493] text-2xl font-black">←</button>
+          <button onClick={onBack} className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-[#8B5CF6] text-2xl font-black">←</button>
           <div>
             <h2 className="text-xl font-black uppercase tracking-tight">Groceries & Essentials</h2>
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Fresh stock near you</p>
@@ -138,7 +138,7 @@ const Groceries: React.FC<GroceriesProps> = ({ onBack, onNavigate }) => {
               key={store.id}
               onClick={() => setStoreId(store.id)}
               className={`min-w-[190px] rounded-2xl p-4 text-left border-2 ${
-                store.id === currentStore.id ? 'border-[#FF1493] bg-[#FF1493]/5' : 'border-gray-100 bg-white'
+                store.id === currentStore.id ? 'border-[#8B5CF6] bg-[#8B5CF6]/5' : 'border-gray-100 bg-white'
               }`}
             >
               <p className="font-black text-sm">{store.name}</p>
@@ -153,14 +153,14 @@ const Groceries: React.FC<GroceriesProps> = ({ onBack, onNavigate }) => {
               <div>
                 <p className="font-black text-sm text-gray-900">
                   {item.name}
-                  {item.popular && <span className="ml-2 text-[9px] uppercase tracking-widest text-[#FF1493]">popular</span>}
+                  {item.popular && <span className="ml-2 text-[9px] uppercase tracking-widest text-[#8B5CF6]">popular</span>}
                 </p>
                 <p className="text-[11px] font-bold text-gray-500">₱{item.price} {item.unit}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => changeQty(item.id, -1)} className="w-8 h-8 rounded-full bg-gray-100 font-black">-</button>
                 <span className="w-5 text-center font-black text-sm">{basket[item.id] || 0}</span>
-                <button onClick={() => changeQty(item.id, 1)} className="w-8 h-8 rounded-full bg-pink-100 text-[#FF1493] font-black">+</button>
+                <button onClick={() => changeQty(item.id, 1)} className="w-8 h-8 rounded-full bg-purple-100 text-[#8B5CF6] font-black">+</button>
               </div>
             </div>
           ))}
@@ -172,13 +172,13 @@ const Groceries: React.FC<GroceriesProps> = ({ onBack, onNavigate }) => {
             <div className="flex gap-2">
               <button
                 onClick={() => setScheduleMode('NOW')}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${scheduleMode === 'NOW' ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-500'}`}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${scheduleMode === 'NOW' ? 'bg-[#8B5CF6] text-white' : 'bg-gray-100 text-gray-500'}`}
               >
                 Now
               </button>
               <button
                 onClick={() => setScheduleMode('LATER')}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${scheduleMode === 'LATER' ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-500'}`}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${scheduleMode === 'LATER' ? 'bg-[#8B5CF6] text-white' : 'bg-gray-100 text-gray-500'}`}
               >
                 Later
               </button>
@@ -186,12 +186,12 @@ const Groceries: React.FC<GroceriesProps> = ({ onBack, onNavigate }) => {
           </div>
           <label className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
             <span className="text-xs font-black text-gray-700">Eco Pack (less plastic)</span>
-            <input type="checkbox" checked={ecoPack} onChange={(e) => setEcoPack(e.target.checked)} className="w-4 h-4 accent-[#FF1493]" />
+            <input type="checkbox" checked={ecoPack} onChange={(e) => setEcoPack(e.target.checked)} className="w-4 h-4 accent-[#8B5CF6]" />
           </label>
           {scheduleMode === 'LATER' && (
             <input
               type="datetime-local"
-              className="w-full p-3 rounded-xl border border-gray-100 bg-gray-50 outline-none focus:border-[#FF1493]"
+              className="w-full p-3 rounded-xl border border-gray-100 bg-gray-50 outline-none focus:border-[#8B5CF6]"
             />
           )}
         </div>
@@ -202,7 +202,7 @@ const Groceries: React.FC<GroceriesProps> = ({ onBack, onNavigate }) => {
           <div className="flex justify-between text-xs font-black text-gray-500"><span>Platform Fee</span><span>₱{platformFee.toFixed(2)}</span></div>
           <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
             <span className="text-lg font-black uppercase">Total</span>
-            <span className="text-2xl font-black text-[#FF1493]">₱{total.toFixed(2)}</span>
+            <span className="text-2xl font-black text-[#8B5CF6]">₱{total.toFixed(2)}</span>
           </div>
         </div>
       </div>

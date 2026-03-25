@@ -218,7 +218,7 @@ const AIChat: React.FC<AIChatProps> = ({
             mealCategoryScore(b.category) - mealCategoryScore(a.category)
             || a.price - b.price
             || Number(Boolean(b.isPopular)) - Number(Boolean(a.isPopular))
-            || Number(b.rating || 0) - Number(a.rating || 0)
+            || Number((b as any).restaurantRating || 0) - Number((a as any).restaurantRating || 0)
           )
           .slice(0, 4);
 
@@ -228,7 +228,7 @@ const AIChat: React.FC<AIChatProps> = ({
           .sort((a, b) =>
             Number(Boolean(b.isPopular)) - Number(Boolean(a.isPopular))
             || mealCategoryScore(b.category) - mealCategoryScore(a.category)
-            || Number(b.rating || 0) - Number(a.rating || 0)
+            || Number((b as any).restaurantRating || 0) - Number((a as any).restaurantRating || 0)
             || a.price - b.price
           )
           .slice(0, limit);
@@ -287,7 +287,7 @@ const AIChat: React.FC<AIChatProps> = ({
       }
 
       if (/(best restaurant|top restaurant|highest rated|top rated|pinakamaganda|pinakamasarap)/.test(lower) && restaurants.length > 0) {
-        const bestRestaurant = [...restaurants].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0))[0];
+        const bestRestaurant = [...restaurants].sort((a, b) => Number((b as any).restaurantRating || 0) - Number((a as any).restaurantRating || 0))[0];
         sendLocalReply(`Top-rated ngayon: ${bestRestaurant.name} (⭐ ${bestRestaurant.rating}).`);
         setLoading(false);
         return;
@@ -361,12 +361,12 @@ const AIChat: React.FC<AIChatProps> = ({
           ? [...budgetPool].sort((a, b) =>
             a.price - b.price
             || Number(Boolean(b.isPopular)) - Number(Boolean(a.isPopular))
-            || Number(b.rating || 0) - Number(a.rating || 0)
+            || Number((b as any).restaurantRating || 0) - Number((a as any).restaurantRating || 0)
           )
           : [...budgetPool].sort((a, b) =>
             Number(Boolean(b.isPopular)) - Number(Boolean(a.isPopular))
             || mealCategoryScore(b.category) - mealCategoryScore(a.category)
-            || Number(b.rating || 0) - Number(a.rating || 0)
+            || Number((b as any).restaurantRating || 0) - Number((a as any).restaurantRating || 0)
             || a.price - b.price
           );
 
@@ -466,14 +466,14 @@ const AIChat: React.FC<AIChatProps> = ({
       console.error("AI Error:", err);
       
       const allItems = restaurants.flatMap((restaurant) =>
-        restaurant.items.map((item) => ({ ...item, restaurantName: restaurant.name }))
+        restaurant.items.map((item) => ({ ...item, restaurantName: restaurant.name, restaurantRating: restaurant.rating }))
       );
       const safePool = allItems.filter((item) => !isAddonLike(item.name, item.category));
       const picks = [...(safePool.length > 0 ? safePool : allItems)]
         .sort((a, b) =>
           Number(Boolean(b.isPopular)) - Number(Boolean(a.isPopular))
           || mealCategoryScore(b.category) - mealCategoryScore(a.category)
-          || Number(b.rating || 0) - Number(a.rating || 0)
+          || Number((b as any).restaurantRating || 0) - Number((a as any).restaurantRating || 0)
           || a.price - b.price
         )
         .slice(0, 3);
@@ -508,7 +508,8 @@ const AIChat: React.FC<AIChatProps> = ({
       {isOpen && (
         <div className="fixed inset-x-6 bottom-40 bg-white rounded-[30px] shadow-2xl z-[100] border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300 max-h-[450px]">
           {/* Header */}
-          <div className="p-5 text-white flex items-center justify-between" style={{ backgroundColor: COLORS.primary }}>
+            <div className="p-5 bg-gradient-to-r from-primaryDark via-primary to-primaryLight flex items-center justify-between">
+
             <div className="flex items-center gap-3">
                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-lg">✨</div>
                <div>
@@ -524,22 +525,22 @@ const AIChat: React.FC<AIChatProps> = ({
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div 
-                  className={`max-w-[85%] p-4 rounded-[20px] text-xs font-bold shadow-sm ${
+              className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-sm ${
                     m.role === 'user' 
-                      ? 'text-white rounded-tr-none' 
-                      : 'bg-white text-gray-700 rounded-tl-none border border-gray-100'
+                      ? 'bg-purple-600 text-white rounded-tr-none font-medium' 
+                      : 'bg-white text-gray-800 rounded-tl-none border border-gray-100 font-medium'
                   }`}
-                  style={m.role === 'user' ? { backgroundColor: COLORS.primary } : {}}
                 >
+
                   {m.text}
                 </div>
               </div>
             ))}
             {loading && (
               <div className="flex gap-1 items-center ml-1">
-                <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce"></div>
-                <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0.4s]"></div>
               </div>
             )}
           </div>
@@ -554,11 +555,11 @@ const AIChat: React.FC<AIChatProps> = ({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
             />
-            <button 
+              <button 
               onClick={sendMessage} 
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md active:scale-95 transition-all"
-              style={{ backgroundColor: COLORS.primary }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md active:scale-95 transition-all bg-primary"
             >
+
               <span className="text-white text-sm">🚀</span>
             </button>
           </div>

@@ -88,7 +88,7 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
     return (
       <form onSubmit={handleSubmit} className="space-y-6">
         <CardElement options={{ style: { base: { fontSize: '16px' } } }} />
-        <button type="submit" disabled={!stripe || processing} className="pill-shadow py-6 font-black uppercase w-full px-6 rounded-2xl bg-[#FF00CC] text-white hover:shadow-lg transition-all active:scale-95">
+        <button type="submit" disabled={!stripe || processing} className="pill-shadow py-6 font-black uppercase w-full px-6 rounded-2xl bg-[#6D28D9] text-white hover:shadow-lg transition-all active:scale-95">
           Secure Card
         </button>
       </form>
@@ -198,10 +198,10 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
         )}
 
         {showForm && (
-          <div className="bg-white p-10 rounded-[50px] shadow-2xl border-2 border-[#FF00CC]/10 animate-in zoom-in-95">
+          <div className="bg-white p-10 rounded-[50px] shadow-2xl border-2 border-[#6D28D9]/10 animate-in zoom-in-95">
             <div className="flex gap-2 mb-8 bg-gray-50 p-1 rounded-2xl">
-              <button onClick={() => setActiveTab('CARD')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'CARD' ? 'bg-[#FF00CC] text-white shadow-lg' : 'text-gray-400'}`}>Card</button>
-              <button onClick={() => setActiveTab('EWALLET')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'EWALLET' ? 'bg-[#FF00CC] text-white shadow-lg' : 'text-gray-400'}`}>E-Wallet</button>
+              <button onClick={() => setActiveTab('CARD')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'CARD' ? 'bg-[#6D28D9] text-white shadow-lg' : 'text-gray-400'}`}>Card</button>
+              <button onClick={() => setActiveTab('EWALLET')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'EWALLET' ? 'bg-[#6D28D9] text-white shadow-lg' : 'text-gray-400'}`}>E-Wallet</button>
             </div>
 
             {activeTab === 'CARD' ? (
@@ -213,15 +213,15 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
                 <div className="space-y-6">
                   <div className="input-label-border">
                     <label>Card Number</label>
-                    <input type="text" maxLength={16} value={cardNumber} onChange={e => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm tracking-widest" />
+                    <input type="text" maxLength={16} value={cardNumber} onChange={e => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#6D28D9] outline-none font-black text-sm tracking-widest" />
                   </div>
                   <div className="input-label-border">
                     <label>Expiry Date</label>
-                    <input type="text" placeholder="MM/YY" value={expiry} onChange={e => setExpiry(e.target.value)} className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm" />
+                    <input type="text" placeholder="MM/YY" value={expiry} onChange={e => setExpiry(e.target.value)} className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#6D28D9] outline-none font-black text-sm" />
                   </div>
                   <div className="input-label-border">
                     <label>Stripe Token (for testing)</label>
-                    <input type="text" placeholder="tok_visa" value={cardToken} onChange={e => setCardToken(e.target.value)} className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm" />
+                    <input type="text" placeholder="tok_visa" value={cardToken} onChange={e => setCardToken(e.target.value)} className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#6D28D9] outline-none font-black text-sm" />
                   </div>
                   <Button onClick={() => handleAddCard({ token: cardToken })} disabled={isLoading} className="pill-shadow py-6 font-black uppercase">Secure Card</Button>
                 </div>
@@ -240,7 +240,7 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
                     </div>
                     <div className="input-label-border">
                       <label>Registered Phone</label>
-                      <input type="text" maxLength={11} value={phone} onChange={e => setPhone(e.target.value)} placeholder="09XX XXX XXXX" className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm tracking-widest" />
+                      <input type="text" maxLength={11} value={phone} onChange={e => setPhone(e.target.value)} placeholder="09XX XXX XXXX" className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#6D28D9] outline-none font-black text-sm tracking-widest" />
                     </div>
                     <Button onClick={startWalletLink} className="pill-shadow py-6 font-black uppercase bg-black">Request OTP</Button>
                   </>
@@ -250,8 +250,8 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
                       <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Verify it's you</p>
                       <p className="text-xs font-bold text-gray-600">Enter the 4-digit code sent to your phone</p>
                     </div>
-                    <input type="text" maxLength={4} value={otp} onChange={e => setOtp(e.target.value)} placeholder="0 0 0 0" className="w-full p-5 bg-gray-100 border-2 border-[#FF00CC] rounded-3xl text-center font-black text-2xl tracking-[0.5em] outline-none mb-6" autoFocus />
-                    <Button onClick={finalizeWalletLink} className="py-6 font-black uppercase bg-[#FF00CC]">Verify & Link</Button>
+                    <input type="text" maxLength={4} value={otp} onChange={e => setOtp(e.target.value)} placeholder="0 0 0 0" className="w-full p-5 bg-gray-100 border-2 border-[#6D28D9] rounded-3xl text-center font-black text-2xl tracking-[0.5em] outline-none mb-6" autoFocus />
+                    <Button onClick={finalizeWalletLink} className="py-6 font-black uppercase bg-[#6D28D9]">Verify & Link</Button>
                     <button onClick={() => setOtpMode(false)} className="w-full mt-4 text-[9px] font-black uppercase text-gray-400">Back</button>
                   </div>
                 )}

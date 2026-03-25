@@ -3,21 +3,23 @@ import { AppScreen, Restaurant, OrderRecord, Voucher, UserAccount, UserRole } fr
 import Onboarding from './screens/Onboarding';
 import Auth from './screens/Auth';
 import NavBar from './components/NavBar';
+import BottomNav from './components/BottomNav';
 import Logo from './components/Logo';
 import Button from './components/Button';
 import { db } from './db';
 import { ayooCloud } from './api';
 import { COLORS } from './constants';
 import { calculateCheckoutBreakdown } from './src/utils/pricing';
-import { ToastProvider, useToast } from './components/ToastContext';
+import { useToast } from './components/ToastContext';
+import './theme.css';
 
 const OWNER_EMAIL = 'ayoo.admin@gmail.com';
 
 const ScreenFallback: React.FC = () => (
-  <div className="h-screen bg-gradient-to-br from-[#FF1493] via-[#FF69B4] to-[#FF1493] flex items-center justify-center px-6">
+  <div className="h-screen bg-[radial-gradient(circle_at_top,_rgba(214,188,250,0.95),_rgba(139,92,246,0.82)_45%,_rgba(109,40,217,0.88)_100%)] flex items-center justify-center px-6">
     <div className="text-center">
       <Logo size="xl" variant="white" withSubtext={false} showWordmark={false} />
-      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/80 mt-6">Loading experience</p>
+      <p className="text-xs font-medium text-white/80 mt-6 tracking-wide animate-pulse">Loading...</p>
     </div>
   </div>
 );
@@ -31,7 +33,7 @@ const Rides = lazy(() => import('./screens/Rides'));
 const Search = lazy(() => import('./screens/Search'));
 const RestaurantDetail = lazy(() => import('./screens/RestaurantDetail'));
 const Cart = lazy(() => import('./screens/Cart'));
-const OrderTracking = lazy(() => import('./screens/OrderTracking'));
+const OrderTracking = lazy(() => import('./screens/RealtimeOrderTracking'));
 const Vouchers = lazy(() => import('./screens/Vouchers'));
 const History = lazy(() => import('./screens/History'));
 const Profile = lazy(() => import('./screens/Profile'));
@@ -46,6 +48,7 @@ const Messages = lazy(() => import('./screens/Messages'));
 const DineOut = lazy(() => import('./screens/DineOut'));
 const Pharmacy = lazy(() => import('./screens/Pharmacy'));
 const AIChat = lazy(() => import('./components/AIChat'));
+const Community = lazy(() => import('./screens/Community'));
 
 const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(true);
@@ -61,6 +64,7 @@ const App: React.FC = () => {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [deliveryFee, setDeliveryFee] = useState(45);
+  const [cartTip, setCartTip] = useState(0);
 
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
   const [isGroupOrder, setIsGroupOrder] = useState(false);
@@ -115,12 +119,14 @@ const App: React.FC = () => {
       try {
         try {
           await db.connect();
+          // Fix: Clear corrupted merchants cache, force load full MOCK_RESTAURANTS (fixes Jollibee-only issue)
+          localStorage.removeItem('ayoo_merchants_registry_v2');
           const [session, resList, config] = await Promise.all([
             db.getSession(),
             db.getRestaurants(),
             db.getSystemConfig()
           ]);
-
+          console.log(`✅ Loaded ${resList.length} restaurants (Jollibee fix)`);
           setRestaurants(resList);
           setDeliveryFee(config.deliveryFee);
 
@@ -222,6 +228,7 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setCartItems([]);
     setAppliedVoucher(null);
+    setCartTip(0);
     setHistory([]);
     setScreen('AUTH');
   };
@@ -256,7 +263,7 @@ const App: React.FC = () => {
 
     const subtotal = orderDetails.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
     const pricing = calculateCheckoutBreakdown(subtotal, deliveryFee, appliedVoucher);
-    const finalTotal = pricing.total;
+    const finalTotal = pricing.total + cartTip;
 
     const newOrder: OrderRecord = {
       id: paymentMeta.orderId || `AYO-${Math.floor(Math.random() * 90000) + 10000}`,
@@ -268,6 +275,7 @@ const App: React.FC = () => {
       customerEmail: currentUser.email,
       customerName: currentUser.name,
       pointsEarned: Math.floor(pricing.subtotal / 10),
+      tipAmount: cartTip,
       deliveryAddress: deliveryAddress || `Tibanga, ${deliveryCity}`,
       paymentMethod: paymentMethod?.type || 'COD',
       isPaid: isPaid ? 1 : 0,
@@ -291,6 +299,7 @@ const App: React.FC = () => {
       setLastOrder([...cartItems]);
       setCartItems([]);
       setAppliedVoucher(null);
+      setCartTip(0);
 
       const freshHistory = await db.getHistory(currentUser.email);
       setHistory(freshHistory);
@@ -308,6 +317,7 @@ const App: React.FC = () => {
       setLastOrder([...cartItems]);
       setCartItems([]);
       setAppliedVoucher(null);
+      setCartTip(0);
 
       const freshHistory = await db.getHistory(currentUser.email);
       setHistory(freshHistory);
@@ -319,7 +329,7 @@ const App: React.FC = () => {
 
   const renderScreen = () => {
     if (syncError) return (
-      <div className="h-screen bg-white flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
+      <div className="min-h-screen bg-transparent flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
         <div className="w-24 h-24 rounded-[40px] flex items-center justify-center text-5xl mb-10 shadow-lg animate-bounce" style={{ backgroundColor: COLORS.primaryBg }}>📵</div>
         <h2 className="text-3xl font-black uppercase tracking-tighter mb-4" style={{ color: COLORS.black }}>Connection Issue</h2>
         <p className="text-gray-500 font-medium text-sm mb-12 leading-relaxed px-4">We're having trouble reaching our servers. Please check your internet connection and try again.</p>
@@ -348,7 +358,7 @@ const App: React.FC = () => {
       case 'ONBOARDING': return <Onboarding onFinish={async () => { await db.setOnboardingSeen(true); setScreen('AUTH'); }} />;
       case 'AUTH': return <Auth onLogin={handleLogin} />;
       case 'MANUAL': return <AyooManual role={activeRole} onFinish={handleManualFinish} />;
-      case 'SERVICES': return activeRole === 'CUSTOMER' ? customerHomeScreen : <Services user={currentUser} deliveryCity={deliveryCity} onNavigate={handleNavigate} />;
+case 'SERVICES': return <Services user={currentUser} deliveryCity={deliveryCity} onNavigate={handleNavigate} />;
       case 'HOME': return customerHomeScreen;
       case 'SEARCH':
         return (
@@ -370,7 +380,7 @@ const App: React.FC = () => {
       case 'DINE_OUT': return <DineOut onBack={() => setScreen('HOME')} onNavigate={handleNavigate} />;
       case 'PHARMACY': return <Pharmacy onBack={() => setScreen('HOME')} onNavigate={handleNavigate} />;
       case 'RESTAURANT': return selectedRestaurant ? <RestaurantDetail restaurant={selectedRestaurant} onBack={() => setScreen('HOME')} onAddToCart={addToCart} onOpenCart={() => setScreen('CART')} cartCount={cartItems.length} /> : null;
-      case 'CART': return <Cart items={cartItems} restaurants={restaurants} onBack={() => setScreen('HOME')} onCheckout={handleCheckout} onNavigateToTracking={() => setScreen('TRACKING')} isGroup={isGroupOrder} onStartGroup={() => setIsGroupOrder(true)} appliedVoucher={appliedVoucher} onUpdateQuantity={updateQuantity} customDeliveryFee={deliveryFee} />;
+      case 'CART': return <Cart items={cartItems} restaurants={restaurants} email={currentUser?.email || ''} currentAddress={deliveryAddress} onBack={() => setScreen('HOME')} onCheckout={handleCheckout} onNavigateToTracking={() => setScreen('TRACKING')} isGroup={isGroupOrder} onStartGroup={() => setIsGroupOrder(true)} appliedVoucher={appliedVoucher} onApplyVoucher={setAppliedVoucher} onUpdateQuantity={updateQuantity} customDeliveryFee={deliveryFee} tipAmount={cartTip} onTipChange={setCartTip} onSelectAddress={(addr) => { setDeliveryCity(addr.city); setDeliveryAddress(addr.details); if (typeof addr.deliveryFee === 'number' && !Number.isNaN(addr.deliveryFee)) setDeliveryFee(addr.deliveryFee); }} />;
       case 'TRACKING': return <OrderTracking onBack={() => setScreen('HOME')} onNavigate={handleNavigate} orderItems={lastOrder} restaurant={selectedRestaurant} deliveryCity={deliveryCity} customerEmail={currentUser?.email || ''} currentUser={currentUser} onOpenMessages={(convoId) => { setScreen('MESSAGES'); }} />;
       case 'VOUCHERS': return <Vouchers onBack={() => setScreen('HOME')} onApply={(v) => { setAppliedVoucher(v); setScreen('CART'); }} onNavigate={handleNavigate} />;
       case 'HISTORY': return <History onBack={() => setScreen('HOME')} orders={history} onNavigate={handleNavigate} />;
@@ -382,6 +392,7 @@ const App: React.FC = () => {
       }} />;
       case 'PAYMENTS': return <PaymentsScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} />;
       case 'PABILI': return <PabiliScreen onBack={() => setScreen('HOME')} email={currentUser?.email || ''} />;
+      case 'COMMUNITY': return <Community onBack={() => setScreen('HOME')} onNavigate={handleNavigate} currentUser={currentUser} />;
       case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name || 'Ayoo Merchant'} onBack={() => setScreen('SERVICES')} onNavigate={handleNavigate} isOwner={isOwner} />;
       case 'RIDER_DASHBOARD': return <RiderDashboard onBack={() => setScreen('SERVICES')} onNavigate={handleNavigate} isOwner={isOwner} />;
       case 'ADMIN_PANEL':
@@ -393,19 +404,30 @@ const App: React.FC = () => {
   };
 
   const hideTopNavOnScreens: AppScreen[] = ['SERVICES', 'HOME', 'GROCERIES', 'COURIER', 'RIDES', 'DINE_OUT', 'PHARMACY', 'TRACKING', 'VOUCHERS', 'HISTORY', 'PROFILE', 'PABILI', 'MERCHANT_DASHBOARD', 'RIDER_DASHBOARD', 'ADMIN_PANEL', 'MESSAGES'];
-  const shouldShowTopNav = currentUser && screen !== 'AUTH' && screen !== 'ONBOARDING' && screen !== 'MANUAL' && !hideTopNavOnScreens.includes(screen);
+  const shouldShowTopNav = false;
+
+  const screensWithBottomNav: AppScreen[] = [
+    'HOME',
+    'MESSAGES',
+    'VOUCHERS',
+    'HISTORY',
+    'PROFILE',
+    'MERCHANT_DASHBOARD',
+    'RIDER_DASHBOARD',
+    'ADMIN_PANEL',
+  ];
+  const shouldShowBottomNav = currentUser && screensWithBottomNav.includes(screen);
 
   return (
-    <ToastProvider>
-      <div className="max-w-md mx-auto min-h-screen relative shadow-2xl bg-gray-50 overflow-x-hidden overflow-y-auto scrollbar-hide">
-        {isConnecting ? (
-          <div className="max-w-md mx-auto h-screen bg-gradient-to-b from-[#FF1493] via-[#FF69B4] to-[#FF1493] flex flex-col items-center justify-center p-8">
+      <div className="app-shell max-w-[430px] mx-auto min-h-screen relative overflow-x-hidden overflow-y-auto scrollbar-hide lg:my-8 lg:rounded-[40px] lg:shadow-2xl lg:border-[8px] lg:border-gray-900 bg-gray-50">
+{isConnecting ? (
+          <div className="max-w-[430px] mx-auto h-screen bg-[radial-gradient(circle_at_top,_rgba(214,188,250,0.98),_rgba(139,92,246,0.88)_44%,_rgba(109,40,217,0.92)_100%)] flex flex-col items-center justify-center p-8">
             {/* AYOO LOGO - Full screen dramatic entrance with actual logo */}
             <div className="relative mb-12">
               <div className="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
-              <div className="w-72 h-72 rounded-[60px] bg-white flex items-center justify-center shadow-[0_20px_60px_rgba(0,0,0,0.3)] animate-[bounce_2s_infinite] overflow-hidden">
+              <div className="w-48 h-48 rounded-[40px] bg-white/95 flex items-center justify-center shadow-2xl animate-pulse overflow-hidden">
                 <img
-                  src="https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844276236_36e2add8.jpg"
+                  src="/logo.png"
                   alt="Ayoo Logo"
                   className="w-full h-full object-cover"
                 />
@@ -413,22 +435,30 @@ const App: React.FC = () => {
             </div>
 
             {/* Brand Name */}
-            <h1 className="text-7xl font-black text-white tracking-tighter mb-2 drop-shadow-lg">AYOO</h1>
-            <p className="text-white/80 text-sm font-bold uppercase tracking-[0.4em] mb-16">Super App</p>
+            <h1 className="text-5xl font-bold text-white tracking-tight mb-2 drop-shadow-lg">AYOO</h1>
+            <p className="text-white/90 text-sm font-medium tracking-[0.2em] mb-16">Super App</p>
 
-            <div className="w-64 h-2 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
+            <div className="w-64 h-2 bg-white/25 rounded-full overflow-hidden backdrop-blur-sm">
               <div className="h-full bg-white rounded-full animate-progress shadow-lg" style={{ width: '70%' }}></div>
             </div>
-            <p className="mt-8 text-sm font-bold uppercase tracking-[0.2em] text-white/90 animate-pulse text-center">Setting up your experience...</p>
+            <p className="mt-8 text-xs font-medium tracking-wide text-white/80 animate-pulse text-center">Initializing...</p>
           </div>
         ) : (
           <>
-            {shouldShowTopNav && (
-              <NavBar user={currentUser} onNavigate={handleNavigate} onLogout={handleLogout} isOwner={isOwner} />
-            )}
+            {/* Top NavBar removed per request - BottomNav handles navigation */}
             <Suspense fallback={<ScreenFallback />}>
               {renderScreen()}
             </Suspense>
+            {shouldShowBottomNav && (
+              <BottomNav
+                active={screen}
+                onNavigate={handleNavigate}
+                cartCount={cartItems.length}
+                mode={activeRole === 'CUSTOMER' ? 'customer' : 'operations'}
+                showAdmin={isOwner}
+              />
+
+            )}
             {screen !== 'ONBOARDING' && (
               <Suspense fallback={null}>
                 <AIChat
@@ -451,9 +481,7 @@ const App: React.FC = () => {
           </>
         )}
       </div>
-    </ToastProvider>
   );
 };
 
 export default App;
-

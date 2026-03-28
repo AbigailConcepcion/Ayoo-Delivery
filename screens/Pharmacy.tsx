@@ -142,12 +142,12 @@ const MEDICINES = [
     },
 ];
 
-// Pharmacies list
+// Pharmacies list - Fixed syntax
 const PHARMACIES = [
-    { id: '1', name: 'Mercury Drug Iligan', distance: '0.5 km', rating: 4.5, open24h: true },
-    { id: '2', name: 'Watson\'s Iligan', distance: '0.8 km', rating: 4.6, open24h: false },
-    { id: '3', name: 'The Generics Pharmacy', distance: '1.2 km', rating: 4.3, open24h: true },
-    { id: '4', name: 'Southstar Drug', distance: '1.5 km', rating: 4.4, open24h: false },
+    { id: '1', name: "Mercury Drug Iligan", distance: '0.5 km', rating: 4.5, open24h: true },
+    { id: '2', name: "Watson's Iligan", distance: '0.8 km', rating: 4.6, open24h: false },
+    { id: '3', name: "The Generics Pharmacy", distance: '1.2 km', rating: 4.3, open24h: true },
+    { id: '4', name: "Southstar Drug", distance: '1.5 km', rating: 4.4, open24h: false },
 ];
 
 const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
@@ -207,7 +207,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
     if (showPrescriptionModal && selectedMedicine) {
         return (
             <div className="flex flex-col h-screen bg-gray-50">
-                <div className="bg-gradient-to-r from-[#F44336] to-[#FF9800] p-6 pb-20 rounded-b-[40px]">
+                <div className="bg-gradient-to-r from-[#C084FC] to-[#A855F7] p-6 pb-20 rounded-b-[40px]">
                     <div className="flex items-center gap-3">
                         <button onClick={() => setShowPrescriptionModal(false)} className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black">
                             ←
@@ -219,7 +219,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                 <div className="p-4 -mt-12">
                     <div className="bg-white rounded-2xl p-6 shadow-lg">
                         <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">💊</div>
+                            <div className="w-16 h-16 bg-[#E9D5FF] rounded-full flex items-center justify-center text-4xl mx-auto mb-4">💊</div>
                             <h3 className="font-black text-xl text-gray-900">{selectedMedicine.name}</h3>
                             <p className="text-gray-500 text-sm mt-1">This item requires a prescription</p>
                         </div>
@@ -239,7 +239,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                                     setShowPrescriptionModal(false);
                                     setSelectedMedicine(null);
                                 }}
-                                className="w-full py-3 bg-[#F44336] text-white font-black rounded-xl"
+                                className="w-full py-3 bg-gradient-to-r from-[#C084FC] to-[#A855F7] text-white font-black rounded-xl"
                             >
                                 Add to Cart Anyway
                             </button>
@@ -260,7 +260,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
     if (showCart) {
         return (
             <div className="flex flex-col h-screen bg-gray-50">
-                <div className="bg-gradient-to-r from-[#F44336] to-[#FF9800] p-6 pb-20 rounded-b-[40px]">
+                <div className="bg-gradient-to-r from-[#C084FC] to-[#A855F7] p-6 pb-20 rounded-b-[40px]">
                     <div className="flex items-center justify-between">
                         <button onClick={() => setShowCart(false)} className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black">
                             ←
@@ -283,7 +283,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                                     <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl">💊</div>
                                     <div className="flex-1">
                                         <p className="font-black text-sm text-gray-900">{item.name}</p>
-                                        <p className="text-[#F44336] font-bold text-sm">₱{item.price}</p>
+                                        <p className="text-[#C084FC] font-bold text-sm">₱{item.price}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
@@ -295,7 +295,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                                         <span className="font-bold text-sm w-6 text-center">{item.quantity}</span>
                                         <button
                                             onClick={() => addToCart(MEDICINES.find(m => m.id === item.id)!)}
-                                            className="w-8 h-8 bg-[#F44336] rounded-lg flex items-center justify-center text-white font-bold"
+                                            className="w-8 h-8 bg-gradient-to-r from-[#C084FC] to-[#A855F7] rounded-lg flex items-center justify-center text-white font-bold"
                                         >
                                             +
                                         </button>
@@ -310,14 +310,14 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                     <div className="p-4 bg-white border-t border-gray-100">
                         <div className="flex justify-between items-center mb-4">
                             <span className="font-bold text-gray-500">Total</span>
-                            <span className="text-2xl font-black text-[#F44336]">₱{getCartTotal()}</span>
+                            <span className="text-2xl font-black text-[#C084FC]">₱{getCartTotal()}</span>
                         </div>
                         <button
                             onClick={() => {
                                 setShowCart(false);
                                 onNavigate?.('CART');
                             }}
-                            className="w-full py-4 bg-gradient-to-r from-[#F44336] to-[#FF9800] text-white font-black uppercase rounded-2xl"
+                            className="w-full py-4 bg-gradient-to-r from-[#C084FC] to-[#A855F7] text-white font-black uppercase rounded-2xl"
                         >
                             Checkout
                         </button>
@@ -331,7 +331,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
     return (
         <div className="flex flex-col h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#F44336] to-[#FF9800] p-6 pb-28 rounded-b-[40px] shadow-lg">
+            <div className="bg-gradient-to-r from-[#C084FC] to-[#A855F7] p-6 pb-28 rounded-b-[40px] shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                     <button onClick={onBack} className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black">
                         ←
@@ -343,7 +343,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                     >
                         🛒
                         {getCartCount() > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-white text-[#F44336] text-xs font-black w-5 h-5 rounded-full flex items-center justify-center">
+                            <span className="absolute -top-1 -right-1 bg-white text-[#C084FC] text-xs font-black w-5 h-5 rounded-full flex items-center justify-center">
                                 {getCartCount()}
                             </span>
                         )}
@@ -373,7 +373,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                             key={cat.id}
                             onClick={() => setSelectedCategory(cat.id)}
                             className={`flex-shrink-0 px-4 py-2 rounded-full flex items-center gap-2 transition-all ${selectedCategory === cat.id
-                                    ? 'bg-gradient-to-r from-[#F44336] to-[#FF9800] text-white'
+                                    ? 'bg-gradient-to-r from-[#C084FC] to-[#A855F7] text-white'
                                     : 'bg-white border border-gray-100'
                                 }`}
                         >
@@ -414,7 +414,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                             <p className="font-black text-xs text-gray-900 line-clamp-2">{medicine.name}</p>
                             <p className="text-[10px] text-gray-500 mt-1 line-clamp-2">{medicine.description}</p>
                             <div className="flex items-center justify-between mt-2">
-                                <span className="text-[#F44336] font-black text-sm">₱{medicine.price}</span>
+                                <span className="text-[#C084FC] font-black text-sm">₱{medicine.price}</span>
                                 {medicine.requiresPrescription && (
                                     <span className="text-orange-500 text-[8px] font-bold">Rx</span>
                                 )}
@@ -422,7 +422,7 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
                             <button
                                 onClick={() => handleBuyNow(medicine)}
                                 className={`w-full mt-2 py-2 rounded-lg text-xs font-black ${medicine.inStock
-                                        ? 'bg-gradient-to-r from-[#F44336] to-[#FF9800] text-white'
+                                        ? 'bg-gradient-to-r from-[#C084FC] to-[#A855F7] text-white'
                                         : 'bg-gray-200 text-gray-400'
                                     }`}
                             >
@@ -437,4 +437,3 @@ const Pharmacy: React.FC<PharmacyProps> = ({ onBack, onNavigate }) => {
 };
 
 export default Pharmacy;
-

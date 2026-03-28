@@ -18,8 +18,8 @@ interface AIChatProps {
 }
 
 // Load API key from environment variable (set in .env.local)
-// Get it from: https://aistudio.google.com/apikey
-const API_KEY = import.meta.env.VITE_GOOGLE_AI_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY || "";
+ // Get it from: https://aistudio.google.com/apikey
+const API_KEY = (import.meta as any).env.VITE_GOOGLE_AI_API_KEY || (import.meta as any).env.VITE_GOOGLE_API_KEY || '';
 
 const STOPWORDS = new Set([
   'the', 'a', 'an', 'for', 'to', 'of', 'and', 'with', 'in', 'on', 'at', 'sa', 'ng', 'na', 'ko', 'po', 'please', 'yung', 'yong', 'ako'
@@ -537,7 +537,7 @@ const AIChat: React.FC<AIChatProps> = ({
             ))}
             {loading && (
               <div className="flex gap-1 items-center ml-1">
-                <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce"></div>
                 <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                 <div className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
               </div>

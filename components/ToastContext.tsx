@@ -82,7 +82,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       case 'warning':
         return { bg: 'bg-amber-500', icon: '⚠' };
       default:
-        return { bg: 'bg-[#FF1493]', icon: '🔔' };
+return { bg: 'bg-[#C084FC]', icon: '🔔' };
     }
   };
 

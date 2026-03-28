@@ -154,7 +154,12 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col pb-28 overflow-y-auto scrollbar-hide">
       <div className="bg-white p-6 flex items-center gap-4 border-b border-gray-100 sticky top-0 z-20">
-        <button onClick={onBack} className="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-[#FF1493] text-2xl font-black">←</button>
+        <button 
+          onClick={onBack}
+          className="w-10 h-10 bg-[#F3E8FF] rounded-xl flex items-center justify-center text-[#C084FC] text-2xl font-black"
+        >
+          ←
+        </button>
         <div>
           <h2 className="text-xl font-black uppercase tracking-tighter">Pabili Express</h2>
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{activeCount} active requests</p>
@@ -174,9 +179,11 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
                   setItems(tpl.items);
                   setShowForm(true);
                 }}
-                className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-left hover:border-[#FF1493]/40"
+                className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-left hover:border-[#C084FC]/40"
               >
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#FF1493] mb-1">{tpl.store}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#C084FC] mb-1">
+                  {tpl.store}
+                </p>
                 <p className="text-xs font-black text-gray-900">{tpl.title}</p>
               </button>
             ))}
@@ -184,16 +191,44 @@ const Pabili: React.FC<PabiliProps> = ({ onBack, email }) => {
         </div>
 
         {showForm && (
-          <div className="bg-white rounded-[40px] p-7 border-2 border-[#FF1493]/10 shadow-lg space-y-4">
+          <div className="bg-white rounded-[36px] p-8 border-2 border-[#C084FC]/10 shadow-lg space-y-4">
             <h3 className="text-lg font-black uppercase tracking-tighter">New Pabili Request</h3>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Request title" className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493]" />
-            <input value={store} onChange={(e) => setStore(e.target.value)} placeholder="Store / Pickup place" className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493]" />
-            <textarea value={items} onChange={(e) => setItems(e.target.value)} placeholder="List of items / errands" className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493] min-h-[96px]" />
-            <input value={budget} onChange={(e) => setBudget(e.target.value)} inputMode="decimal" placeholder="Max budget (PHP)" className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493]" />
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notes for rider (optional)" className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493]" />
+            <input 
+              value={title} 
+              onChange={(e) => setTitle(e.target.value)} 
+              placeholder="Request title" 
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493]" 
+            />
+            <input 
+              value={store} 
+              onChange={(e) => setStore(e.target.value)} 
+              placeholder="Store / Pickup place" 
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493]" 
+            />
+            <textarea 
+              value={items} 
+              onChange={(e) => setItems(e.target.value)} 
+              placeholder="List of items / errands" 
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493] min-h-[96px]" 
+            />
+            <input 
+              value={budget} 
+              onChange={(e) => setBudget(e.target.value)} 
+              inputMode="decimal" 
+              placeholder="Max budget (PHP)" 
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493]" 
+            />
+            <input 
+              value={note} 
+              onChange={(e) => setNote(e.target.value)} 
+              placeholder="Notes for rider (optional)" 
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none focus:border-[#FF1493]" 
+            />
             {isSubmitting && <p className="text-[10px] font-black uppercase tracking-widest text-[#FF1493]">{submitStatus}</p>}
             <div className="flex gap-3">
-              <Button onClick={submitRequest} disabled={isSubmitting} className="flex-1 py-4 font-black uppercase">{isSubmitting ? 'Submitting...' : 'Submit Request'}</Button>
+              <Button onClick={submitRequest} disabled={isSubmitting} className="flex-1 py-4 font-black uppercase">
+                {isSubmitting ? 'Submitting...' : 'Submit Request'}
+              </Button>
               <button onClick={() => setShowForm(false)} className="px-5 py-4 rounded-2xl bg-gray-100 text-gray-600 text-[10px] font-black uppercase">Cancel</button>
             </div>
           </div>

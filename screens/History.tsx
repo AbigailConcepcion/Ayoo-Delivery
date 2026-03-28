@@ -233,7 +233,7 @@ const History: React.FC<HistoryProps> = ({ onBack, orders, onNavigate }) => {
    return (
       <div className="flex flex-col h-screen bg-gray-50 pb-24 overflow-y-auto scrollbar-hide">
          {/* Header */}
-         <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-6 pb-10 rounded-b-[50px] shadow-xl text-white relative">
+         <div className="bg-gradient-to-r from-[#C084FC] via-[#A78BFA] to-[#8B5CF6] p-6 pb-10 rounded-b-[50px] shadow-xl text-white relative">
             <div className="flex justify-between items-center mb-4">
                <button onClick={onBack} className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-xl font-black shadow-lg">←</button>
                <button

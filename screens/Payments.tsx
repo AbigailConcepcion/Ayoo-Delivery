@@ -131,7 +131,7 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       {/* Bills & Load Header - Without extra top nav, just back button */}
-      <div className="bg-gradient-to-r from-[#00BCD4] to-[#26C6DA] p-6 flex items-center justify-between shadow-lg z-10">
+      <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 flex items-center justify-between shadow-lg z-10">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-white text-2xl font-black">←</button>
           <div>
@@ -198,10 +198,10 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
         )}
 
         {showForm && (
-          <div className="bg-white p-10 rounded-[50px] shadow-2xl border-2 border-[#FF00CC]/10 animate-in zoom-in-95">
+          <div className="bg-white p-10 rounded-[50px] shadow-2xl border-2 border-purple-500/10 animate-in zoom-in-95">
             <div className="flex gap-2 mb-8 bg-gray-50 p-1 rounded-2xl">
-              <button onClick={() => setActiveTab('CARD')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'CARD' ? 'bg-[#FF00CC] text-white shadow-lg' : 'text-gray-400'}`}>Card</button>
-              <button onClick={() => setActiveTab('EWALLET')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'EWALLET' ? 'bg-[#FF00CC] text-white shadow-lg' : 'text-gray-400'}`}>E-Wallet</button>
+              <button onClick={() => setActiveTab('CARD')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'CARD' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-400'}`}>Card</button>
+              <button onClick={() => setActiveTab('EWALLET')} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${activeTab === 'EWALLET' ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-400'}`}>E-Wallet</button>
             </div>
 
             {activeTab === 'CARD' ? (
@@ -213,7 +213,7 @@ const Payments: React.FC<PaymentsProps> = ({ onBack, email }) => {
                 <div className="space-y-6">
                   <div className="input-label-border">
                     <label>Card Number</label>
-                    <input type="text" maxLength={16} value={cardNumber} onChange={e => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-[#FF00CC] outline-none font-black text-sm tracking-widest" />
+                    <input type="text" maxLength={16} value={cardNumber} onChange={e => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" className="w-full p-5 bg-gray-50 border border-gray-100 rounded-[24px] focus:border-purple-500 outline-none font-black text-sm tracking-widest" />
                   </div>
                   <div className="input-label-border">
                     <label>Expiry Date</label>

@@ -199,7 +199,7 @@ const Addresses: React.FC<AddressesProps> = ({ onBack, email, currentCity, onSel
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       <div className="bg-white p-6 flex items-center justify-between shadow-sm z-10 border-b border-gray-100">
          <div className="flex items-center gap-4">
-            <button onClick={onBack} className="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center text-[#FF00CC] text-2xl font-black">←</button>
+            <button onClick={onBack} className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-500 text-2xl font-black">←</button>
             <h2 className="text-xl font-black uppercase tracking-tighter">My Locations</h2>
          </div>
          {isLoading && (

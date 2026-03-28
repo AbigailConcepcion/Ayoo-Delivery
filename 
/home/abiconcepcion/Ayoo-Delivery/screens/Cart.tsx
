@@ -5,6 +5,7 @@ import { Voucher, PaymentMethod, PaymentType, Restaurant } from '../types';
 import { db } from '../db';
 import { ayooCloud } from '../api';
 import { calculateCheckoutBreakdown } from '../src/utils/pricing';
+import { COLORS } from '../constants';
 
 interface CartProps {
   items: { id: string; quantity: number }[];
@@ -53,7 +54,7 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
       if (item) return { ...item, quantity: cartItem.quantity };
     }
     return null;
-  }).filter(Boolean);
+  }).filter(Boolean) as any[];
 
   const subtotal = cartDetails.reduce((acc, curr) => acc + (curr?.price || 0) * (curr?.quantity || 0), 0);
   const {
@@ -89,14 +90,13 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
     setTimeout(() => addLog(`Confirming Funds with ${selectedMethod.type}...`), 2400);
 
     if (selectedMethod.type === 'COD') {
-      // cash on delivery: no processing, just mark as unpaid
       setPayStep(3);
       setReceiptData({
         ref: 'COD',
         txn: '',
         date: new Date().toLocaleString(),
         method: 'COD',
-        total: total
+        total
       });
       setTimeout(() => {
         setIsProcessing(false);
@@ -105,7 +105,6 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
       return;
     }
 
-    // Mock payment - always succeeds for demo
     const mockRes = { success: true, reference: 'AYO-' + Date.now(), transactionId: 'TXN-' + Date.now(), pending: false, checkoutUrl: undefined, error: undefined };
     const res = mockRes;
 
@@ -128,7 +127,7 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
         txn: res.transactionId,
         date: new Date().toLocaleString(),
         method: selectedMethod.type,
-        total: total
+        total
       });
       setTimeout(() => {
         setIsProcessing(false);
@@ -144,13 +143,12 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col pb-32 overflow-y-auto scrollbar-hide">
 
-      {/* PRODUCTION RECEIPT MODAL */}
       {showReceipt && (
         <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-xl flex items-center justify-center p-8">
           <div className="bg-white w-full max-w-sm rounded-[50px] overflow-hidden shadow-2xl animate-in zoom-in-95 p-10 relative">
-            <div className="absolute top-0 left-0 right-0 h-2 ayoo-gradient"></div>
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[COLORS.primary] to-[#8B5CF6]"></div>
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">📜</div>
+              <div className="w-16 h-16 bg-purple-50 text-[COLORS.primary] rounded-full flex items-center justify-center text-3xl mx-auto mb-4">📜</div>
               <h3 className="text-2xl font-black uppercase tracking-tighter">Verified Slip</h3>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Saved to Cloud Vault</p>
             </div>
@@ -165,29 +163,28 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
                 <span className="text-gray-900">{receiptData?.method}</span>
               </div>
               <div className="flex justify-between items-center pt-2">
-                <span className="font-black text-xs uppercase text-gray-900">Paid Total</span>
-                <span className="font-black text-2xl text-[#FF00CC]">₱{receiptData?.total.toFixed(2)}</span>
+                <span className="font-bold text-xs uppercase text-gray-900">Paid Total</span>
+                <span className="font-black text-2xl text-[COLORS.primary]">₱{receiptData?.total.toFixed(2)}</span>
               </div>
             </div>
 
             <div className="flex flex-col gap-3">
-              <Button onClick={() => onCheckout(selectedMethod, selectedMethod?.type !== 'COD', { orderId: checkoutOrderId, transactionId: receiptData?.txn || '', paymentId: receiptData?.ref || '' })} className="pill-shadow py-5 font-black uppercase tracking-[0.1em]">Track Real-time</Button>
+              <Button onClick={() => onCheckout(selectedMethod, selectedMethod?.type !== 'COD', { orderId: checkoutOrderId, transactionId: receiptData?.txn || '', paymentId: receiptData?.ref || '' })} className="py-5 font-black uppercase tracking-[0.1em] bg-[COLORS.primary] shadow-purple-100">Track Real-time</Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* SECURE GATEWAY OVERLAY */}
       {isProcessing && (
         <div className="fixed inset-0 z-[500] bg-black flex flex-col animate-in fade-in duration-300">
           <div className="bg-[#1A1A1A] p-6 flex items-center justify-between text-white border-b border-white/5">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 ayoo-gradient rounded-xl flex items-center justify-center font-black text-[12px]">ay</div>
+              <div className="w-8 h-8 bg-gradient-to-r from-[COLORS.primary] to-[#8B5CF6] rounded-xl flex items-center justify-center font-black text-[12px]">ay</div>
               <span className="text-[10px] font-black uppercase tracking-widest">Ayoo API Gateway</span>
             </div>
-            <div className="px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full flex items-center gap-1.5">
-              <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-[8px] font-black text-green-500">ENCRYPTED</span>
+            <div className="px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full flex items-center gap-1.5">
+              <div className="w-1 h-1 bg-purple-500 rounded-full animate-pulse"></div>
+              <span className="text-[8px] font-black text-purple-500">ENCRYPTED</span>
             </div>
           </div>
 
@@ -195,15 +192,15 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
             {payStep <= 2 && (
               <div className="animate-in zoom-in-95">
                 <div className="w-32 h-32 rounded-[45px] bg-white/5 border border-white/10 flex items-center justify-center mb-10 mx-auto shadow-2xl relative overflow-hidden">
-                  <div className="absolute inset-0 ayoo-gradient opacity-10 animate-pulse"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-[COLORS.primary] to-[#8B5CF6] opacity-10 animate-pulse"></div>
                   <span className="text-5xl animate-bounce">🛡️</span>
                 </div>
                 <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-white">Authorizing...</h3>
 
                 <div className="bg-[#0A0A0A] p-6 rounded-[30px] border border-white/5 text-left w-full max-w-[280px] font-mono space-y-2">
                   {handshakeLogs.map((log, i) => (
-                    <p key={i} className="text-[9px] text-green-500/80 animate-in slide-in-from-left-2">
-                      <span className="opacity-50 mr-2">&gt;</span>{log}
+                    <p key={i} className="text-[9px] text-purple-400/80 animate-in slide-in-from-left-2">
+                      <span className="opacity-50 mr-2">></span>{log}
                     </p>
                   ))}
                 </div>
@@ -224,10 +221,8 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
 
       <div className="bg-white p-4 flex items-center justify-between sticky top-0 z-10 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="w-9 h-9 bg-purple-50 rounded-xl flex items-center justify-center text-purple-500 font-bold">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+          <button onClick={onBack} className="w-9 h-9 bg-purple-50 rounded-xl flex items-center justify-center text-[COLORS.primary] font-bold">
+            ←
           </button>
           <h2 className="text-lg font-bold uppercase tracking-tight leading-none">Checkout Central</h2>
         </div>
@@ -236,21 +231,21 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
       <div className="flex-1 p-4 space-y-4">
         <div className="space-y-3">
           {cartDetails.map(item => (
-            <div key={item!.id} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-gray-100">
+            <div key={item.id} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-gray-100">
               <div className="flex items-center gap-3">
-                <img src={item!.image} className="w-14 h-14 rounded-xl object-cover" alt={item!.name} />
+                <img src={item.image} className="w-14 h-14 rounded-xl object-cover" alt={item.name} />
                 <div>
-                  <h4 className="font-bold text-sm text-gray-900 leading-none mb-1">{item!.name}</h4>
-                  <p className="text-[10px] text-gray-400 font-medium uppercase">₱{item!.price} x {item!.quantity}</p>
+                  <h4 className="font-bold text-sm text-gray-900 leading-none mb-1">{item.name}</h4>
+                  <p className="text-[10px] text-gray-400 font-medium uppercase">₱{item.price} x {item.quantity}</p>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-2">
-                <span className="font-bold text-gray-900">₱{item!.price * item!.quantity}</span>
+                <span className="font-bold text-gray-900">₱{item.price * item.quantity}</span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => onUpdateQuantity(item!.id, -1)} className="w-7 h-7 rounded-lg bg-gray-100 font-bold text-gray-600 hover:bg-gray-200">-</button>
-                  <span className="text-xs font-bold w-5 text-center">{item!.quantity}</span>
-                <button onClick={() => onUpdateQuantity(item!.id, 1)} className="w-7 h-7 rounded-lg bg-purple-100 text-purple-500 font-bold hover:bg-purple-200">+</button>
-                    </div>
+                  <button onClick={() => onUpdateQuantity(item.id, -1)} className="w-7 h-7 rounded-lg bg-gray-100 font-bold text-gray-600 hover:bg-gray-200">-</button>
+                  <span className="text-xs font-bold w-5 text-center">{item.quantity}</span>
+                  <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-7 h-7 rounded-lg bg-purple-100 text-[COLORS.primary] font-bold hover:bg-purple-200">+</button>
+                </div>
               </div>
             </div>
           ))}
@@ -260,12 +255,12 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
           <h3 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Payment Method</h3>
           <div className="flex gap-2 mb-3">
             {(['DIGITAL', 'CARD', 'CASH'] as const).map(filter => (
-                <button
-                  key={filter}
-                  onClick={() => setPaymentFilter(filter)}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${paymentFilter === filter ? 'bg-gradient-to-r from-[#C084FC] to-[#A855F7] text-white' : 'bg-gray-100 text-gray-500'
-                    }`}
-                >
+              <button
+                key={filter}
+                onClick={() => setPaymentFilter(filter)}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${paymentFilter === filter ? 'bg-gradient-to-r from-[COLORS.primary] to-[#8B5CF6] text-white' : 'bg-gray-100 text-gray-500'
+                  }`}
+              >
                 {filter}
               </button>
             ))}
@@ -275,7 +270,7 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
               <button
                 key={m.id}
                 onClick={() => setSelectedMethod(m)}
-                className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 transition-all flex flex-col gap-0.5 items-center min-w-[120px] ${selectedMethod?.id === m.id ? 'border-purple-400 bg-purple-50 scale-[1.02] shadow-md' : 'border-gray-100 bg-gray-50 opacity-60'
+                className={`flex-shrink-0 px-4 py-3 rounded-xl border-2 transition-all flex flex-col gap-0.5 items-center min-w-[120px] ${selectedMethod?.id === m.id ? 'border-[COLORS.primary] bg-purple-50 scale-[1.02] shadow-md' : 'border-gray-100 bg-gray-50 opacity-60'
                   }`}
               >
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${m.type === 'GCASH' ? 'text-[#007DFE]' : m.type === 'MAYA' ? 'text-[#00D15F]' : 'text-gray-900'
@@ -306,23 +301,21 @@ const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onN
           {discountAmount > 0 && (
             <div className="flex justify-between text-[11px] font-medium text-gray-500 uppercase tracking-wider">
               <span>Voucher</span>
-              <span className="text-purple-500">-₱{discountAmount.toFixed(2)}</span>
+              <span className="text-[COLORS.primary]">-₱{discountAmount.toFixed(2)}</span>
             </div>
           )}
           <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
             <span className="font-bold text-gray-900 text-xl tracking-tight uppercase leading-none">Total</span>
-                <span className="font-bold text-3xl text-[#C084FC] tracking-tight">₱{total.toFixed(0)}</span>
-              </div>
-            </div>
+            <span className="font-bold text-3xl text-[COLORS.primary] tracking-tight">₱{total.toFixed(0)}</span>
           </div>
+        </div>
 
-      <div className="p-5 bg-white border-t border-gray-100 fixed bottom-0 left-0 right-0 max-w-md mx-auto rounded-t-3xl shadow-lg z-[60]">
-        <Button onClick={handleSecureCheckout} disabled={!selectedMethod} className="py-4 text-base font-bold uppercase tracking-wider">
-          Execute Transaction
-        </Button>
+        <div className="p-5 bg-white border-t border-gray-100 fixed bottom-0 left-0 right-0 max-w-md mx-auto rounded-t-3xl shadow-lg z-[60]">
+          <Button onClick={handleSecureCheckout} disabled={!selectedMethod} className="py-4 text-base font-bold uppercase tracking-wider bg-[COLORS.primary] shadow-purple-100">Execute Transaction</Button>
+        </div>
       </div>
-    </div>
-  );
+    );
 };
 
 export default Cart;
+

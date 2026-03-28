@@ -51,6 +51,7 @@ export interface FoodItem {
   isPopular?: boolean;
   isSpicy?: boolean;
   isNew?: boolean;
+  rating?: number;
 }
 
 export interface Review {
@@ -129,6 +130,8 @@ export interface Address {
 
 export type PaymentType = 'VISA' | 'MASTERCARD' | 'GCASH' | 'MAYA' | 'CASH' | 'COD';
 
+export type OrderTrackingStatus = OrderStatus;
+
 export interface PaymentMethod {
   id: string;
   type: PaymentType;
@@ -192,6 +195,18 @@ export interface CommunityPost {
   comments: Comment[];
   reactions: Reaction[];
   userReaction?: string;
+};
+
+export interface Comment {
+  id: string;
+  author: string;
+  content: string;
+  time: string;
+}
+
+export interface Reaction {
+  type: string;
+  count: number;
 }
 
 // ==================== LEADERBOARD TYPES ====================

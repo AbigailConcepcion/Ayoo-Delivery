@@ -1,386 +1,449 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Conversation, Message, UserAccount, ParticipantRole } from '../types';
-import { db } from '../db';
-import { messagingHub } from '../api';
-import { COLORS } from '../constants';
+import React, { useState, useEffect, useRef, useCallback, forwardRef, CSSProperties } from 'react';
 import BottomNav from '../components/BottomNav';
+import { Conversation, Message, UserAccount, ParticipantRole, AppScreen } from '../types';
+import { db } from '../db';
+import { COLORS } from '../constants';
 
 interface MessagesProps {
-    currentUser: UserAccount;
-    onBack: () => void;
-    onNavigate?: (screen: string) => void;
+  currentUser: UserAccount;
+  onBack: () => void;
+  onNavigate: (screen: AppScreen) => void;
 }
 
 const Messages: React.FC<MessagesProps> = ({ currentUser, onBack, onNavigate }) => {
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [newMessage, setNewMessage] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [showNewChat, setShowNewChat] = useState(false);
-    const [availableUsers, setAvailableUsers] = useState<{ email: string; name: string; role: ParticipantRole }[]>([]);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<{ email: string; name: string; role: ParticipantRole }[]>([]);
+  const scrollViewRef = useRef<HTMLDivElement>(null);
 
-    const currentUserRole = currentUser.role || 'CUSTOMER';
+  const currentUserRole = currentUser.role || 'CUSTOMER';
 
-    // Load conversations on mount
-    useEffect(() => {
-        loadConversations();
+  // Helper to merge styles
+  const mergeStyles = (...styles: CSSProperties[]): CSSProperties => {
+    const merged = {} as CSSProperties;
+    styles.forEach(style => Object.assign(merged, style));
+    return merged;
+  };
 
-        // Subscribe to real-time message updates
-        const unsubscribe = messagingHub.subscribe(() => {
-            loadConversations();
-            if (selectedConversation) {
-                loadMessages(selectedConversation.id);
-            }
-        });
-
-        return () => unsubscribe();
-    }, [currentUser.email]);
-
-    // Load messages when conversation is selected
-    useEffect(() => {
-        if (selectedConversation) {
-            loadMessages(selectedConversation.id);
-            // Mark as read
-            db.markConversationAsRead(selectedConversation.id, currentUser.email);
-        }
-    }, [selectedConversation, currentUser.email]);
-
-    // Scroll to bottom when messages change
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
-
-    const loadConversations = async () => {
-        try {
-            const convos = await db.getConversations(currentUser.email);
-            setConversations(convos);
-        } catch (err) {
-            console.error('Failed to load conversations:', err);
-        }
+  // Real-time messaging
+  useEffect(() => {
+    const channel = new BroadcastChannel('ayoo_messaging_v1');
+    const handleMessage = () => {
+      loadConversations();
+      if (selectedConversation) {
+        db.getMessages(selectedConversation.id).then(setMessages);
+      }
     };
+    channel.onmessage = handleMessage;
+    return () => channel.close();
+  }, []);
 
-    const loadMessages = async (conversationId: string) => {
-        try {
-            const msgs = await db.getMessages(conversationId);
-            setMessages(msgs);
-        } catch (err) {
-            console.error('Failed to load messages:', err);
-        }
-    };
-
-    const loadAvailableUsers = async () => {
-        try {
-            const users = await db.getRegistryUsers();
-            const filtered = users
-                .filter(u => u.email.toLowerCase() !== currentUser.email.toLowerCase())
-                .map(u => ({
-                    email: u.email,
-                    name: u.name,
-                    role: (u.role || 'CUSTOMER') as ParticipantRole,
-                }));
-            setAvailableUsers(filtered);
-        } catch (err) {
-            console.error('Failed to load users:', err);
-        }
-    };
-
-    const handleSendMessage = async () => {
-        if (!newMessage.trim() || !selectedConversation) return;
-
-        setIsLoading(true);
-        try {
-            await db.sendMessage(
-                selectedConversation.id,
-                currentUser.email,
-                currentUser.name,
-                newMessage.trim()
-            );
-            setNewMessage('');
-            loadMessages(selectedConversation.id);
-            loadConversations();
-        } catch (err) {
-            console.error('Failed to send message:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleStartNewChat = async (otherUser: { email: string; name: string; role: ParticipantRole }) => {
-        setIsLoading(true);
-        try {
-            const convo = await db.getOrCreateConversation(
-                currentUser.email,
-                currentUser.name,
-                currentUserRole as 'CUSTOMER' | 'MERCHANT' | 'RIDER',
-                otherUser.email,
-                otherUser.name,
-                otherUser.role
-            );
-            setSelectedConversation(convo);
-            setShowNewChat(false);
-            loadConversations();
-        } catch (err) {
-            console.error('Failed to create conversation:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const getOtherParticipant = (convo: Conversation) => {
-        return convo.participants.find(p => p.email.toLowerCase() !== currentUser.email.toLowerCase());
-    };
-
-    const getRoleIcon = (role: ParticipantRole) => {
-        switch (role) {
-            case 'MERCHANT': return '🏪';
-            case 'RIDER': return '🛵';
-            default: return '👤';
-        }
-    };
-
-    const formatTime = (timestamp: string) => {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
-        return date.toLocaleDateString();
-    };
-
-    const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
-
-    // If a conversation is selected, show the chat view
-    if (selectedConversation) {
-        const otherUser = getOtherParticipant(selectedConversation);
-
-        return (
-            <div className="flex flex-col h-screen bg-gray-50">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-6 rounded-b-[40px] shadow-lg">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setSelectedConversation(null)}
-                            className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black"
-                        >
-                            ←
-                        </button>
-                        <div className="w-12 h-12 bg-white/30 rounded-full flex items-center justify-center text-2xl">
-                            {otherUser ? getRoleIcon(otherUser.role) : '💬'}
-                        </div>
-                        <div className="flex-1">
-                            <h2 className="text-white font-black text-lg">{otherUser?.name || 'Chat'}</h2>
-                            <p className="text-white/70 text-xs font-bold uppercase tracking-wider">
-                                {otherUser?.role || 'User'}
-                                {selectedConversation.orderId && ` • Order #${selectedConversation.orderId.slice(-6)}`}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-4">
-                    {messages.length === 0 ? (
-                        <div className="text-center py-12 opacity-50">
-                            <p className="text-4xl mb-4">💬</p>
-                            <p className="font-black text-xs uppercase tracking-widest">No messages yet</p>
-                            <p className="text-gray-400 text-xs mt-2">Start the conversation!</p>
-                        </div>
-                    ) : (
-                        messages.map((msg) => {
-                            const isMe = msg.senderEmail.toLowerCase() === currentUser.email.toLowerCase();
-                            return (
-                                <div
-                                    key={msg.id}
-                                    className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-                                >
-                                    <div
-                                        className={`max-w-[75%] p-3 rounded-[20px] ${isMe
-                                            ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white rounded-tr-none'
-                                            : 'bg-white border border-gray-100 text-gray-800 rounded-tl-none'
-                                            } shadow-sm`}
-                                    >
-                                        <p className="text-sm font-medium">{msg.text}</p>
-                                        <p className={`text-[10px] mt-1 ${isMe ? 'text-white/70' : 'text-gray-400'}`}>
-                                            {formatTime(msg.timestamp)}
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        })
-                    )}
-                    <div ref={messagesEndRef} />
-                </div>
-
-                {/* Input */}
-                <div className="p-4 bg-white border-t border-gray-100">
-                    <div className="flex gap-2 items-center">
-                        <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                            placeholder="Type a message..."
-                            className="flex-1 bg-gray-100 rounded-full px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-[#FF00CC]/30"
-                        />
-                        <button
-                            onClick={handleSendMessage}
-                            disabled={!newMessage.trim() || isLoading}
-                            className="w-12 h-12 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-full flex items-center justify-center text-white font-black shadow-lg disabled:opacity-50"
-                        >
-                            ➤
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
+  const scrollToBottom = useCallback(() => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTop = scrollViewRef.current.scrollHeight;
     }
+  }, []);
 
-    // Show new chat modal
-    if (showNewChat) {
-        return (
-            <div className="flex flex-col h-screen bg-gray-50">
-                <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-6 rounded-b-[40px] shadow-lg">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setShowNewChat(false)}
-                            className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black"
-                        >
-                            ←
-                        </button>
-                        <h2 className="text-white font-black text-lg">New Message</h2>
-                    </div>
-                </div>
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
-                <div className="p-4">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Select a contact</p>
-                    {availableUsers.length === 0 ? (
-                        <div className="text-center py-8 opacity-50">
-                            <p className="text-4xl mb-4">👥</p>
-                            <p className="font-black text-xs uppercase tracking-widest">No users found</p>
-                            <p className="text-gray-400 text-xs mt-2">Register more users to start chatting</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {availableUsers.map((user) => (
-                                <button
-                                    key={user.email}
-                                    onClick={() => handleStartNewChat(user)}
-                                    className="w-full p-4 bg-white rounded-2xl border border-gray-100 flex items-center gap-3 shadow-sm active:scale-95 transition-transform"
-                                >
-                                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-2xl">
-                                        {getRoleIcon(user.role)}
-                                    </div>
-                                    <div className="flex-1 text-left">
-                                        <p className="font-black text-gray-900">{user.name}</p>
-                                        <p className="text-xs text-gray-400 uppercase tracking-wider">{user.role}</p>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
+  const loadConversations = async () => {
+    try {
+      const convos = await db.getConversations(currentUser.email);
+      setConversations(convos);
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
     }
+  };
 
-    // Main conversations list
+  const loadAvailableUsers = async () => {
+    try {
+      const users = await db.getRegistryUsers();
+      const filtered = users.filter((u: any) => u.email.toLowerCase() !== currentUser.email.toLowerCase()).map((u: any) => ({
+        email: u.email,
+        name: u.name,
+        role: (u.role || 'CUSTOMER') as ParticipantRole,
+      }));
+      setAvailableUsers(filtered);
+    } catch (err) {
+      console.error('Failed to load users:', err);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedConversation) return;
+
+    const text = newMessage.trim();
+    setIsLoading(true);
+    setNewMessage('');
+    try {
+      await db.sendMessage(selectedConversation.id, currentUser.email, currentUser.name, text);
+      new BroadcastChannel('ayoo_messaging_v1').postMessage({ type: 'NEW_MESSAGE' });
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      setNewMessage(text);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStartNewChat = async (otherUser: { email: string; name: string; role: ParticipantRole }) => {
+    try {
+      const convo = await db.getOrCreateConversation(
+        currentUser.email, currentUser.name, currentUserRole as any,
+        otherUser.email, otherUser.name, otherUser.role
+      );
+      setSelectedConversation(convo);
+      setShowNewChat(false);
+    } catch (err) {
+      console.error('Failed to create conversation:', err);
+    }
+  };
+
+  const getOtherParticipant = (convo: Conversation) => {
+    return convo.participants.find((p: any) => p.email.toLowerCase() !== currentUser.email.toLowerCase());
+  };
+
+  const getRoleIcon = (role: ParticipantRole) => {
+    switch (role) {
+      case 'MERCHANT': return '🏪';
+      case 'RIDER': return '🛵';
+      default: return '👤';
+    }
+  };
+
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const totalUnread = conversations.reduce((sum: number, c: Conversation) => sum + (c.unreadCount || 0), 0);
+
+  // Polyfills - fixed typing
+  const View: React.FC<any> = (props) => <div {...props} />;
+  const TextComponent: React.FC<any> = (props) => <span {...props} />;
+  const TextInputComp = forwardRef<HTMLTextAreaElement, any>((props, ref) => (
+    <textarea ref={ref} {...props} style={{ resize: 'none', border: 'none', outline: 'none', ...props.style }} />
+  ));
+  const ScrollViewComp = forwardRef<HTMLDivElement, any>((props, ref) => (
+    <div ref={ref} style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any, flex: 1, ...props.style }} {...props} />
+  ));
+  const TouchableOpacityComp: React.FC<any> = (props) => (
+    <button type="button" onClick={props.onPress} style={props.style} {...props}>
+      {props.children}
+    </button>
+  );
+  const SafeAreaViewComp: React.FC<any> = (props) => (
+    <div style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)', ...props.style }} {...props} />
+  );
+
+  if (selectedConversation) {
+    const otherUser = getOtherParticipant(selectedConversation);
     return (
-        <div className="flex flex-col h-screen bg-gray-50 pb-24">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[#FF1493] via-[#FF69B4] to-[#FF1493] p-4 pb-6 rounded-b-[40px] shadow-lg">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={onBack}
-                            className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black"
-                        >
-                            ←
-                        </button>
-                        <h2 className="text-white font-black text-xl">Messages</h2>
-                        {totalUnread > 0 && (
-                            <span className="bg-white text-[#FF00CC] text-xs font-black px-2 py-1 rounded-full">
-                                {totalUnread}
-                            </span>
-                        )}
-                    </div>
-                    <button
-                        onClick={() => { loadAvailableUsers(); setShowNewChat(true); }}
-                        className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white text-xl"
-                    >
-                        ✏️
-                    </button>
-                </div>
-                <p className="text-white/70 text-xs mt-2 px-1 font-medium">
-                    Chat with your {currentUserRole === 'CUSTOMER' ? 'merchants and riders' : currentUserRole === 'MERCHANT' ? 'customers and riders' : 'customers and merchants'}
-                </p>
+      <SafeAreaViewComp style={{ flex: 1, backgroundColor: COLORS.primaryBg, paddingBottom: 100 }}>
+        <View style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: '20px 16px',
+          background: COLORS.primaryGradient,
+          borderBottomLeftRadius: 40,
+          borderBottomRightRadius: 40,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        }}>
+          <TouchableOpacityComp onPress={() => setSelectedConversation(null)} style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+            <TextComponent style={{ color: 'white', fontSize: 20, fontWeight: 900 as any }}>←</TextComponent>
+          </TouchableOpacityComp>
+          <View style={{ flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.3)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+              <TextComponent>{otherUser ? getRoleIcon(otherUser.role) : '💬'}</TextComponent>
+            </View>
+            <div>
+              <TextComponent style={{ color: 'white', fontSize: 18, fontWeight: 900 as any }}>{otherUser?.name || 'Chat'}</TextComponent>
+              <TextComponent style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 700 as any }}>{otherUser?.role || 'User'}</TextComponent>
             </div>
+          </View>
+        </View>
 
-            {/* Conversations List */}
-            <div className="flex-1 overflow-y-auto p-4">
-                {conversations.length === 0 ? (
-                    <div className="text-center py-12 opacity-50">
-                        <p className="text-6xl mb-4">💬</p>
-                        <p className="font-black text-sm uppercase tracking-widest">No conversations yet</p>
-                        <p className="text-gray-400 text-xs mt-2">
-                            Start an order to chat with your {currentUserRole === 'CUSTOMER' ? 'merchant or rider' : 'customer'}
-                        </p>
-                        <button
-                            onClick={() => { loadAvailableUsers(); setShowNewChat(true); }}
-                            className="mt-6 px-6 py-3 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white font-black text-sm rounded-full shadow-lg"
-                        >
-                            Start New Chat
-                        </button>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {conversations.map((convo) => {
-                            const otherUser = getOtherParticipant(convo);
-                            return (
-                                <button
-                                    key={convo.id}
-                                    onClick={() => setSelectedConversation(convo)}
-                                    className="w-full p-4 bg-white rounded-[25px] border border-gray-100 flex items-center gap-3 shadow-sm active:scale-[0.98] transition-transform"
-                                >
-                                    <div className="relative">
-                                        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">
-                                            {otherUser ? getRoleIcon(otherUser.role) : '💬'}
-                                        </div>
-                                        {convo.unreadCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FF00CC] text-white text-[10px] font-black rounded-full flex items-center justify-center">
-                                                {convo.unreadCount}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 text-left min-w-0">
-                                        <div className="flex items-center justify-between">
-                                            <p className="font-black text-gray-900 truncate">{otherUser?.name || 'Unknown'}</p>
-                                            <p className="text-[10px] text-gray-400 font-bold">
-                                                {convo.lastMessageTime ? formatTime(convo.lastMessageTime) : ''}
-                                            </p>
-                                        </div>
-                                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-                                            {otherUser?.role || 'User'}
-                                        </p>
-                                        <p className="text-sm text-gray-400 truncate mt-1">
-                                            {convo.lastMessage || 'No messages yet'}
-                                        </p>
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+        <ScrollViewComp ref={scrollViewRef} style={{ flex: 1, padding: 16, paddingBottom: 100 }}>
+          {messages.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+              <TextComponent style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }} >💬</TextComponent>
+              <TextComponent style={{ fontSize: 12, fontWeight: 900 as any, marginBottom: 8, opacity: 0.5 }}>No messages yet</TextComponent>
+              <TextComponent style={{ fontSize: 12, textAlign: 'center' as any, marginBottom: 24, opacity: 0.5 }}>Start the conversation!</TextComponent>
+            </View>
+          ) : (
+            messages.map((msg) => {
+              const isMe = msg.senderEmail.toLowerCase() === currentUser.email.toLowerCase();
+              return (
+                <View key={msg.id} style={{ display: 'flex', flexDirection: 'row' as any, justifyContent: isMe ? 'flex-end' : 'flex-start', marginVertical: 4 }}>
+                  <View style={{
+                    maxWidth: '75%',
+                    padding: 12,
+                    borderRadius: 20,
+                    backgroundColor: isMe ? COLORS.primary : 'white',
+                    borderTopRightRadius: isMe ? 4 : 20,
+                    borderTopLeftRadius: isMe ? 20 : 4,
+                    border: `1px solid ${COLORS.gray100}`,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  }}>
+                    <TextComponent style={{ fontSize: 14, fontWeight: 500 as any, lineHeight: 20, color: isMe ? 'white' : 'black' }}>{msg.text}</TextComponent>
+                    <TextComponent style={{ marginTop: 4, fontSize: 10, fontWeight: 500 as any, opacity: 0.7, color: isMe ? 'rgba(255,255,255,0.7)' : 'black' }}>
+                      {formatTime(msg.timestamp)}
+                    </TextComponent>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </ScrollViewComp>
+
+        <div style={{
+          display: 'flex',
+          flexDirection: 'row' as any,
+          alignItems: 'flex-end',
+          padding: 16,
+          backgroundColor: 'white',
+          borderTop: `1px solid ${COLORS.gray100}`,
+          position: 'fixed' as any,
+          bottom: 100,
+          left: 0,
+          right: 0,
+        }}>
+          <textarea
+            style={{
+              flex: 1,
+              backgroundColor: COLORS.gray100,
+              borderRadius: 25,
+              padding: '12px 16px',
+              fontSize: 14,
+              fontWeight: 500 as any,
+              marginRight: 8,
+              resize: 'none' as any,
+              border: 'none',
+              outline: 'none',
+              lineHeight: 1.4,
+            }}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type a message..."
+            rows={1}
+            maxLength={1000}
+          />
+          <TouchableOpacityComp
+            onPress={handleSendMessage}
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: (!newMessage.trim() || isLoading) ? 'rgba(192,132,252,0.5)' : COLORS.primary,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <TextComponent style={{ color: 'white', fontSize: 18, fontWeight: 900 as any }}>➤</TextComponent>
+          </TouchableOpacityComp>
         </div>
+
+        <BottomNav active="MESSAGES" onNavigate={onNavigate} user={currentUser} />
+      </SafeAreaViewComp>
     );
+  }
+
+  if (showNewChat) {
+    return (
+      <SafeAreaViewComp style={{ flex: 1, backgroundColor: COLORS.primaryBg, paddingBottom: 100 }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'row' as any,
+          alignItems: 'center',
+          padding: '20px 16px',
+          backgroundColor: COLORS.primary,
+          borderBottomLeftRadius: 40,
+          borderBottomRightRadius: 40,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        }}>
+          <TouchableOpacityComp onPress={() => setShowNewChat(false)} style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+            <TextComponent style={{ color: 'white', fontSize: 20, fontWeight: 900 as any }}>←</TextComponent>
+          </TouchableOpacityComp>
+          <TextComponent style={{ color: 'white', fontSize: 18, fontWeight: 900 as any, marginLeft: 12, flex: 1 }}>New Message</TextComponent>
+        </div>
+        <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
+          <TextComponent style={{ fontSize: 12, fontWeight: 700 as any, color: COLORS.gray500, textTransform: 'uppercase' as any, marginBottom: 16 }}>Select a contact</TextComponent>
+          {availableUsers.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+              <TextComponent style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }} >👥</TextComponent>
+              <TextComponent style={{ fontSize: 12, fontWeight: 900 as any, marginBottom: 8, opacity: 0.5 }}>No users found</TextComponent>
+              <TextComponent style={{ fontSize: 12, textAlign: 'center' as any, marginBottom: 24, opacity: 0.5 }}>Register more users</TextComponent>
+            </View>
+          ) : (
+            availableUsers.map((user) => (
+              <TouchableOpacityComp key={user.email} onPress={() => handleStartNewChat(user)} style={{
+                display: 'flex',
+                flexDirection: 'row' as any,
+                backgroundColor: 'white',
+                borderRadius: 16,
+                border: `1px solid ${COLORS.gray100}`,
+                padding: 16,
+                marginBottom: 8,
+              }}>
+                <div style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.gray100, display: 'flex', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                  <TextComponent>{getRoleIcon(user.role)}</TextComponent>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <TextComponent style={{ fontSize: 16, fontWeight: 900 as any }}>{user.name}</TextComponent>
+                  <TextComponent style={{ fontSize: 11, fontWeight: 700 as any, textTransform: 'uppercase' as any, opacity: 0.7 }}>{user.role}</TextComponent>
+                </div>
+              </TouchableOpacityComp>
+            ))
+          )}
+        </div>
+        <BottomNav active="MESSAGES" onNavigate={onNavigate} user={currentUser} />
+      </SafeAreaViewComp>
+    );
+  }
+
+  return (
+    <SafeAreaViewComp style={{ flex: 1, backgroundColor: COLORS.primaryBg, paddingBottom: 100 }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'row' as any,
+        alignItems: 'center',
+        padding: '20px 16px',
+        backgroundColor: COLORS.primary,
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+      }}>
+        <TouchableOpacityComp onPress={onBack} style={{
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: 'rgba(255,255,255,0.2)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <TextComponent style={{ color: 'white', fontSize: 20, fontWeight: 900 as any }}>←</TextComponent>
+        </TouchableOpacityComp>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+          <TextComponent style={{ color: 'white', fontSize: 20, fontWeight: 900 as any, flex: 1 }}>Messages</TextComponent>
+          {totalUnread > 0 && (
+            <div style={{ backgroundColor: 'white', borderRadius: 10, padding: '2px 6px' }}>
+              <TextComponent style={{ color: COLORS.primary, fontSize: 12, fontWeight: 900 as any }}>{totalUnread}</TextComponent>
+            </div>
+          )}
+        </div>
+        <TouchableOpacityComp onPress={() => {
+          loadAvailableUsers();
+          setShowNewChat(true);
+        }} style={{
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: 'rgba(255,255,255,0.2)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <TextComponent style={{ color: 'white', fontSize: 20 }}>✏️</TextComponent>
+        </TouchableOpacityComp>
+      </div>
+      <TextComponent style={{ padding: 16, color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 500 as any }}>Your messaging hub</TextComponent>
+      <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
+        {conversations.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+            <TextComponent style={{ fontSize: 72, marginBottom: 24, opacity: 0.5 }} >💬</TextComponent>
+            <TextComponent style={{ fontSize: 12, fontWeight: 900 as any, marginBottom: 8, opacity: 0.5 }}>No conversations</TextComponent>
+            <TextComponent style={{ fontSize: 12, textAlign: 'center' as any, marginBottom: 24, opacity: 0.5 }}>Start an order or chat</TextComponent>
+            <TouchableOpacityComp onPress={() => {
+              loadAvailableUsers();
+              setShowNewChat(true);
+            }} style={{
+              backgroundColor: COLORS.primary,
+              borderRadius: 25,
+              padding: '12px 24px',
+            }}>
+              <TextComponent style={{ color: 'white', fontSize: 14, fontWeight: 900 as any }}>New Chat</TextComponent>
+            </TouchableOpacityComp>
+          </View>
+        ) : (
+          conversations.map((convo) => {
+            const otherUser = getOtherParticipant(convo);
+            return (
+              <TouchableOpacityComp key={convo.id} onPress={() => setSelectedConversation(convo)} style={{
+                display: 'flex',
+                flexDirection: 'row' as any,
+                backgroundColor: 'white',
+                borderRadius: 25,
+                border: `1px solid ${COLORS.gray100}`,
+                padding: 16,
+                marginBottom: 12,
+              }}>
+                <div style={{ position: 'relative' as any }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.gray100, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <TextComponent>{otherUser ? getRoleIcon(otherUser.role) : '💬'}</TextComponent>
+                  </div>
+                  {convo.unreadCount > 0 && (
+                    <div style={{
+                      position: 'absolute' as any,
+                      top: -4,
+                      right: -4,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: COLORS.primary,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}>
+                      <TextComponent style={{ color: 'white', fontSize: 10, fontWeight: 900 as any }}>{convo.unreadCount}</TextComponent>
+                    </div>
+                  )}
+                </div>
+                <div style={{ flex: 1, marginLeft: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <TextComponent style={{ fontSize: 16, fontWeight: 900 as any }}>{otherUser?.name || 'Unknown'}</TextComponent>
+                    <TextComponent style={{ fontSize: 10, opacity: 0.7 }}>{convo.lastMessageTime ? formatTime(convo.lastMessageTime) : ''}</TextComponent>
+                  </div>
+                  <TextComponent style={{ fontSize: 11, fontWeight: 700 as any, textTransform: 'uppercase' as any, marginBottom: 4 }}>{otherUser?.role || 'User'}</TextComponent>
+                  <TextComponent style={{ fontSize: 14, opacity: 0.7 }}>{convo.lastMessage || 'Say hello!'}</TextComponent>
+                </div>
+              </TouchableOpacityComp>
+            );
+          })
+        )}
+      </div>
+      <BottomNav active="MESSAGES" onNavigate={onNavigate} user={currentUser} />
+    </SafeAreaViewComp>
+  );
 };
 
 export default Messages;

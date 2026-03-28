@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppScreen } from '../types';
+// Ayoo Purple Theme
 
 interface DineOutProps {
     onBack: () => void;
@@ -120,7 +121,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
         return (
             <div className="flex flex-col h-screen bg-gray-50">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-[#E91E63] to-[#FF69B4] p-6 pb-24 rounded-b-[40px] shadow-lg">
+                <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 pb-24 rounded-b-[40px] shadow-lg">
                     <div className="flex items-center justify-between mb-4">
                         <button onClick={onBack} className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black">
                             ←
@@ -135,7 +136,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
                         {reservations.map((res, idx) => (
                             <div key={idx} className="bg-white rounded-2xl p-4 shadow-md border border-gray-100">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center text-2xl">🍽️</div>
+                                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-2xl">🍽️</div>
                                     <div>
                                         <p className="font-black text-gray-900">{res.venue}</p>
                                         <p className="text-xs text-gray-500">{res.date} at {res.time}</p>
@@ -143,7 +144,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-gray-400">{res.guests} guests</span>
-                                    <span className="bg-green-100 text-green-600 text-xs font-bold px-3 py-1 rounded-full">Confirmed</span>
+                                    <span className="bg-[COLORS.successLight] text-[COLORS.success] text-xs font-bold px-3 py-1 rounded-full">Confirmed</span>
                                 </div>
                             </div>
                         ))}
@@ -164,7 +165,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
     if (showReservationModal && selectedVenue) {
         return (
             <div className="flex flex-col h-screen bg-gray-50">
-                <div className="bg-gradient-to-r from-[#E91E63] to-[#FF69B4] p-6 pb-20 rounded-b-[40px]">
+                <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 pb-20 rounded-b-[40px]">
                     <div className="flex items-center gap-3 mb-4">
                         <button onClick={() => setShowReservationModal(false)} className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black">
                             ←
@@ -196,7 +197,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
                                     key={time}
                                     onClick={() => setSelectedTime(time)}
                                     className={`p-3 rounded-xl text-xs font-bold transition-all ${selectedTime === time
-                                            ? 'bg-[#E91E63] text-white'
+                                            ? 'bg-[COLORS.primary] text-white'
                                             : 'bg-white border border-gray-100 text-gray-600'
                                         }`}
                                 >
@@ -215,7 +216,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
                                     key={num}
                                     onClick={() => setGuests(num)}
                                     className={`flex-shrink-0 w-12 h-12 rounded-xl text-sm font-bold transition-all ${guests === num
-                                            ? 'bg-[#E91E63] text-white'
+                                            ? 'bg-[COLORS.primary] text-white'
                                             : 'bg-white border border-gray-100 text-gray-600'
                                         }`}
                                 >
@@ -229,7 +230,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
                         onClick={handleReserve}
                         disabled={!selectedDate || !selectedTime}
                         className={`w-full py-4 rounded-2xl font-black uppercase tracking-wider text-sm ${selectedDate && selectedTime
-                                ? 'bg-gradient-to-r from-[#E91E63] to-[#FF69B4] text-white shadow-lg'
+                                ? `bg-gradient-to-r from-[COLORS.primary] to-[COLORS.primaryDark] text-white shadow-lg`
                                 : 'bg-gray-200 text-gray-400'
                             }`}
                     >
@@ -277,7 +278,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
 
                         <button
                             onClick={() => setShowReservationModal(true)}
-                            className="w-full mt-6 py-4 bg-gradient-to-r from-[#E91E63] to-[#FF69B4] text-white font-black uppercase tracking-wider rounded-2xl shadow-lg"
+                            className="w-full mt-6 py-4 bg-gradient-to-r from-[COLORS.primary] to-[COLORS.primaryDark] text-white font-black uppercase tracking-wider rounded-2xl shadow-lg"
                         >
                             🍽️ Reserve a Table
                         </button>
@@ -291,7 +292,7 @@ const DineOut: React.FC<DineOutProps> = ({ onBack, onNavigate }) => {
     return (
         <div className="flex flex-col h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#E91E63] to-[#FF69B4] p-6 pb-24 rounded-b-[40px] shadow-lg">
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 pb-24 rounded-b-[40px] shadow-lg">
                 <div className="flex items-center justify-between mb-4">
                     <button onClick={onBack} className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white font-black">
                         ←

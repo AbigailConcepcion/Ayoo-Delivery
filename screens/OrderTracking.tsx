@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../components/ToastContext';
 import Button from '../components/Button';
-import { Restaurant, OrderRecord, OrderStatus, UserAccount } from '../types';
+import { Restaurant, OrderRecord, OrderStatus, UserAccount, OrderTrackingStatus } from '../types';
 import { ayooCloud } from '../api';
 import { db } from '../db';
 import MapItinerary from '../components/MapItinerary';
@@ -340,7 +340,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
               >
                 🔔
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-black flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#C084FC] rounded-full text-white text-[10px] font-black flex items-center justify-center shadow-lg">
                     {notifications.filter(n => !n.read).length}
                   </span>
                 )}
@@ -371,7 +371,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
               <div
                 key={order.id}
                 onClick={() => selectOrder(order)}
-                className="bg-white border-2 border-gray-100 rounded-[30px] p-6 shadow-sm hover:shadow-lg hover:border-[#FF1493]/30 transition-all cursor-pointer"
+                className="bg-white border-2 border-gray-100 rounded-[30px] p-6 shadow-sm hover:shadow-lg hover:border-[#C084FC]/30 transition-all cursor-pointer"
               >
                 {/* Order Header */}
                 <div className="flex justify-between items-start mb-4">
@@ -389,7 +389,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
 
                 {/* Restaurant */}
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-white text-xl">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#C084FC] to-[#A855F7] rounded-2xl flex items-center justify-center text-white text-xl">
                     🍔
                   </div>
                   <div>
@@ -410,7 +410,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-400 uppercase tracking-wider">ETA</p>
-                    <p className="font-black text-[#FF1493]">{calculateETA(order.status)}</p>
+                    <p className="font-black text-[#C084FC]">{calculateETA(order.status)}</p>
                   </div>
                 </div>
 
@@ -481,9 +481,9 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
             >
               🔔
               {notifications.filter(n => !n.read).length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-black flex items-center justify-center">
-                  {notifications.filter(n => !n.read).length}
-                </span>
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#C084FC] rounded-full text-white text-[10px] font-black flex items-center justify-center shadow-lg">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
               )}
             </button>
 
@@ -575,7 +575,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === tab ? 'bg-white text-[#FF1493] shadow' : 'text-gray-500'
+              className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === tab ? 'bg-white text-[#C084FC] shadow' : 'text-gray-500'
                 }`}
             >
               {tab}
@@ -601,7 +601,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
 
         {!liveOrder ? (
           <div className="py-20 text-center opacity-40">
-            <div className="w-12 h-1 bg-[#FF1493]/20 mx-auto mb-4 rounded-full animate-pulse"></div>
+            <div className="w-12 h-1 bg-[#C084FC]/20 mx-auto mb-4 rounded-full animate-pulse"></div>
             <p className="font-black uppercase tracking-widest text-[9px]">Awaiting Dispatch Node...</p>
           </div>
         ) : (
@@ -631,11 +631,11 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
               <div className="bg-white border-2 border-gray-50 rounded-[45px] p-8 shadow-sm">
                 <h3 className="font-black text-[10px] text-gray-400 uppercase tracking-widest mb-6">Status Timeline</h3>
                 <div className="space-y-4">
-                  {(['PENDING', 'ACCEPTED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED'] as OrderStatus[]).map((status, idx) => {
+                  {(['PENDING', 'ACCEPTED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED'] as OrderTrackingStatus[]).map((status, idx) => {
                     const done = getStatusIndex(liveOrder.status) >= getStatusIndex(status);
                     return (
                       <div key={status} className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${done ? 'bg-[#FF1493] text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${done ? 'bg-[#C084FC] text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div>
                         <p className={`text-xs font-black uppercase tracking-widest ${done ? 'text-gray-900' : 'text-gray-400'}`}>{status.replaceAll('_', ' ')}</p>
                       </div>
                     );
@@ -645,9 +645,9 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
             )}
 
             {/* ENHANCED RIDER INFO CARD */}
-            <div className="bg-gradient-to-br from-gray-50 to-white p-8 rounded-[40px] border-2 border-[#FF1493]/10 shadow-lg">
+            <div className="bg-gradient-to-br from-gray-50 to-white p-8 rounded-[40px] border-2 border-[#C084FC]/10 shadow-lg">
               <div className="flex items-center gap-5">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-3xl flex items-center justify-center text-white text-3xl font-black shadow-xl overflow-hidden">
+                <div className="w-20 h-20 bg-gradient-to-br from-[#C084FC] to-[#A855F7] rounded-3xl flex items-center justify-center text-white text-3xl font-black shadow-xl overflow-hidden">
                   {riderProfile?.avatar ? (
                     <img src={riderProfile.avatar} alt={riderProfile.name} className="w-full h-full object-cover" />
                   ) : (
@@ -666,7 +666,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                       <span className="text-xs font-bold text-gray-500">{riderProfile.totalDeliveries} deliveries</span>
                     </div>
                   )}
-                  <p className="text-[10px] font-bold text-[#FF1493] uppercase tracking-[0.2em] mt-2">
+                  <p className="text-[10px] font-bold text-[#C084FC] uppercase tracking-[0.2em] mt-2">
                     {riderProfile ? `${riderProfile.vehicleColor} ${riderProfile.vehicleType} • ${riderProfile.vehiclePlate}` : 'Active Logistics Partner'}
                   </p>
                 </div>
@@ -690,7 +690,7 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({
                 ))}
                 <div className="mt-6 pt-6 border-t border-gray-100 flex justify-between items-center">
                   <span className="font-black text-lg text-gray-900">Total</span>
-                  <span className="text-2xl font-black text-[#FF1493]">₱{liveOrder.total}</span>
+                  <span className="text-2xl font-black text-[#C084FC]">₱{liveOrder.total}</span>
                 </div>
               </div>
             )}

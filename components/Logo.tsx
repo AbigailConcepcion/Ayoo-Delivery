@@ -15,14 +15,14 @@ const sizes = {
   '2xl': { container: 'w-56 h-56', text: 'text-9xl' },
 };
 
-const AYOO_IMAGE_URL = 'https://d64gsuwffb70l.cloudfront.net/68eb2e4f3c019d04aff05499_1770844273557_ae970a79.jpg';
+const AYOO_IMAGE_URL = '/logo.png';
 
 const getVariantClasses = (variant?: string) => {
   switch (variant) {
     case 'white':
       return 'bg-white/10 backdrop-blur-md';
-    case 'colored':
-      return 'bg-gradient-to-br from-pink-500 via-purple-500 to-pink-400';
+case 'colored':
+      return 'bg-gradient-to-br from-[#C084FC] via-[#A855F7] to-[#8B5CF6]';
     default:
       return 'bg-transparent';
   }
@@ -50,9 +50,9 @@ export const Logo: React.FC<LogoProps> = ({
   const textColor = getTextColor(variant);
 
   // For icon variant
-  if (variant === 'icon') {
+if (variant === 'icon') {
     return (
-      <div className={`${sizeConfig.container} rounded-[30px] bg-gradient-to-br from-pink-500 via-purple-500 to-pink-400 flex items-center justify-center shadow-xl overflow-hidden`}>
+      <div className={`${sizeConfig.container} rounded-[30px] bg-gradient-to-br from-[#C084FC] via-[#A855F7] to-[#8B5CF6] flex items-center justify-center shadow-xl overflow-hidden`}>
         <img
           src={AYOO_IMAGE_URL}
           alt="Ayoo Icon"

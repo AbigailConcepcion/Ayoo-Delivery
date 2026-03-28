@@ -147,7 +147,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, onNavigate, restaurants
     <div className="min-h-screen bg-[#0F0F0F] text-white p-8 pb-32 overflow-y-auto scrollbar-hide">
       <div className="flex justify-between items-center mb-10">
         <div className="flex flex-col">
-          <h2 className="text-4xl font-black uppercase tracking-tighter text-[#FF00CC]">Owner HQ</h2>
+        <h2 className="text-4xl font-black uppercase tracking-tighter text-purple-400">Owner HQ</h2>
           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">Logistics Engine</p>
         </div>
         {/* explicit return button with arrow and label */}
@@ -159,7 +159,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, onNavigate, restaurants
       {!editingRes && (
         <div className="flex gap-2 mb-8 bg-white/5 p-1.5 rounded-[24px] overflow-x-auto scrollbar-hide border border-white/5">
           {(['merchants', 'users', 'dispatch', 'leaderboard', 'system'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 min-w-[80px] py-4 rounded-[18px] text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-[#FF00CC] text-white shadow-lg' : 'text-gray-500 hover:text-gray-400'}`}>
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 min-w-[80px] py-4 rounded-[18px] text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-purple-500 text-white shadow-lg' : 'text-gray-500 hover:text-gray-400'}`}>
               {tab}
             </button>
           ))}
@@ -169,9 +169,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, onNavigate, restaurants
       {!editingRes ? (
         activeTab === 'merchants' ? (
           <div className="space-y-6">
-            <button onClick={() => setEditingRes({ name: '', cuisine: '', image: '', items: [] } as any)} className="w-full p-8 bg-[#FF00CC] rounded-[35px] font-black uppercase tracking-widest text-sm active:scale-95 transition-all shadow-xl shadow-pink-900/10">Add Merchant +</button>
+            <button onClick={() => setEditingRes({ name: '', cuisine: '', image: '', items: [] } as any)} className="w-full p-8 bg-purple-500 rounded-[35px] font-black uppercase tracking-widest text-sm active:scale-95 transition-all shadow-xl shadow-purple-900/10">Add Merchant +</button>
             {restaurants.map(res => (
-              <div key={res.id} className="bg-[#1A1A1A] p-6 rounded-[35px] border border-white/5 flex items-center justify-between group hover:border-pink-500/30 transition-all">
+              <div key={res.id} className="bg-[#1A1A1A] p-6 rounded-[35px] border border-white/5 flex items-center justify-between group hover:border-purple-500/30 transition-all">
                 <div className="flex items-center gap-4">
                   <img src={res.image} className="w-14 h-14 rounded-2xl object-cover border border-white/10" alt={res.name} />
                   <div>
@@ -179,7 +179,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack, onNavigate, restaurants
                     <p className="text-[10px] font-bold text-gray-500 uppercase mt-1">{res.items.length} items • {res.cuisine}</p>
                   </div>
                 </div>
-                <button onClick={() => setEditingRes(res)} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-[#FF00CC] transition-all">✎</button>
+                <button onClick={() => setEditingRes(res)} className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-purple-500 transition-all">✎</button>
               </div>
             ))}
           </div>

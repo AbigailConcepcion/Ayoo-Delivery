@@ -161,7 +161,7 @@ const BottomNav: React.FC<BottomNavProps> = ({
   const items = mode === 'operations' ? operationsItems : customerItems;
 
   // Use consistent color from design system
-  const activeColor = '#FF1493';
+  const activeColor = 'purple-500';
   const inactiveColor = '#9CA3AF';
 
   return (
@@ -173,7 +173,7 @@ const BottomNav: React.FC<BottomNavProps> = ({
             key={item.screen}
             onClick={() => onNavigate(item.screen)}
             className={`flex flex-col items-center justify-center py-2 px-2 rounded-xl transition-all duration-200 min-w-[56px] ${isActive
-              ? 'bg-pink-50'
+              ? 'bg-purple-50'
               : 'hover:bg-gray-50'
               }`}
           >
@@ -188,14 +188,14 @@ const BottomNav: React.FC<BottomNavProps> = ({
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-white"></span>
               )}
             </div>
-            <span
-              className={`text-[10px] font-medium mt-1 ${isActive ? 'text-pink-500' : 'text-gray-400'
-                }`}
-            >
+              <span
+                className={`text-[10px] font-medium mt-1 ${isActive ? 'text-purple-500' : 'text-gray-400'
+                  }`}
+              >
               {item.label}
             </span>
             {isActive && (
-              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-full"></div>
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-[#C084FC] to-[#A78BFA] rounded-full"></div>
             )}
           </button>
         );

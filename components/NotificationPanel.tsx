@@ -42,7 +42,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
             case 'OUT_FOR_DELIVERY':
                 return 'bg-blue-50 border-blue-200';
             default:
-                return 'bg-pink-50 border-pink-200';
+                return 'bg-purple-50 border-purple-200';
         }
     };
 
@@ -70,13 +70,13 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
                 <div className="p-6 pb-4 border-b border-gray-100 flex-shrink-0">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-white text-xl shadow-lg">
+                            <div className="w-12 h-12 bg-gradient-to-br from-[#C084FC] to-[#A78BFA] rounded-2xl flex items-center justify-center text-white text-xl shadow-lg">
                                 🔔
                             </div>
                             <div>
                                 <h2 className="text-xl font-black text-gray-900">Notifications</h2>
                                 {unreadCount > 0 && (
-                                    <p className="text-xs font-bold text-[#FF1493]">{unreadCount} unread</p>
+                                    <p className="text-xs font-bold text-[#C084FC]">{unreadCount} unread</p>
                                 )}
                             </div>
                         </div>
@@ -91,7 +91,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
                     {unreadCount > 0 && (
                         <button
                             onClick={onMarkAllAsRead}
-                            className="text-xs font-bold text-[#FF1493] hover:underline"
+                            className="text-xs font-bold text-[#C084FC] hover:underline"
                         >
                             Mark all as read
                         </button>
@@ -122,8 +122,8 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
                                             <h4 className={`font-black text-sm ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>
                                                 {notification.title}
                                             </h4>
-                                            {!notification.read && (
-                                                <div className="w-2 h-2 bg-[#FF1493] rounded-full flex-shrink-0 mt-1"></div>
+{!notification.read && (
+                                                <div className="w-2 h-2 bg-[#C084FC] rounded-full flex-shrink-0 mt-1 ml-auto"></div>
                                             )}
                                         </div>
                                         <p className="text-xs font-medium text-gray-600 mt-1 line-clamp-2">

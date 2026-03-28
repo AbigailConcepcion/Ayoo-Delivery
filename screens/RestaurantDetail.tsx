@@ -5,6 +5,7 @@ import { Restaurant, FoodItem, Review, OrderRecord } from '../types';
 import Button from '../components/Button';
 import { streamHub, ayooCloud } from '../api';
 import { GoogleGenAI, Modality } from '@google/genai';
+// Purple theme - COLORS import not needed
 
 interface RestaurantDetailProps {
   restaurant: Restaurant;
@@ -45,7 +46,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
     showToast(`${item.name} x${toAdd} added`);
   };
 
-  // MANUAL AUDIO HELPERS PER GUIDELINES
+  // MANUAL AUDIO HELPERS
   const decode = (base64: string) => {
     const binaryString = atob(base64);
     const len = binaryString.length;
@@ -110,7 +111,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
         callbacks: {
           onopen: () => setIntercomStatus('LIVE'),
           onmessage: async (msg) => {
-            const audioB64 = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+            const audioB64 = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioB64 && audioContextRef.current) {
               const buffer = await decodeAudioData(decode(audioB64), audioContextRef.current, 24000, 1);
               const source = audioContextRef.current.createBufferSource();
@@ -175,13 +176,13 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                 <img src={liveFrame} className="w-full h-full object-cover" alt="Live Feed" />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center bg-black">
-                   <div className="w-16 h-16 ayoo-gradient rounded-full animate-spin mb-6 opacity-30"></div>
+                   <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-500 rounded-full animate-spin mb-6 opacity-30"></div>
                    <p className="text-white/40 font-black uppercase text-[10px] tracking-widest leading-relaxed">Awaiting High-Fi<br/>Merchant Stream...</p>
                 </div>
               )}
 
               <div className="absolute top-10 left-8 right-8 flex justify-between items-center z-10">
-                 <div className="bg-red-600 text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg">
+                 <div className="bg-[COLORS.success] text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg">
                     <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                     Live Prep
                  </div>
@@ -192,22 +193,22 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                  <div className="bg-black/60 backdrop-blur-xl p-6 rounded-[35px] border border-white/10">
                     <div className="flex justify-between items-center mb-4">
                        <div>
-                          <p className="text-[10px] font-black text-[#FF00CC] uppercase mb-1">Kitchen Intercom</p>
+                          <p className="text-[10px] font-black text-purple-400 uppercase mb-1">Kitchen Intercom</p>
                           <h4 className="text-white font-black text-lg tracking-tighter uppercase leading-none">{intercomStatus}</h4>
                        </div>
-                       {isIntercomActive && <div className="w-3 h-3 bg-red-500 rounded-full animate-ping"></div>}
+                       {isIntercomActive && <div className="w-3 h-3 bg-[COLORS.error] rounded-full animate-ping"></div>}
                     </div>
                     <button 
                       onClick={isIntercomActive ? stopIntercom : startIntercom}
                       className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
-                        isIntercomActive ? 'bg-red-500 text-white shadow-lg' : 'bg-white text-black active:scale-95'
+                        isIntercomActive ? 'bg-[COLORS.error] text-white shadow-lg' : 'bg-white text-black active:scale-95'
                       }`}
                     >
                       {isIntercomActive ? 'Disconnect Intercom' : '🎤 Talk to Head Chef'}
                     </button>
                  </div>
               </div>
-              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-[#FF00CC]/10 to-transparent animate-scan pointer-events-none"></div>
+              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-purple-500/10 to-transparent animate-scan pointer-events-none"></div>
            </div>
         </div>
       )}
@@ -221,13 +222,13 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
              {restaurant.hasLiveCam && (
                <button 
                  onClick={() => setShowLiveCam(true)}
-                 className="h-14 bg-green-500 px-6 rounded-2xl flex items-center justify-center text-white font-black uppercase tracking-widest text-[10px] shadow-xl active:scale-90 transition-all gap-2"
+                 className="h-14 bg-[COLORS.success] px-6 rounded-2xl flex items-center justify-center text-white font-black uppercase tracking-widest text-[10px] shadow-xl active:scale-90 transition-all gap-2"
                >
                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                  Live Cam
                </button>
              )}
-             <button onClick={onOpenCart} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-[#FF00CC] shadow-xl active:scale-90 transition-all relative">
+             <button onClick={onOpenCart} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-purple-500 shadow-xl active:scale-90 transition-all relative">
                 🛒
                 {cartCount > 0 && <span className="absolute -top-1 -right-1 bg-yellow-400 text-black text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">{cartCount}</span>}
              </button>
@@ -241,9 +242,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
 
       <div className="bg-white sticky top-0 z-40 px-8 py-2 border-b border-gray-100 flex gap-10 justify-center">
          {['Menu', 'Reviews'].map((tab) => (
-           <button key={tab} onClick={() => setActiveTab(tab as any)} className={`py-4 text-sm font-black uppercase tracking-widest relative transition-all ${activeTab === tab ? 'text-[#FF00CC]' : 'text-gray-300'}`}>
+           <button key={tab} onClick={() => setActiveTab(tab as any)} className={`py-4 text-sm font-black uppercase tracking-widest relative transition-all ${activeTab === tab ? 'text-purple-500' : 'text-gray-300'}`}>
              {tab}
-             {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 ayoo-gradient rounded-full"></div>}
+             {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-400 to-purple-600"></div>}
            </button>
          ))}
       </div>
@@ -257,7 +258,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
-                    activeCategory === cat ? 'bg-[#FF00CC] text-white' : 'bg-gray-100 text-gray-500'
+                    activeCategory === cat ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-500'
                   }`}
                 >
                   {cat}
@@ -282,7 +283,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
                               <span className="w-5 text-center text-xs font-black">{qtyDraft[item.id] || 1}</span>
                               <button onClick={() => setQtyDraft(prev => ({ ...prev, [item.id]: (prev[item.id] || 1) + 1 }))} className="w-6 h-6 rounded-lg bg-white text-xs font-black">+</button>
                             </div>
-                            <button onClick={() => handleAdd(item)} className="bg-gray-100 text-[#FF00CC] px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-pink-50 transition-colors">Add +</button>
+                            <button onClick={() => handleAdd(item)} className="bg-gray-100 text-purple-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-purple-50 transition-colors">Add +</button>
                           </div>
                         </div>
                       </div>
@@ -319,3 +320,4 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
 };
 
 export default RestaurantDetail;
+

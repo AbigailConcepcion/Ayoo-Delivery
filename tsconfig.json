@@ -23,5 +23,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "files": ["shims-react.d.ts"]
+"files":["shims-react.d.ts","src/react-native-shim.d.ts","env.d.ts"]
 }

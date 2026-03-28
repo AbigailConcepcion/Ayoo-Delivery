@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { CATEGORIES, PHILIPPINE_CITIES } from '../constants';
 import type { Restaurant, UserBadge, AppScreen, Voucher, UserAccount, OrderRecord, LeaderboardEntry, LeaderboardPeriod } from '../types';
+import BottomNav from '../components/BottomNav';
 import { db } from '../db';
 import { ayooCloud } from '../api';
 
@@ -496,7 +497,7 @@ const Home: React.FC<HomeProps> = ({
           </div>
           <button
             onClick={() => { setSharePost(post); setShowShareModal(true); }}
-            className="text-gray-400 hover:text-[#FF1493] text-lg"
+            className="text-gray-400 hover:text-[#C084FC] text-lg"
           >
             📤
           </button>
@@ -521,7 +522,7 @@ const Home: React.FC<HomeProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowReactionPicker(showReactionPicker === post.id ? null : post.id)}
-              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${post.userReaction ? 'text-[#FF1493] bg-pink-50' : 'text-gray-500 hover:bg-gray-100'}`}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${post.userReaction ? 'text-[#C084FC] bg-purple-50' : 'text-gray-500 hover:bg-gray-100'}`}
             >
               {post.userReaction ? REACTION_EMOJIS[post.userReaction] : '👍'}
               <span>{post.userReaction || 'Like'}</span>
@@ -571,11 +572,11 @@ const Home: React.FC<HomeProps> = ({
                 onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
                 onKeyDown={(e) => e.key === 'Enter' && handleComment(post.id)}
                 placeholder="Write a comment..."
-                className="flex-1 bg-gray-50 rounded-full px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-[#FF1493]/30"
+                className="flex-1 bg-gray-50 rounded-full px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-[#C084FC]/30"
               />
               <button
                 onClick={() => handleComment(post.id)}
-                className="w-8 h-8 bg-[#FF1493] rounded-full flex items-center justify-center text-white text-sm"
+                className="w-8 h-8 bg-[#C084FC] rounded-full flex items-center justify-center text-white text-sm"
               >
                 ➤
               </button>
@@ -627,18 +628,18 @@ const Home: React.FC<HomeProps> = ({
                 {/* Reply Input */}
                 {replyText[comment.id] !== undefined && (
                   <div className="ml-6 mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={replyText[comment.id] || ''}
-                      onChange={(e) => setReplyText({ ...replyText, [comment.id]: e.target.value })}
-                      onKeyDown={(e) => e.key === 'Enter' && handleReply(post.id, comment.id)}
-                      placeholder="Write a reply..."
-                      className="flex-1 bg-gray-50 rounded-full px-3 py-1 text-xs font-medium outline-none focus:ring-2 focus:ring-[#FF1493]/30"
-                    />
-                    <button
-                      onClick={() => handleReply(post.id, comment.id)}
-                      className="text-[#FF1493] text-xs font-black"
-                    >
+                <input
+                  type="text"
+                  value={replyText[comment.id] || ''}
+                  onChange={(e) => setReplyText({ ...replyText, [comment.id]: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && handleReply(post.id, comment.id)}
+                  placeholder="Write a reply..."
+                  className="flex-1 bg-gray-50 rounded-full px-3 py-1 text-xs font-medium outline-none focus:ring-2 focus:ring-[#C084FC]/30"
+                />
+            <button
+              onClick={() => handleReply(post.id, comment.id)}
+              className="text-[#C084FC] text-xs font-black"
+            >
                       Send
                     </button>
                   </div>
@@ -680,7 +681,7 @@ const Home: React.FC<HomeProps> = ({
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-black text-gray-900 text-base">⭐ Featured Merchants</h3>
-          <button className="text-[#FF1493] text-xs font-bold">See All</button>
+          <button className="text-[#C084FC] text-xs font-bold">See All</button>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
           {featuredRestaurants.map((res) => (
@@ -702,14 +703,14 @@ const Home: React.FC<HomeProps> = ({
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-black text-gray-900 text-base">🔥 Trending Now</h3>
-          <button className="text-[#FF1493] text-xs font-bold">See All</button>
+          <button className="text-[#C084FC] text-xs font-bold">See All</button>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
           {trendingItems.map((item, idx) => (
             <div key={idx} className="flex-shrink-0 w-32 bg-white rounded-2xl shadow-md border border-gray-100 p-3">
               <div className="text-2xl mb-2">🍜</div>
               <p className="font-bold text-xs text-gray-900 truncate">{item.name}</p>
-              <p className="text-[#FF1493] font-black text-sm">₱{item.price}</p>
+              <p className="text-purple-500 font-black text-sm">₱{item.price}</p>
             </div>
           ))}
         </div>
@@ -719,7 +720,7 @@ const Home: React.FC<HomeProps> = ({
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-black text-gray-900 text-base">🆕 New on Ayoo</h3>
-          <button className="text-[#FF1493] text-xs font-bold">See All</button>
+          <button className="text-[#C084FC] text-xs font-bold">See All</button>
         </div>
         <div className="space-y-2">
           {newRestaurants.slice(0, 3).map((res) => (
@@ -755,7 +756,7 @@ const Home: React.FC<HomeProps> = ({
         <h3 className="font-black text-gray-900 text-base mb-3">🤖 AI Picks For You</h3>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-3">
           {MOODS.map(mood => (
-            <button key={mood.name} onClick={() => askAiForMood(mood.name)} className={`flex-shrink-0 px-4 py-2 rounded-full flex items-center gap-2 transition-all ${selectedMood === mood.name ? 'bg-[#FF1493] text-white' : 'bg-white border border-gray-100'}`}>
+            <button key={mood.name} onClick={() => askAiForMood(mood.name)} className={`flex-shrink-0 px-4 py-2 rounded-full flex items-center gap-2 transition-all ${selectedMood === mood.name ? 'bg-[#C084FC] text-white' : 'bg-white border border-gray-100'}`}>
               <span className="text-sm">{mood.icon}</span>
               <span className="text-[10px] font-black uppercase">{mood.name}</span>
             </button>
@@ -764,8 +765,8 @@ const Home: React.FC<HomeProps> = ({
         {(aiLoading || aiSuggestion) && (
           <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-4 rounded-2xl border border-pink-100">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] font-black text-[#FF1493]">🤖 Ayoo AI</p>
-              {aiLoading && <div className="w-3 h-3 border-2 border-[#FF1493] border-t-transparent rounded-full animate-spin"></div>}
+              <p className="text-[10px] font-black text-[#C084FC]">🤖 Ayoo AI</p>
+              {aiLoading && <div className="w-3 h-3 border-2 border-[#C084FC] border-t-transparent rounded-full animate-spin"></div>}
             </div>
             {aiSuggestion && <p className="text-gray-700 font-bold text-sm mt-1">"{aiSuggestion}"</p>}
           </div>
@@ -907,7 +908,7 @@ const Home: React.FC<HomeProps> = ({
                 <p className="font-black text-sm text-gray-900">{merchant.name}</p>
                 <p className="text-[10px] text-gray-500">{merchant.stats}</p>
               </div>
-              <span className="bg-pink-100 text-[#FF1493] text-[8px] font-black px-2 py-1 rounded-full">{merchant.badge}</span>
+            <span className="bg-purple-100 text-[#C084FC] text-[8px] font-black px-2 py-1 rounded-full">{merchant.badge}</span>
             </button>
           ))}
         </div>
@@ -1034,10 +1035,10 @@ const Home: React.FC<HomeProps> = ({
 
         {/* Tab Switcher */}
         <div className="bg-white/20 backdrop-blur-sm rounded-xl p-1 flex">
-          <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'discover' ? 'bg-white text-[#FF1493] shadow-md' : 'text-white'}`}>
+          <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'discover' ? 'bg-white text-purple-500 shadow-md' : 'text-white'}`}>
             Discover
           </button>
-          <button onClick={() => setActiveTab('community')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'community' ? 'bg-white text-[#FF1493] shadow-md' : 'text-white'}`}>
+          <button onClick={() => setActiveTab('community')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'community' ? 'bg-white text-purple-500 shadow-md' : 'text-white'}`}>
             Community
           </button>
         </div>
@@ -1048,29 +1049,7 @@ const Home: React.FC<HomeProps> = ({
         {activeTab === 'discover' ? renderDiscoveries() : renderCommunity()}
       </div>
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-2xl border-t border-gray-100 px-6 py-3 flex justify-around items-center max-w-md mx-auto rounded-t-[40px] shadow-[0_-10px_40px_rgba(255,20,147,0.15)] z-50">
-        <button onClick={() => { }} className="flex flex-col items-center text-[#FF1493] p-2">
-          <span className="text-3xl mb-1">🏠</span>
-          <span className="text-[10px] font-black uppercase tracking-wider">Home</span>
-        </button>
-        <button onClick={() => onNavigate?.('MESSAGES')} className="flex flex-col items-center text-gray-400 p-2">
-          <span className="text-3xl mb-1">💬</span>
-          <span className="text-[10px] font-black uppercase tracking-wider">Messages</span>
-        </button>
-        <button onClick={() => onNavigate?.('VOUCHERS')} className="flex flex-col items-center text-gray-400 p-2">
-          <span className="text-3xl mb-1">🎟️</span>
-          <span className="text-[10px] font-black uppercase tracking-wider">Voucher</span>
-        </button>
-        <button onClick={() => onNavigate?.('HISTORY')} className="flex flex-col items-center text-gray-400 p-2">
-          <span className="text-3xl mb-1">📑</span>
-          <span className="text-[10px] font-black uppercase tracking-wider">Orders</span>
-        </button>
-        <button onClick={() => onNavigate?.('PROFILE')} className="flex flex-col items-center text-gray-400 p-2">
-          <span className="text-3xl mb-1">👤</span>
-          <span className="text-[10px] font-black uppercase tracking-wider">Profile</span>
-        </button>
-      </div>
+      <BottomNav active="HOME" onNavigate={onNavigate!} user={currentUser} />
     </div>
   );
 };

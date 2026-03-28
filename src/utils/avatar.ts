@@ -26,7 +26,7 @@ export const getInitials = (name: string): string => {
  */
 const getColorFromEmail = (email: string): string => {
     const colors = [
-        '#FF1493', // Pink
+        '#C084FC', // Purple
         '#7B2FF7', // Purple
         '#3B82F6', // Blue
         '#10B981', // Green

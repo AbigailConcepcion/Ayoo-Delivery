@@ -117,9 +117,9 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
                 className="absolute inset-0 opacity-20"
                 style={{
                     backgroundImage: `
-            linear-gradient(#FF1493 0.5px, transparent 0.5px),
-            linear-gradient(90deg, #FF1493 0.5px, transparent 0.5px)
-          `,
+                        linear-gradient(#C084FC 0.5px, transparent 0.5px),
+                        linear-gradient(90deg, #C084FC 0.5px, transparent 0.5px)
+                    `,
                     backgroundSize: '20px 20px'
                 }}
             ></div>
@@ -129,7 +129,7 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
                 {/* Grid pattern */}
                 <defs>
                     <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#FF1493" strokeWidth="0.3" opacity="0.2" />
+                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#C084FC" strokeWidth="0.3" opacity="0.2" />
                     </pattern>
                 </defs>
                 <rect width="100%" height="100%" fill="url(#grid)" />
@@ -138,7 +138,7 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
                 <path
                     d={routePath}
                     fill="none"
-                    stroke="#FF1493"
+                    stroke="#C084FC"
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -150,7 +150,7 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
                     <path
                         d={routePath}
                         fill="none"
-                        stroke="#FF69B4"
+                        stroke="#A78BFA"
                         strokeWidth="4"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -160,9 +160,9 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
 
                 {/* Restaurant Marker */}
                 <g>
-                    <circle cx={restaurantPos.x} cy={restaurantPos.y} r="8" fill="#FF1493" opacity="0.3" />
-                    <circle cx={restaurantPos.x} cy={restaurantPos.y} r="5" fill="#FF1493" />
-                    <text x={restaurantPos.x} y={restaurantPos.y - 12} textAnchor="middle" fontSize="8" fill="#FF1493" fontWeight="bold">STORE</text>
+                    <circle cx={restaurantPos.x} cy={restaurantPos.y} r="8" fill="#C084FC" opacity="0.3" />
+                    <circle cx={restaurantPos.x} cy={restaurantPos.y} r="5" fill="#C084FC" />
+                    <text x={restaurantPos.x} y={restaurantPos.y - 12} textAnchor="middle" fontSize="8" fill="#C084FC" fontWeight="bold">STORE</text>
                 </g>
 
                 {/* Delivery Marker */}
@@ -175,9 +175,9 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
                 {/* Rider Marker (when out for delivery) */}
                 {status === 'OUT_FOR_DELIVERY' && (
                     <g className="animate-bounce" style={{ animationDuration: '2s' }}>
-                        <circle cx={riderPos.x} cy={riderPos.y} r="12" fill="#FF69B4" opacity="0.4" />
-                        <circle cx={riderPos.x} cy={riderPos.y} r="8" fill="#FF69B4" stroke="white" strokeWidth="2" />
-                        <text x={riderPos.x} y={riderPos.y + 20} textAnchor="middle" fontSize="7" fill="#FF1493" fontWeight="bold">🛵 RIDER</text>
+                        <circle cx={riderPos.x} cy={riderPos.y} r="12" fill="#A78BFA" opacity="0.4" />
+                        <circle cx={riderPos.x} cy={riderPos.y} r="8" fill="#A78BFA" stroke="white" strokeWidth="2" />
+                        <text x={riderPos.x} y={riderPos.y + 20} textAnchor="middle" fontSize="7" fill="#C084FC" fontWeight="bold">🛵 RIDER</text>
                     </g>
                 )}
             </svg>
@@ -186,12 +186,12 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
             <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
                 <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg">
                     <p className="text-[8px] font-black uppercase text-gray-500 tracking-wider">Distance</p>
-                    <p className="text-sm font-black text-[#FF1493]">{distance.toFixed(1)} km</p>
+                    <p className="text-sm font-black text-[#C084FC]">{distance.toFixed(1)} km</p>
                 </div>
 
                 <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg">
                     <p className="text-[8px] font-black uppercase text-gray-500 tracking-wider">ETA</p>
-                    <p className="text-sm font-black text-[#FF1493]">{eta}</p>
+                    <p className="text-sm font-black text-[#C084FC]">{eta}</p>
                 </div>
             </div>
 
@@ -202,7 +202,7 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
                     onClick={onRiderClick}
                 >
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-lg">
+                        <div className="w-12 h-12 bg-gradient-to-br from-[#C084FC] to-[#A78BFA] rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-lg">
                             {riderProfile.avatar ? (
                                 <img src={riderProfile.avatar} alt={riderProfile.name} className="w-full h-full rounded-2xl object-cover" />
                             ) : (
@@ -229,7 +229,7 @@ const MapItinerary: React.FC<MapItineraryProps> = ({
                     {/* Progress Bar */}
                     <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                            className="h-full bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-full transition-all duration-500"
+                            className="h-full bg-gradient-to-r from-[#C084FC] to-[#A78BFA] rounded-full transition-all duration-500"
                             style={{ width: `${progress}%` }}
                         ></div>
                     </div>

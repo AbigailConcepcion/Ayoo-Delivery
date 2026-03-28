@@ -188,7 +188,7 @@ const Search: React.FC<SearchProps> = ({
             <h3 className="text-2xl font-black uppercase tracking-tighter mb-2 text-center">Delivery location</h3>
 
             <div className="space-y-3 max-h-[45vh] overflow-y-auto scrollbar-hide pb-6 border-t border-gray-100 pt-6">
-              {PHILIPPINE_CITIES.map((city) => (
+          {PHILIPPINE_CITIES.map((city) => (
                 <button
                   key={city}
                   onClick={() => {
@@ -196,18 +196,18 @@ const Search: React.FC<SearchProps> = ({
                     setShowLocationPicker(false);
                   }}
                   className={`w-full p-6 rounded-[30px] flex items-center justify-between border-2 transition-all ${
-                    deliveryCity === city ? 'bg-[#FF1493]/5 border-[#FF1493]' : 'bg-gray-50 border-gray-100'
+                    deliveryCity === city ? 'bg-purple-500/5 border-purple-500' : 'bg-gray-50 border-gray-100'
                   }`}
                 >
                   <span
                     className={`font-black uppercase tracking-widest text-xs ${
-                      deliveryCity === city ? 'text-[#FF1493]' : 'text-gray-900'
+                      deliveryCity === city ? 'text-purple-500' : 'text-gray-900'
                     }`}
                   >
                     {city}
                   </span>
                   {deliveryCity === city && (
-                    <div className="w-6 h-6 bg-[#FF1493] rounded-full flex items-center justify-center text-white text-[10px]">
+                    <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center text-white text-[10px]">
                       ✓
                     </div>
                   )}
@@ -225,20 +225,20 @@ const Search: React.FC<SearchProps> = ({
       )}
 
       {/* Grab-like Search Header */}
-      <div className="bg-[#FF1493] px-4 pt-4 pb-5 rounded-b-[34px] shadow-xl sticky top-0 z-40 transition-all duration-300">
+      <div className="bg-purple-500 px-4 pt-4 pb-5 rounded-b-[34px] shadow-xl sticky top-0 z-40 transition-all duration-300">
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={onBack}
-              className="w-10 h-10 bg-white/90 rounded-xl flex items-center justify-center text-[#FF1493] shadow-xl active:scale-95"
+              className="w-10 h-10 bg-white/90 rounded-xl flex items-center justify-center text-purple-500 shadow-xl active:scale-95"
               title="Back"
             >
               ←
             </button>
 
-            <div className="flex items-center gap-3 cursor-pointer group min-w-0" onClick={() => setShowLocationPicker(true)}>
-              <div className="w-12 h-12 bg-white/15 border border-white/25 rounded-2xl overflow-hidden shadow-lg">
-                <img src={IMAGES.logoPink} alt="Ayoo Logo" className="w-full h-full object-cover scale-[1.35]" />
+              <div className="flex items-center gap-3 cursor-pointer group min-w-0" onClick={() => setShowLocationPicker(true)}>
+              <div className="w-12 h-12 bg-white/20 border border-white/30 rounded-2xl overflow-hidden shadow-lg flex items-center justify-center">
+                <img src="/logo.png" alt="Ayoo" className="w-full h-full object-contain p-1" />
               </div>
               <div className="text-white min-w-0">
                 <p className="text-[9px] opacity-80 font-black uppercase tracking-[0.2em] mb-1">Delivering to</p>
@@ -252,14 +252,14 @@ const Search: React.FC<SearchProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => onNavigate('PROFILE')}
-              className="w-10 h-10 bg-white/90 rounded-xl flex items-center justify-center text-[#FF1493] shadow-xl active:scale-95"
+              className="w-10 h-10 bg-white/90 rounded-xl flex items-center justify-center text-purple-500 shadow-xl active:scale-95"
               title="Settings"
             >
               ⚙️
             </button>
             <button
               onClick={onOpenCart}
-              className="w-10 h-10 bg-white rounded-xl flex items-center justify-center relative text-[#FF1493] shadow-xl active:scale-95"
+              className="w-10 h-10 bg-white rounded-xl flex items-center justify-center relative text-purple-500 shadow-xl active:scale-95"
               title="Cart"
             >
               🛒
@@ -287,7 +287,7 @@ const Search: React.FC<SearchProps> = ({
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest text-[#FF1493] bg-[#FFF2FA]"
+                className="px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest text-purple-600 bg-purple-50"
               >
                 Clear
               </button>
@@ -300,11 +300,11 @@ const Search: React.FC<SearchProps> = ({
       {!hasQuery && (
         <div className="px-6 pt-6 space-y-5">
           {recommendations.topPick && (
-            <div className="bg-[#FFF2FA] border-2 border-[#FF1493]/15 rounded-[30px] p-4">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <h3 className="font-black text-[11px] uppercase tracking-[0.16em] text-[#FF1493]">Top pick for you</h3>
-                <span className="text-[8px] font-black uppercase tracking-widest text-[#FF1493]/70">Recommended</span>
-              </div>
+              <div className="bg-purple-50/80 border-2 border-purple-200/50 rounded-[30px] p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="font-black text-[11px] uppercase tracking-[0.16em] text-purple-600">Top pick for you</h3>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-purple-500/70">Recommended</span>
+                </div>
 
               <button
                 onClick={() => onSelectRestaurant(recommendations.topPick!)}
@@ -508,39 +508,39 @@ const Search: React.FC<SearchProps> = ({
                         e.currentTarget.src = FALLBACK_RESTAURANT_IMAGE;
                       }}
                     />
-                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-black text-[#FF1493]">
+                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-black text-purple-500">
                       🛵 {res.deliveryTime}
                     </div>
 
                     <div className="absolute top-4 right-4 flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(res.id);
-                        }}
-                        className={`w-9 h-9 rounded-xl border text-sm flex items-center justify-center ${
-                          favorites.includes(res.id)
-                            ? 'bg-[#FF1493] text-white border-[#FF1493]'
-                            : 'bg-white/90 text-gray-500 border-white'
-                        }`}
-                        title="Favorite"
-                      >
-                        ♥
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleWishlist(res.id);
-                        }}
-                        className={`w-9 h-9 rounded-xl border text-sm flex items-center justify-center ${
-                          wishlist.includes(res.id)
-                            ? 'bg-[#FF1493] text-white border-[#FF1493]'
-                            : 'bg-white/90 text-gray-500 border-white'
-                        }`}
-                        title="Wishlist"
-                      >
-                        ☆
-                      </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(res.id);
+                            }}
+                            className={`w-9 h-9 rounded-xl border text-sm flex items-center justify-center ${
+                              favorites.includes(res.id)
+                                ? 'bg-purple-500 text-white border-purple-500'
+                                : 'bg-white/90 text-gray-500 border-white'
+                            }`}
+                            title="Favorite"
+                          >
+                            ♥
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleWishlist(res.id);
+                            }}
+                            className={`w-9 h-9 rounded-xl border text-sm flex items-center justify-center ${
+                              wishlist.includes(res.id)
+                                ? 'bg-purple-500 text-white border-purple-500'
+                                : 'bg-white/90 text-gray-500 border-white'
+                            }`}
+                            title="Wishlist"
+                          >
+                            ☆
+                          </button>
                     </div>
 
                     <div className="absolute right-4 bottom-4 flex gap-2">
@@ -550,7 +550,7 @@ const Search: React.FC<SearchProps> = ({
                         </div>
                       )}
                       {res.isPartner && (
-                        <div className="bg-[#FF1493] text-white px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">
+                        <div className="bg-purple-500 text-white px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest">
                           Recommended
                         </div>
                       )}

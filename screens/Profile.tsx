@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AppScreen, UserAccount, UserRole, WalletTransaction } from '../types';
 import { db } from '../db';
@@ -194,7 +193,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
         <div className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className={`bg-[#1A1A1A] w-full max-w-xs rounded-3xl p-8 border border-white/10 shadow-2xl transition-all ${pinError ? 'animate-shake border-red-500' : ''}`}>
             <div className="text-center mb-6">
-              <div className="w-14 h-14 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3">
+              <div className="w-14 h-14 bg-gradient-to-r from-[#C084FC] to-[#A855F7] rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
@@ -208,7 +207,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
                 value={pin}
                 onChange={e => setPin(e.target.value)}
                 placeholder="••••"
-                className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-center text-2xl tracking-[0.5em] text-pink-400 font-bold focus:outline-none focus:border-pink-500 mb-5"
+                className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-center text-2xl tracking-[0.5em] text-[#C084FC] font-bold focus:outline-none focus:border-[#A855F7] mb-5"
               />
               <Button type="submit">Authorize</Button>
             </form>
@@ -231,16 +230,16 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
 
             {/* Avatar Edit */}
             <div className="flex flex-col items-center mb-2">
-              <div onClick={() => fileInputRef.current?.click()} className="w-24 h-24 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-full p-0.5 mb-3 relative cursor-pointer group shadow-lg flex-shrink-0">
+              <div onClick={() => fileInputRef.current?.click()} className="w-24 h-24 bg-gradient-to-r from-[#C084FC] to-[#A855F7] rounded-full p-0.5 mb-3 relative cursor-pointer group shadow-lg flex-shrink-0">
                 <div className="w-full h-full rounded-full overflow-hidden bg-white">
                   <img
-                    src={imagePreview || (editAvatar && isValidAvatar(editAvatar) ? editAvatar : generateAvatar(editName || user.name, user.email))}
+                    src={imagePreview || (editAvatar && isValidAvatar(editAvatar) ? editAvatar : generateAvatar(editName || user!.name, user!.email))}
                     className="w-full h-full object-cover"
                     alt="Edit Avatar"
                     onError={(e) => {
                       // Fallback to initials if image fails to load
                       const target = e.target as HTMLImageElement;
-                      target.src = generateAvatar(editName || user.name, user.email);
+                      target.src = generateAvatar(editName || user!.name, user!.email);
                     }}
                   />
                 </div>
@@ -252,7 +251,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
                 </div>
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-              <p className="text-xs font-medium text-pink-500">Tap photo to change</p>
+              <p className="text-xs font-medium text-[#C084FC]">Tap photo to change</p>
             </div>
 
             {/* Form Fields */}
@@ -262,7 +261,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
                 <input
                   value={editName}
                   onChange={e => setEditName(e.target.value)}
-                  className="w-full p-3.5 border-2 border-gray-100 rounded-xl font-medium focus:border-pink-400 outline-none transition-all text-gray-800"
+                  className="w-full p-3.5 border-2 border-gray-100 rounded-xl font-medium focus:border-[#C084FC] outline-none transition-all text-gray-800"
                   placeholder="Enter your name"
                 />
               </div>
@@ -271,7 +270,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
                 <select
                   value={editCity}
                   onChange={e => setEditCity(e.target.value)}
-                  className="w-full p-3.5 border-2 border-gray-100 rounded-xl font-medium appearance-none outline-none focus:border-pink-400 bg-white text-gray-800"
+                  className="w-full p-3.5 border-2 border-gray-100 rounded-xl font-medium appearance-none outline-none focus:border-[#C084FC] bg-white text-gray-800"
                 >
                   {PHILIPPINE_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -298,7 +297,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
         </div>
       )}
 
-      <div className="bg-gradient-to-br from-[#FF1493] via-[#FF69B4] to-[#FF1493] pt-24 pb-16 px-6 rounded-b-[32px] shadow-lg text-white relative overflow-visible">
+      <div className="bg-gradient-to-br from-[#C084FC] via-[#A855F7] to-[#C084FC] pt-24 pb-16 px-6 rounded-b-[32px] shadow-lg text-white relative overflow-visible">
         {/* Decorative elements - subtle */}
         <div className="absolute top-8 right-8 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
         <div className="absolute bottom-4 left-4 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
@@ -335,7 +334,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
           {isOwner && (
             <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
               <svg className="w-4 h-4 text-yellow-700" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3 .921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784 .57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81 .588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               </svg>
             </div>
           )}
@@ -349,16 +348,16 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
       </div>
 
       <div className="p-5 space-y-5">
-        {/* Stats Cards - Updated for consistency */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-2xl p-4 text-center shadow-md border border-gray-100">
-            <div className="w-10 h-10 mx-auto mb-2 bg-gradient-to-br from-pink-100 to-pink-50 rounded-xl flex items-center justify-center">
-              <svg className="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="w-10 h-10 mx-auto mb-2 bg-gradient-to-br from-[#E9D5FF] to-[#F3E8FF] rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#C084FC]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08 .402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <p className="text-[10px] font-bold uppercase text-gray-500">Points</p>
-            <p className="text-lg font-black text-pink-500">{user.points || 0}</p>
+            <p className="text-lg font-black text-[#C084FC]">{user.points || 0}</p>
           </div>
           <div className="bg-white rounded-2xl p-4 text-center shadow-md border border-gray-100">
             <div className="w-10 h-10 mx-auto mb-2 bg-gradient-to-br from-purple-100 to-purple-50 rounded-xl flex items-center justify-center">
@@ -384,10 +383,10 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
         <div className="bg-white rounded-2xl p-5 shadow-md border border-gray-100">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Level Progress</p>
-            <p className="text-xs font-black text-pink-500">{levelProgress.percent}%</p>
+            <p className="text-xs font-black text-[#C084FC]">{levelProgress.percent}%</p>
           </div>
           <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-full transition-all" style={{ width: `${levelProgress.percent}%` }}></div>
+            <div className="h-full bg-gradient-to-r from-[#C084FC] to-[#A855F7] rounded-full transition-all" style={{ width: `${levelProgress.percent}%` }}></div>
           </div>
           <p className="text-[10px] font-medium text-gray-500 mt-2">
             {levelProgress.remaining} XP to reach {levelProgress.nextXp.toLocaleString()} XP
@@ -402,14 +401,14 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
             className="w-full p-3 bg-gray-50 rounded-xl flex items-center justify-between hover:bg-gray-100 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${settings.pushAlerts ? 'bg-pink-100' : 'bg-gray-200'}`}>
-                <svg className={`w-4 h-4 ${settings.pushAlerts ? 'text-pink-500' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${settings.pushAlerts ? 'bg-[#E9D5FF]' : 'bg-gray-200'}`}>
+                <svg className={`w-4 h-4 ${settings.pushAlerts ? 'text-[#C084FC]' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               </div>
               <span className="text-sm font-semibold text-gray-700">Push Alerts</span>
             </div>
-            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${settings.pushAlerts ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4]' : 'bg-gray-300'}`}>
+            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${settings.pushAlerts ? 'bg-gradient-to-r from-[#C084FC] to-[#A855F7]' : 'bg-gray-300'}`}>
               <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${settings.pushAlerts ? 'translate-x-5' : ''}`}></div>
             </div>
           </button>
@@ -425,7 +424,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
               </div>
               <span className="text-sm font-semibold text-gray-700">Auto Sync</span>
             </div>
-            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${settings.autoSync ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4]' : 'bg-gray-300'}`}>
+            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${settings.autoSync ? 'bg-gradient-to-r from-[#C084FC] to-[#A855F7]' : 'bg-gray-300'}`}>
               <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${settings.autoSync ? 'translate-x-5' : ''}`}></div>
             </div>
           </button>
@@ -441,7 +440,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
               </div>
               <span className="text-sm font-semibold text-gray-700">Compact Mode</span>
             </div>
-            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${settings.compactMode ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4]' : 'bg-gray-300'}`}>
+            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${settings.compactMode ? 'bg-gradient-to-r from-[#C084FC] to-[#A855F7]' : 'bg-gray-300'}`}>
               <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${settings.compactMode ? 'translate-x-5' : ''}`}></div>
             </div>
           </button>
@@ -475,7 +474,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
             <h3 className="font-bold text-[10px] uppercase tracking-wider text-gray-400 mb-1">Ayoo Perspective</h3>
             <div className="grid grid-cols-3 gap-2">
               {(['CUSTOMER', 'MERCHANT', 'RIDER'] as UserRole[]).map(r => (
-                <button key={r} onClick={() => onSetRole(r)} className={`py-3 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all ${user.role === r ? 'bg-gradient-to-r from-[#FF1493] to-[#FF69B4] text-white shadow-md' : 'bg-white text-gray-400 border border-gray-100'}`}>{r}</button>
+                <button key={r} onClick={() => onSetRole(r)} className={`py-3 rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all ${user.role === r ? 'bg-gradient-to-r from-[#C084FC] to-[#A855F7] text-white shadow-md' : 'bg-white text-gray-400 border border-gray-100'}`}>{r}</button>
               ))}
             </div>
           </div>
@@ -483,12 +482,12 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
 
         {/* Ayoo Manual Button */}
         <button onClick={resetManual} className="w-full p-4 bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl relative overflow-hidden group shadow-lg transition-all active:scale-[0.98]">
-          <div className="absolute top-0 right-0 bottom-0 w-28 bg-gradient-to-l from-[#FF1493] to-[#FF69B4] opacity-90"></div>
+          <div className="absolute top-0 right-0 bottom-0 w-28 bg-gradient-to-l from-[#C084FC] to-[#A855F7] opacity-90"></div>
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-xl backdrop-blur-sm">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332 .477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332 .477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332 .477-4.5 1.253" />
                 </svg>
               </div>
               <div className="text-left">
@@ -497,7 +496,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
               </div>
             </div>
             <svg className="w-5 h-5 text-white/40 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555 .832l3.197-2.132a1 1 0 000-1.664z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
@@ -506,7 +505,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
         {/* Transaction Summary Toggle */}
         <button onClick={() => setShowLedger(!showLedger)} className="w-full p-4 bg-gray-50 rounded-2xl text-left border border-gray-100 flex items-center justify-between">
           <h3 className="font-bold text-sm uppercase tracking-wider text-gray-700">Transaction Summary</h3>
-          <span className="text-xs font-bold text-pink-500">{showLedger ? 'Hide' : 'Show'}</span>
+          <span className="text-xs font-bold text-[#C084FC]">{showLedger ? 'Hide' : 'Show'}</span>
         </button>
 
         {/* Transaction List */}
@@ -530,10 +529,10 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
 
         {/* Menu Items */}
         <div className="space-y-2">
-          <button onClick={() => onNavigate('ADDRESSES')} className="w-full p-4 bg-white rounded-2xl flex items-center justify-between group shadow-sm border border-gray-100 hover:border-pink-200 transition-all">
+          <button onClick={() => onNavigate('ADDRESSES')} className="w-full p-4 bg-white rounded-2xl flex items-center justify-between group shadow-sm border border-gray-100 hover:border-purple-200 transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 bg-[#E9D5FF] rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#C084FC]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -543,7 +542,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
                 <p className="text-xs text-gray-400">Manage saved addresses</p>
               </div>
             </div>
-            <svg className="w-5 h-5 text-gray-300 group-hover:text-pink-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-gray-300 group-hover:text-[#C084FC] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -559,7 +558,7 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
                 <p className="text-xs text-gray-400">Manage payment methods</p>
               </div>
             </div>
-            <svg className="w-5 h-5 text-gray-300 group-hover:text-pink-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-gray-300 group-hover:text-[#C084FC] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -594,3 +593,4 @@ const Profile: React.FC<ProfileProps> = ({ onBack, user, onLogout, onNavigate, o
 };
 
 export default Profile;
+

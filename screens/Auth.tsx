@@ -66,12 +66,21 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
     try {
       if (mode === 'LOGIN') {
-        const user = await db.login(cleanEmail, cleanPass, rememberMe);
-        if (user) {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: cleanPass })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.token) {
+          // Store the JWT for subsequent authenticated API calls
+          localStorage.setItem('ayoo_session_token', result.token);
           setShowSuccess(true);
-          setTimeout(() => onLogin(user), 1200);
+          setTimeout(() => onLogin(result.user), 1200);
         } else {
-          setErrorMessage('Invalid email or password.');
+          setErrorMessage(result.message || 'Invalid email or password.');
           setShowError(true);
           setIsSubmitting(false);
         }
@@ -321,4 +330,3 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 };
 
 export default Auth;
-

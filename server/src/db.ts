@@ -1,36 +1,63 @@
-import Database from 'better-sqlite3';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import pkg from 'pg';
+const { Pool } = pkg;
 import { DEFAULT_RESTAURANTS } from './seed.js';
+import winston from 'winston';
 
 /**
- * Ayoo Delivery - Database Configuration
- * Optimized for Better-SQLite3 and Node v22 ESM
+ * Ayoo Delivery - PostgreSQL Configuration
+ * Replaces SQLite for Production scaling.
  */
 
-// Dahil sa ESM, kailangan nating i-derive ang __dirname manually
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+let pool: any;
 
-let db: any;
+const MAX_RETRIES = 3;
+const logger = winston.createLogger({
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [new winston.transports.Console()]
+});
 
-export function initDb() {
-  if (db) return db;
+
+const INITIAL_DELAY = 1000; // 1 second
+
+/**
+ * Executes a query with retry logic for transient errors
+ */
+export async function query(text: string, params?: any[]) {
+  let lastError;
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    try {
+      return await pool.query(text, params);
+    } catch (err: any) {
+      lastError = err;
+      // Retry on connection errors (08xxx) or server shutdown (57Pxx) or deadlocks (40P01)
+      const isTransient = err.code?.startsWith('08') || err.code?.startsWith('57') || err.code === '40P01';
+      if (!isTransient || i === MAX_RETRIES - 1) throw err;
+      
+      const delay = INITIAL_DELAY * Math.pow(2, i);
+      logger.warn(`⚠️ DB Query failed (attempt ${i + 1}). Retrying in ${delay}ms...`, { error: err.message, query: text, params });
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+  throw lastError;
+}
+
+export async function initDb() {
+  if (pool) return pool;
 
   try {
-    // Tinitiyak na ang database file ay mapupunta sa tamang folder (isang level up mula sa src)
-    const dbPath = join(__dirname, '..', 'ayoo.sqlite');
-    
-    console.log(`🗄️ Initializing database at: ${dbPath}`);
-    
-    db = new Database(dbPath, { verbose: console.log });
-    
-    // Performance and integrity settings
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
+    logger.info(`🗄️ Connecting to PostgreSQL...`);
+
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
 
     // Create tables if they don't exist
-    db.exec(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         email TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -40,12 +67,13 @@ export function initDb() {
         xp INTEGER DEFAULT 0,
         level INTEGER DEFAULT 1,
         streak INTEGER DEFAULT 0,
-        badges TEXT DEFAULT '[]',
+        badges JSONB DEFAULT '[]',
         preferredCity TEXT,
         role TEXT DEFAULT 'CUSTOMER',
         merchantId TEXT,
         earnings REAL DEFAULT 0,
-        manualsSeen TEXT DEFAULT '[]'
+        manualsSeen TEXT DEFAULT '[]',
+        "fcmToken" TEXT
       );
 
       CREATE TABLE IF NOT EXISTS restaurants (
@@ -55,18 +83,18 @@ export function initDb() {
         deliveryTime TEXT,
         image TEXT,
         cuisine TEXT,
-        items TEXT,
+        items JSONB,
         isPartner INTEGER DEFAULT 0,
         address TEXT,
         hasLiveCam INTEGER DEFAULT 0,
-        reviews TEXT
+        reviews JSONB
       );
 
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
         date TEXT,
-        items TEXT,
-        total REAL,
+        items JSONB,
+        total DOUBLE PRECISION,
         status TEXT,
         restaurantName TEXT,
         customerEmail TEXT,
@@ -74,16 +102,19 @@ export function initDb() {
         riderName TEXT,
         riderEmail TEXT,
         deliveryAddress TEXT,
-        tipAmount REAL,
+        tipAmount DOUBLE PRECISION,
         pointsEarned INTEGER,
         paymentMethod TEXT,
         paymentId TEXT,
         isPaid INTEGER DEFAULT 0,
+        "amountPaid" DOUBLE PRECISION DEFAULT 0,
         transactionId TEXT,
         rating INTEGER,
         comment TEXT,
         receiptUrl TEXT
       );
+
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS "amountPaid" DOUBLE PRECISION DEFAULT 0;
 
       CREATE TABLE IF NOT EXISTS addresses (
         id TEXT PRIMARY KEY,
@@ -104,7 +135,7 @@ export function initDb() {
         last4 TEXT,
         expiry TEXT,
         phoneNumber TEXT,
-        balance REAL,
+        balance DOUBLE PRECISION,
         token TEXT
       );
 
@@ -125,67 +156,63 @@ export function initDb() {
       CREATE TABLE IF NOT EXISTS ledger (
         ownerId TEXT,
         id TEXT,
-        amount REAL,
+        amount DOUBLE PRECISION,
         type TEXT,
         description TEXT,
         timestamp TEXT,
         orderId TEXT,
         methodType TEXT,
         referenceId TEXT,
-        status TEXT,
+        "idempotencyKey" TEXT,
+        status TEXT,        
         PRIMARY KEY(ownerId, id)
       );
 
       CREATE TABLE IF NOT EXISTS system_config (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        deliveryFee REAL DEFAULT 45,
+        id SERIAL PRIMARY KEY,
+        deliveryFee DOUBLE PRECISION DEFAULT 45,
         masterPin TEXT DEFAULT '1234'
+      );
+
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        "orderId" TEXT NOT NULL,
+        "senderEmail" TEXT NOT NULL,
+        "senderName" TEXT NOT NULL,
+        text TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        "isRead" INTEGER DEFAULT 0
       );
     `);
 
-    const configRow = db.prepare('SELECT id FROM system_config WHERE id = 1').get();
-    if (!configRow) {
-      db.prepare('INSERT INTO system_config (id, deliveryFee, masterPin) VALUES (1, 45, ?)').run('1234');
+    const configRes = await pool.query('SELECT id FROM system_config WHERE id = 1');
+    if (configRes.rowCount === 0) {
+      if (!process.env.MASTER_PIN) {
+        throw new Error('MASTER_PIN environment variable is required for initial config setup.');
+      }
+      await pool.query('INSERT INTO system_config (id, deliveryFee, masterPin) VALUES (1, 45, $1)', [process.env.MASTER_PIN]);
     }
 
-    const countRow = db.prepare('SELECT COUNT(*) as count FROM restaurants').get() as { count: number };
-    if (countRow.count === 0) {
-      const insertRestaurant = db.prepare(`
-        INSERT INTO restaurants (id,name,rating,deliveryTime,image,cuisine,items,isPartner,address,hasLiveCam,reviews)
-        VALUES (@id,@name,@rating,@deliveryTime,@image,@cuisine,@items,@isPartner,@address,@hasLiveCam,@reviews)
-      `);
-      const tx = db.transaction((rows: any[]) => {
-        for (const row of rows) {
-          insertRestaurant.run({
-            ...row,
-            items: JSON.stringify(row.items || []),
-            reviews: JSON.stringify(row.reviews || []),
-            isPartner: row.isPartner || 0,
-            hasLiveCam: row.hasLiveCam || 0
-          });
-        }
-      });
-      tx(DEFAULT_RESTAURANTS);
-      console.log(`✅ Seeded ${DEFAULT_RESTAURANTS.length} restaurants.`);
+    const restaurantRes = await pool.query('SELECT COUNT(*) as count FROM restaurants');
+    if (parseInt(restaurantRes.rows[0].count) === 0) {
+      for (const row of DEFAULT_RESTAURANTS) {
+        await pool.query(
+          `INSERT INTO restaurants (id,name,rating,deliveryTime,image,cuisine,items,isPartner,address,hasLiveCam,reviews)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [row.id, row.name, row.rating, row.deliveryTime, row.image, row.cuisine, JSON.stringify(row.items || []), row.isPartner || 0, row.address, row.hasLiveCam || 0, JSON.stringify(row.reviews || [])]
+        );
+      }
+      logger.info(`✅ Seeded ${DEFAULT_RESTAURANTS.length} restaurants.`);
     }
 
-    const addressCols = (db.prepare(`PRAGMA table_info(addresses)`).all() as any[]).map((c: any) => c.name);
-    if (!addressCols.includes('latitude')) db.exec('ALTER TABLE addresses ADD COLUMN latitude REAL');
-    if (!addressCols.includes('longitude')) db.exec('ALTER TABLE addresses ADD COLUMN longitude REAL');
-    if (!addressCols.includes('distanceKm')) db.exec('ALTER TABLE addresses ADD COLUMN distanceKm REAL');
-    if (!addressCols.includes('deliveryFee')) db.exec('ALTER TABLE addresses ADD COLUMN deliveryFee REAL');
-
-    console.log("✅ Database schema is up to date.");
-    return db;
+    logger.info("✅ Database schema is up to date.");
+    return pool;
   } catch (error) {
-    console.error("❌ Critical Error initializing database:", error);
+    logger.error("❌ Critical Error initializing database:", error);
     throw error;
   }
 }
 
 export function getDb() {
-  if (!db) {
-    return initDb();
-  }
-  return db;
+  return pool;
 }

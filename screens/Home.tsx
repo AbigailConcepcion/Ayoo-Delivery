@@ -1,8 +1,10 @@
-/// <reference path="../src/react-shims.d.ts" />
-import React from 'react';
 
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { CATEGORIES, PHILIPPINE_CITIES } from '../constants';
-import { Restaurant, UserBadge, AppScreen, OrderRecord } from '../types';
+import type { Restaurant, UserBadge, AppScreen, Voucher, UserAccount, OrderRecord, LeaderboardEntry, LeaderboardPeriod } from '../types';
+import BottomNav from '../components/BottomNav';
+import { db } from '../db';
+import { ayooCloud, communityHub } from '../api';
 
 interface HomeProps {
   restaurants: Restaurant[];
@@ -15,27 +17,178 @@ interface HomeProps {
   badges?: UserBadge[];
   deliveryCity: string;
   onSetDeliveryCity: (city: string) => void;
-  currentUser?: any;
+  currentUser?: UserAccount | null;
   recentOrders?: OrderRecord[];
 }
 
-const quickServices: ReadonlyArray<{ icon: string; name: string; caption: string; screen: AppScreen }> = [
-  { icon: '🍔', name: 'Food', caption: 'Fast delivery', screen: 'SEARCH' },
-  { icon: '🛒', name: 'Mart', caption: 'Daily essentials', screen: 'GROCERIES' },
-  { icon: '📦', name: 'Padala', caption: 'Same-day drop', screen: 'COURIER' },
-  { icon: '🚗', name: 'Rides', caption: 'Book a trip', screen: 'RIDES' },
+// Service types for the Super App
+type ServiceType = 'food' | 'groceries' | 'courier' | 'rides' | 'pabili' | 'bills' | 'dineout' | 'pharmacy';
+
+interface Service {
+  id: ServiceType;
+  name: string;
+  icon: string;
+  color: string;
+  screen: AppScreen;
+  description: string;
+}
+
+// Community member type
+interface CommunityMember {
+  id: string;
+  name: string;
+  role: 'rider' | 'merchant' | 'customer';
+  avatar: string;
+  stats: string;
+  badge: string;
+}
+
+// Community post with comments and reactions
+interface CommunityPost {
+  id: string;
+  author: string;
+  avatar: string;
+  content: string;
+  time: string;
+  likes: number;
+  comments: CommunityComment[];
+  reactions: Reaction[];
+  userReaction?: string;
+}
+
+interface CommunityComment {
+  id: string;
+  author: string;
+  avatar: string;
+  content: string;
+  time: string;
+  replies: CommunityReply[];
+}
+
+interface CommunityReply {
+  id: string;
+  author: string;
+  avatar: string;
+  content: string;
+  time: string;
+}
+
+interface Reaction {
+  type: 'like' | 'love' | 'fire' | 'haha' | 'wow' | 'sad' | 'angry';
+  count: number;
+  users: string[];
+}
+
+// Sample community data
+const TOP_RIDERS: CommunityMember[] = [
+  { id: '1', name: 'Mark D.', role: 'rider', avatar: '🛵', stats: '1,234 deliveries', badge: '⭐ Top Rider' },
+  { id: '2', name: 'John P.', role: 'rider', avatar: '🛵', stats: '987 deliveries', badge: '⚡ Fast' },
+  { id: '3', name: 'Karen S.', role: 'rider', avatar: '🛵', stats: '856 deliveries', badge: '😊 Friendly' },
 ];
 
-const moodOptions = [
+const FEATURED_MERCHANTS: CommunityMember[] = [
+  { id: '1', name: 'Mang Tomas Eatery', role: 'merchant', avatar: '🏪', stats: '4.9 ★', badge: '⭐ Featured' },
+  { id: '2', name: 'Tea Shop PH', role: 'merchant', avatar: '🧋', stats: '4.8 ★', badge: '🆕 New' },
+  { id: '3', name: 'Pizza Haven', role: 'merchant', avatar: '🍕', stats: '4.7 ★', badge: '🔥 Hot' },
+];
+
+// Realistic community posts with initial data
+const INITIAL_POSTS: CommunityPost[] = [
+  {
+    id: '1',
+    author: 'Ayoo Team',
+    avatar: '🚀',
+    content: '🎉 Welcome to Ayoo! Now serving Iligan City with fast delivery! Download now and get ₱50 off your first order.',
+    time: '2h ago',
+    likes: 128,
+    comments: [
+      {
+        id: 'c1', author: 'Maria S.', avatar: '👩', content: 'Finally in Iligan! 🎉', time: '1h ago', replies: [
+          { id: 'r1', author: 'Ayoo Team', avatar: '🚀', content: 'Yes Maria! We\'re here!', time: '45m ago' }
+        ]
+      },
+      { id: 'c2', author: 'John D.', avatar: '👨', content: 'How do I claim the ₱50 off?', time: '30m ago', replies: [] }
+    ],
+    reactions: [
+      { type: 'like', count: 89, users: [] },
+      { type: 'love', count: 45, users: [] },
+      { type: 'fire', count: 12, users: [] }
+    ]
+  },
+  {
+    id: '2',
+    author: 'Mang Tomas Eatery',
+    avatar: '🏪',
+    content: '🍜 New menu items available! Try our special silog meals now. Comes with unlimited rice! 🤤',
+    time: '5h ago',
+    likes: 45,
+    comments: [
+      { id: 'c3', author: 'Foodie King', avatar: '👨‍🍳', content: 'The silog meals are amazing!', time: '3h ago', replies: [] }
+    ],
+    reactions: [
+      { type: 'love', count: 23, users: [] },
+      { type: 'fire', count: 8, users: [] },
+      { type: 'haha', count: 5, users: [] }
+    ]
+  },
+  {
+    id: '3',
+    author: 'Ayoo Team',
+    avatar: '🚀',
+    content: '🛵 Become a rider and earn up to ₱500/day! Flexible hours, fast payments. Apply now through the app.',
+    time: '1d ago',
+    likes: 89,
+    comments: [],
+    reactions: [
+      { type: 'like', count: 34, users: [] },
+      { type: 'love', count: 28, users: [] },
+      { type: 'wow', count: 15, users: [] }
+    ]
+  },
+];
+
+// Reaction emoji map
+const REACTION_EMOJIS: Record<string, string> = {
+  like: '👍',
+  love: '❤️',
+  fire: '🔥',
+  haha: '😂',
+  wow: '😮',
+  sad: '😢',
+  angry: '😠'
+};
+
+// Services configuration
+const SERVICES: Service[] = [
+  { id: 'food', name: 'Food', icon: '🍔', color: '#C084FC', screen: 'SEARCH', description: 'All Restaurants & Milk Tea' },
+  { id: 'groceries', name: 'Groceries', icon: '🛒', color: '#9C27B0', screen: 'GROCERIES', description: 'Daily Essentials' },
+  { id: 'courier', name: 'Courier', icon: '📦', color: '#2196F3', screen: 'COURIER', description: 'Send Packages' },
+  { id: 'rides', name: 'Rides', icon: '🛵', color: '#C084FC', screen: 'RIDES', description: 'Moto Only' },
+  { id: 'pabili', name: 'Pabili', icon: '🛍️', color: '#FF9800', screen: 'PABILI', description: 'Errands' },
+  { id: 'bills', name: 'Bills & Load', icon: '💳', color: '#00BCD4', screen: 'PAYMENTS', description: 'Pay Bills & Load' },
+{ id: 'dineout', name: 'Dine Out', icon: '🍽️', color: '#C084FC', screen: 'DINE_OUT', description: 'Restaurant Reservations' },
+  { id: 'pharmacy', name: 'Pharmacy', icon: '💊', color: '#F44336', screen: 'PHARMACY', description: 'Medicines & Health' },
+];
+
+const SEARCH_CATEGORIES = [
+  { name: 'Cravings', icon: '🤤', query: '' },
+  { name: 'Places', icon: '📍', query: '' },
+  { name: 'Groceries', icon: '🛒', query: 'groceries' },
+  { name: 'Medicines', icon: '💊', query: 'medicines' },
+  { name: 'Flowers', icon: '💐', query: 'flowers' },
+  { name: 'Pet Supplies', icon: '🐕', query: 'pet' },
+];
+
+const MOODS = [
   { name: 'Lazy', icon: '😴' },
-  { name: 'Hungry', icon: '😋' },
+  { name: 'Stressed', icon: '😫' },
   { name: 'Celebratory', icon: '🥳' },
-  { name: 'Healthy', icon: '🥗' },
-  { name: 'Adventurous', icon: '🌶️' },
-] as const;
+  { name: 'Fit', icon: '🥗' },
+  { name: 'Spicy', icon: '🌶️' }
+];
 
 const Home: React.FC<HomeProps> = ({
-  restaurants = [],
+  restaurants,
   onSelectRestaurant,
   onOpenCart,
   onNavigate,
@@ -43,61 +196,239 @@ const Home: React.FC<HomeProps> = ({
   points = 0,
   streak = 0,
   badges = [],
-  deliveryCity = 'Iligan City',
+  deliveryCity,
   onSetDeliveryCity,
   currentUser,
-  recentOrders = [],
+  recentOrders = []
 }) => {
-  const [search, setSearch] = React.useState('');
-  const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
-  const [aiLoading, setAiLoading] = React.useState(false);
-  const [aiSuggestion, setAiSuggestion] = React.useState<string | null>(null);
-  const [recommendedId, setRecommendedId] = React.useState<string | null>(null);
-  const [selectedMood, setSelectedMood] = React.useState<string | null>(null);
-  const [showLocationPicker, setShowLocationPicker] = React.useState(false);
-  const [geoStatus, setGeoStatus] = React.useState<'IDLE' | 'FETCHING' | 'ERROR'>('IDLE');
-  const [activeTab, setActiveTab] = React.useState<'discover' | 'community'>('discover');
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [geoStatus, setGeoStatus] = useState<'IDLE' | 'FETCHING' | 'ERROR'>('IDLE');
+  const [activeTab, setActiveTab] = useState<'discover' | 'community'>('discover');
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [recommendedId, setRecommendedId] = useState<string | null>(null);
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [expandedPost, setExpandedPost] = useState<string | null>(null);
 
+  // Community state and Leaderboard state
+  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>(INITIAL_POSTS);
+  const [commentText, setCommentText] = useState<Record<string, string>>({});
+  const [replyText, setReplyText] = useState<Record<string, string>>({});
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [sharePost, setSharePost] = useState<CommunityPost | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [customerLeaderboard, setCustomerLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [merchantLeaderboard, setMerchantLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [riderLeaderboard, setRiderLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('week');
+
+  const loadCommunityData = useCallback(async () => {
+    try {
+      const posts = await ayooCloud.getCommunityPosts();
+      setCommunityPosts((posts as unknown as CommunityPost[]) || INITIAL_POSTS); 
+    } catch (err) {
+      console.error("Failed to load community feed", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'community') loadCommunityData();
+  }, [activeTab, loadCommunityData]);
+
+  // Load leaderboard data based on period
+  const loadLeaderboards = useCallback(async () => {
+    setLeaderboardLoading(true);
+    try {
+      if ((db as any).ENV?.USE_REAL_BACKEND) {
+        setCustomerLeaderboard(await ayooCloud.getCustomerLeaderboard(leaderboardPeriod));
+        setMerchantLeaderboard(await ayooCloud.getMerchantLeaderboard(leaderboardPeriod));
+        setRiderLeaderboard(await ayooCloud.getRiderLeaderboard(leaderboardPeriod));
+      } else {
+        setCustomerLeaderboard(await db.getCustomerLeaderboard(leaderboardPeriod));
+        setMerchantLeaderboard(await db.getMerchantLeaderboard(leaderboardPeriod));
+        setRiderLeaderboard(await db.getRiderLeaderboard(leaderboardPeriod));
+      }
+    } catch (err) {
+      console.error('Failed to load leaderboards', err);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }, [leaderboardPeriod]);
+
+  useEffect(() => {
+    loadLeaderboards();
+  }, [leaderboardPeriod]);
+
+  // Get the appropriate leaderboard based on user role
+  const getLeaderboardForRole = () => {
+    switch (userRole) {
+      case 'CUSTOMER':
+        return customerLeaderboard;
+      case 'MERCHANT':
+        return merchantLeaderboard;
+      case 'RIDER':
+        return riderLeaderboard;
+      default:
+        return customerLeaderboard;
+    }
+  };
+
+  // Get leaderboard title based on role
+  const getLeaderboardTitle = () => {
+    switch (userRole) {
+      case 'CUSTOMER':
+        return '🏆 Top Customers';
+      case 'MERCHANT':
+        return '🏆 Top Merchants';
+      case 'RIDER':
+        return '🏆 Top Riders';
+      default:
+        return '🏆 Leaderboard';
+    }
+  };
+
+  // Get user name for commenting
+  const userName = currentUser?.name || 'Anonymous';
+  const userAvatar = currentUser?.avatar || '👤';
+
+  // Handle reaction on post
+  const handleReaction = async (postId: string, reactionType: Reaction['type']) => {
+    try {
+      await ayooCloud.reactToPost(postId, reactionType);
+    } catch (err) {
+      console.error("Failed to sync reaction", err);
+    }
+
+    setCommunityPosts(posts => posts.map(post => {
+      if (post.id !== postId) return post;
+      const isRemoving = post.userReaction === reactionType;
+      const updatedReactions = post.reactions.map(r => {
+        if (r.type === reactionType) {
+          return { ...r, count: isRemoving ? Math.max(0, r.count - 1) : r.count + 1 };
+        }
+        if (post.userReaction && r.type === post.userReaction) {
+          return { ...r, count: Math.max(0, r.count - 1) };
+        }
+        return r;
+      });
+
+      return {
+        ...post,
+        userReaction: isRemoving ? undefined : reactionType,
+        reactions: updatedReactions
+      };
+    }));
+    setShowReactionPicker(null);
+  };
+
+  // Handle comment on post
+  const handleComment = async (postId: string) => {
+    const text = commentText[postId];
+    if (!text?.trim()) return;
+
+    try {
+      const newComment = await ayooCloud.addComment(postId, text.trim()) as unknown as CommunityComment;
+      setCommunityPosts((posts: CommunityPost[]) => posts.map((post: CommunityPost) => {
+        if (post.id !== postId) return post;
+        return { ...post, comments: [newComment, ...post.comments] };
+      }));
+      setCommentText({ ...commentText, [postId]: '' });
+    } catch (err) {
+      console.error("Failed to post comment", err);
+    }
+  };
+
+  const handleReply = async (postId: string, commentId: string) => {
+    const text = replyText[commentId];
+    if (!text?.trim()) return;
+    try {
+      const newReply = await ayooCloud.addReply(postId, commentId, text.trim()) as CommunityReply;
+      setCommunityPosts((posts: CommunityPost[]) => posts.map((post: CommunityPost) => {
+        if (post.id !== postId) return post;
+        return {
+          ...post,
+          comments: post.comments.map((c: CommunityComment) => c.id === commentId ? { ...c, replies: [...c.replies, newReply] } : c)
+        };
+      }));
+      setReplyText({ ...replyText, [commentId]: '' });
+    } catch (err) {
+      console.error("Failed to post reply", err);
+    }
+  };
+
+  // Handle share post
+  const handleShare = (post: CommunityPost, platform: string) => {
+    const shareText = `${post.author}: ${post.content}`;
+    const shareUrl = encodeURIComponent(shareText);
+
+    switch (platform) {
+      case 'facebook':
+        window.open(`https://www.facebook.com/sharer/sharer.php?quote=${shareUrl}`, '_blank');
+        break;
+      case 'twitter':
+        window.open(`https://twitter.com/intent/tweet?text=${shareUrl}`, '_blank');
+        break;
+      case 'whatsapp':
+        window.open(`https://wa.me/?text=${shareUrl}`, '_blank');
+        break;
+      case 'messages':
+        if (onNavigate) onNavigate('MESSAGES');
+        break;
+    }
+    setShowShareModal(false);
+  };
+
+  // Calculate total reactions for a post
+  const getTotalReactions = (post: CommunityPost) => {
+    return post.reactions.reduce((sum, r) => sum + r.count, 0);
+  };
+
+  // Get user role
   const userRole = currentUser?.role || 'CUSTOMER';
-  const firstName = currentUser?.name?.split(' ')[0] || 'Ayoo';
 
-  const filteredRestaurants = React.useMemo(() => {
-    let list = restaurants.filter((r) =>
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
+  // Filter restaurants
+  const filteredRestaurants = useMemo(() => {
+    let list = restaurants.filter(r =>
+      r.name.toLowerCase().includes(search.toLowerCase()) || // Use 'search' state variable
       r.cuisine.toLowerCase().includes(search.toLowerCase())
     );
-
     if (selectedCategory) {
-      list = list.filter((r) => r.cuisine.toLowerCase().includes(selectedCategory.toLowerCase()));
+      list = list.filter(r => r.cuisine.toLowerCase().includes(selectedCategory.toLowerCase()));
     }
-
     if (recommendedId) {
-      const rec = list.find((r) => r.id === recommendedId);
-      const others = list.filter((r) => r.id !== recommendedId);
+      const rec = list.find(r => r.id === recommendedId);
+      const others = list.filter((r: Restaurant) => r.id !== recommendedId);
       return rec ? [rec, ...others] : list;
     }
-
-return list; // Show all merchants
+    return list;
   }, [search, recommendedId, selectedCategory, restaurants]);
 
-const PLACEHOLDER_RESTAURANT = 'https://placehold.co/400x300/6D28D9/FFFFFF/png?text=Restaurant&font=roboto';
+  // Featured merchants (highest rated)
+  const featuredRestaurants = useMemo(() => {
+    return [...restaurants].sort((a, b) => b.rating - a.rating).slice(0, 5);
+  }, [restaurants]); // Explicitly use 'restaurants'
 
-const featuredRestaurants = React.useMemo(() => {
-    return [...restaurants].sort((a, b) => b.rating - a.rating).slice(0, 8);
-  }, [restaurants]);
+  // New merchants
+  const newRestaurants = useMemo(() => {
+    return restaurants.filter(r => r.isPartner).slice(0, 5);
+  }, [restaurants]); // Explicitly use 'restaurants'
 
-  const trendingItems = React.useMemo(() => {
-    return restaurants.flatMap((r) => r.items?.filter((i) => i.isPopular || false) || []).slice(0, 6);
+  // Trending items
+  const trendingItems = useMemo(() => {
+    return restaurants.flatMap(r => r.items.filter(i => i.isPopular)).slice(0, 8);
   }, [restaurants]);
 
   const handleGetCurrentLocation = () => {
     setGeoStatus('FETCHING');
-    if (navigator.geolocation) {
+    if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         () => {
           onSetDeliveryCity('Iligan City');
-          setShowLocationPicker(false);
           setGeoStatus('IDLE');
+          setShowLocationPicker(false);
         },
         () => setGeoStatus('ERROR')
       );
@@ -109,92 +440,557 @@ const featuredRestaurants = React.useMemo(() => {
   const askAiForMood = async (mood: string) => {
     setSelectedMood(mood);
     setAiLoading(true);
+    setAiSuggestion(null);
 
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    const suggestions = {
-      Lazy: 'Chickenjoy from Mang Inasal for an easy comfort-food night.',
-      Hungry: 'Go for a loaded burger combo and fries from your nearest fast-food favorite.',
-      Celebratory: 'Pizza and milk tea combo for a mini celebration at home.',
-      Healthy: 'Fresh grilled chicken salad and fruit tea for a lighter pick.',
-      Adventurous: 'Spicy hotpot or Korean wings if you want something bold tonight.',
+    const moodRecommendations: Record<string, { dish: string; reason: string }> = {
+      'Lazy': { dish: 'Chickenjoy', reason: 'Comfort food hits different when you are chilling!' },
+      'Stressed': { dish: 'Milk Tea', reason: 'Sweet treats help ease the stress away!' },
+      'Celebratory': { dish: 'Pizza', reason: 'Nothing says celebration like pizza night!' },
+      'Fit': { dish: 'Salad Bowl', reason: 'Healthy fuel for your achievements!' },
+      'Spicy': { dish: 'Kimchi Fried Rice', reason: 'Turn up the heat!' }
     };
 
-    const suggestion = suggestions[mood as keyof typeof suggestions];
-    setAiSuggestion(suggestion);
-
-    if (suggestion) {
-      const match = restaurants.find((r) => suggestion.toLowerCase().includes(r.name.toLowerCase()));
-      if (match) {
-        setRecommendedId(match.id);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const recommendation = moodRecommendations[mood];
+      if (recommendation) {
+        setAiSuggestion(`${recommendation.dish} - ${recommendation.reason}`);
+        const match = restaurants.find(r =>
+          r.items.some(i => i.name.toLowerCase().includes(recommendation.dish.toLowerCase()))
+        );
+        if (match) setRecommendedId(match.id);
+      } else {
+        setAiSuggestion("Try something fresh today!");
       }
+    } catch (err) {
+      setAiSuggestion("The AI is hungry! Try browsing our top partners.");
+    } finally {
+      setAiLoading(false);
     }
-
-    setAiLoading(false);
   };
 
-  const handleServiceClick = (screen: AppScreen) => {
-    onNavigate?.(screen);
+  const handleServiceClick = (service: Service) => {
+    if (service.screen === 'HOME') return;
+    if (onNavigate) onNavigate(service.screen);
   };
 
-  const handleSelectRestaurant = (restaurant: Restaurant) => {
-    onSelectRestaurant?.(restaurant);
+  const handleSelectRestaurant = (res: Restaurant) => {
+    if (onSelectRestaurant) onSelectRestaurant(res);
   };
 
-  return (
-    <div className="min-h-screen bg-transparent text-[#2D1456] scrollbar-hide">
-      {showLocationPicker && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_24px_60px_rgba(88,28,135,0.18)]">
-            <div className="mx-auto mb-6 h-2 w-16 rounded-full bg-purple-100"></div>
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-purple-400">Ayoo delivery zone</p>
-                <h2 className="mt-2 text-2xl font-black text-[#31135E]">Choose your location</h2>
+  // Render individual post with comments and reactions
+  const renderPost = (post: CommunityPost) => {
+    const isExpanded = expandedPost === post.id;
+    const totalReactions = getTotalReactions(post); // Ensure this function is defined and accessible
+    const displayReactions = post.reactions.filter(r => r.count > 0).slice(0, 3);
+
+    return (
+      <div key={post.id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-3">
+        {/* Post Header */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{post.avatar}</span>
+            <div>
+              <p className="font-black text-xs text-gray-900">{post.author}</p>
+              <p className="text-[8px] text-gray-400">{post.time}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { setSharePost(post); setShowShareModal(true); }}
+            className="text-gray-400 hover:text-[#C084FC] text-lg"
+          >
+            📤
+          </button>
+        </div>
+
+        {/* Post Content */}
+        <p className="text-sm text-gray-700 mb-3">{post.content}</p>
+
+        {/* Reactions Display */}
+        {totalReactions > 0 && (
+          <div className="flex items-center gap-1 mb-2">
+            {displayReactions.map((r, idx) => (
+              <span key={idx} className="text-sm">{REACTION_EMOJIS[r.type]}</span>
+            ))}
+            <span className="text-[10px] text-gray-500 ml-1">{totalReactions}</span>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+          {/* Reaction Button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowReactionPicker(showReactionPicker === post.id ? null : post.id)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs ${post.userReaction ? 'text-[#C084FC] bg-purple-50' : 'text-gray-500 hover:bg-gray-100'}`}
+            >
+              {post.userReaction ? REACTION_EMOJIS[post.userReaction] : '👍'}
+              <span>{post.userReaction || 'Like'}</span>
+            </button>
+
+            {/* Reaction Picker */}
+            {showReactionPicker === post.id && (
+              <div className="absolute bottom-full left-0 mb-1 bg-white rounded-full shadow-lg border border-gray-100 p-1 flex gap-1 animate-in fade-in">
+                {Object.entries(REACTION_EMOJIS).map(([type, emoji]) => (
+                  <button
+                    key={type}
+                    onClick={() => handleReaction(post.id, type as Reaction['type'])}
+                    className="w-8 h-8 hover:bg-gray-100 rounded-full flex items-center justify-center text-lg transition-transform hover:scale-125"
+                  >
+                    {emoji}
+                  </button>
+                ))}
               </div>
+            )}
+          </div>
+
+          {/* Comment Button */}
+          <button
+            onClick={() => setExpandedPost(isExpanded ? null : post.id)}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:bg-gray-100"
+          >
+            💬 <span>Comment {post.comments.length > 0 && `(${post.comments.length})`}</span>
+          </button>
+
+          {/* Share Button */}
+          <button
+            onClick={() => { setSharePost(post); setShowShareModal(true); }}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:bg-gray-100"
+          >
+            📤 Share
+          </button>
+        </div>
+
+        {/* Comments Section */}
+        {isExpanded && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            {/* Add Comment */}
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={commentText[post.id] || ''}
+                onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && handleComment(post.id)}
+                placeholder="Write a comment..."
+                className="flex-1 bg-gray-50 rounded-full px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-[#C084FC]/30"
+              />
               <button
-                type="button"
-                onClick={() => setShowLocationPicker(false)}
-                className="rounded-2xl bg-purple-50 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-purple-600"
+                onClick={() => handleComment(post.id)}
+                className="w-8 h-8 bg-[#C084FC] rounded-full flex items-center justify-center text-white text-sm"
               >
-                Close
+                ➤
               </button>
             </div>
 
+            {/* Comments List */}
+            {post.comments.map((comment: CommunityComment) => (
+              <div key={comment.id} className="mb-3 pl-2 border-l-2 border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{comment.avatar}</span>
+                  <div className="flex-1">
+                    <p className="text-xs">
+                      <span className="font-black text-gray-900">{comment.author}</span>
+                      <span className="text-gray-600"> {comment.content}</span>
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        onClick={() => {
+                          const isReplying = replyText[comment.id];
+                          if (isReplying && comment.id) { // Ensure comment.id is not undefined
+                            handleReply(post.id, comment.id);
+                          } else {
+                            setReplyText({ ...replyText, [comment.id]: '@' });
+                          }
+                        }}
+                        className="text-[10px] text-gray-400 font-bold"
+                      >
+                        Reply
+                      </button>
+                      <span className="text-[10px] text-gray-400">{comment.time}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Replies */}
+                {comment.replies.map((reply: CommunityReply) => (
+                  <div key={reply.id} className="ml-6 mt-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{reply.avatar}</span>
+                      <p className="text-xs">
+                        <span className="font-black text-gray-900">{reply.author}</span>
+                        <span className="text-gray-600"> {reply.content}</span>
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-gray-400 ml-6">{reply.time}</span>
+                  </div>
+                ))}
+
+                {/* Reply Input */}
+                {replyText[comment.id] !== undefined && (
+                  <div className="ml-6 mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={replyText[comment.id] || ''}
+                  onChange={(e) => setReplyText({ ...replyText, [comment.id]: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && comment.id && handleReply(post.id, comment.id)}
+                  placeholder="Write a reply..."
+                  className="flex-1 bg-gray-50 rounded-full px-3 py-1 text-xs font-medium outline-none focus:ring-2 focus:ring-[#C084FC]/30"
+                />
             <button
-              type="button"
-              onClick={handleGetCurrentLocation}
-              disabled={geoStatus === 'FETCHING'}
-              className="mb-4 w-full rounded-[24px] bg-gradient-to-r from-purple-700 via-purple-500 to-purple-300 px-5 py-4 text-sm font-black uppercase tracking-[0.2em] text-white shadow-[0_18px_35px_rgba(124,58,237,0.22)] disabled:cursor-not-allowed disabled:opacity-70"
+              onClick={() => handleReply(post.id, comment.id)}
+              className="text-[#C084FC] text-xs font-black"
             >
-              {geoStatus === 'FETCHING' ? 'Finding you...' : 'Use my current location'}
+                      Send
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render Discoveries Tab
+  const renderDiscoveries = () => (
+    <>
+      {/* Search Bar */}
+      <div className="relative mb-4 cursor-pointer" onClick={() => onNavigate?.('SEARCH')}> {/* Use onNavigate prop */}
+        <div className="w-full p-4 pl-12 rounded-2xl bg-white shadow-md border border-gray-100 flex items-center gap-3">
+          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="text-gray-400 font-medium text-sm">Search for food, shops...</span>
+        </div>
+      </div>
+
+      {/* Services Grid */}
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        {SERVICES.map((service) => (
+          <button key={service.id} onClick={() => handleServiceClick(service)} className="flex flex-col items-center gap-1.5 py-2" style={{ '--service-color': service.color } as React.CSSProperties}>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black shadow-lg bg-gradient-to-br from-[var(--service-color)]/10 to-[var(--service-color)]/5 border border-[var(--service-color)]/20 text-[var(--service-color)] ring-1 ring-[var(--service-color)]/30">
+              {service.icon}
+            </div>
+            <span className="text-[9px] font-medium text-gray-600 uppercase tracking-wider">{service.name}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Featured Merchants */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">⭐ Featured Merchants</h3>
+          <button className="text-[#C084FC] text-xs font-bold">See All</button> {/* Use a button for consistency */}
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {featuredRestaurants.map((res) => (
+            <button key={res.id} onClick={() => handleSelectRestaurant(res)} className="flex-shrink-0 w-40 bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+              <div className="h-24 overflow-hidden relative">
+                <img src={res.image} alt={res.name} className="w-full h-full object-cover" />
+                <div className="absolute top-2 right-2 bg-yellow-400 text-black text-[8px] font-black px-2 py-1 rounded-full">⭐ {res.rating}</div>
+              </div>
+              <div className="p-3">
+                <p className="font-black text-sm text-gray-900 truncate">{res.name}</p>
+                <p className="text-[10px] text-gray-500">{res.cuisine}</p>
+              </div>
             </button>
+          ))}
+        </div>
+      </div>
 
-            {geoStatus === 'ERROR' && (
-              <p className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
-                We could not access your location. Pick a city below instead.
-              </p>
-            )}
+      {/* Trending Items */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">🔥 Trending Now</h3>
+          <button className="text-[#C084FC] text-xs font-bold">See All</button> {/* Use a button for consistency */}
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {trendingItems.map((item, idx) => (
+            <div key={idx} className="flex-shrink-0 w-32 bg-white rounded-2xl shadow-md border border-gray-100 p-3">
+              <div className="text-2xl mb-2">🍜</div>
+              <p className="font-bold text-xs text-gray-900 truncate">{item.name}</p>
+              <p className="text-purple-500 font-black text-sm">₱{item.price}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
-            <div className="max-h-64 space-y-3 overflow-y-auto scrollbar-hide">
-              {PHILIPPINE_CITIES.map((city) => (
-                <button
-                  key={city}
-                  type="button"
-                  onClick={() => {
-                    onSetDeliveryCity(city);
-                    setShowLocationPicker(false);
-                    setGeoStatus('IDLE');
-                  }}
-                  className={[
-                    'flex w-full items-center justify-between rounded-[22px] border px-4 py-4 text-left text-sm font-black transition-all',
-                    deliveryCity === city
-                      ? 'border-purple-500 bg-gradient-to-r from-purple-700 via-purple-500 to-purple-300 text-white shadow-[0_16px_32px_rgba(124,58,237,0.18)]'
-                      : 'border-purple-100 bg-white text-[#41206F] hover:border-purple-200 hover:bg-purple-50',
-                  ].join(' ')}
-                >
-                  <span>{city}</span>
-                  <span className="text-xs uppercase tracking-[0.18em]">Deliver</span>
+      {/* New Merchants */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">🆕 New on Ayoo</h3>
+          <button className="text-[#C084FC] text-xs font-bold">See All</button> {/* Use a button for consistency */}
+        </div>
+        <div className="space-y-2">
+          {newRestaurants.slice(0, 3).map((res) => (
+            <button key={res.id} onClick={() => handleSelectRestaurant(res)} className="w-full bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100">
+              <div className="w-12 h-12 rounded-xl overflow-hidden">
+                <img src={res.image} alt={res.name} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-black text-sm text-gray-900">{res.name}</p>
+                <p className="text-[10px] text-gray-500">{res.cuisine} • {res.deliveryTime}</p>
+              </div>
+              <span className="bg-green-100 text-green-600 text-[8px] font-black px-2 py-1 rounded-full">NEW</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">🗂️ Browse by Category</h3>
+        <div className="grid grid-cols-4 gap-2"> {/* Use CATEGORIES from constants */}
+          {CATEGORIES.slice(0, 8).map((cat) => (
+            <button key={cat.name} onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)} className={`p-3 rounded-2xl flex flex-col items-center gap-1 transition-all ${selectedCategory === cat.name ? 'bg-[#FF1493] text-white' : 'bg-white border border-gray-100'}`}>
+              <span className="text-xl">{cat.icon}</span>
+              <span className="text-[8px] font-black uppercase">{cat.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* AI Picks */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">🤖 AI Picks For You</h3>
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-3">
+          {MOODS.map(mood => (
+            <button key={mood.name} onClick={() => askAiForMood(mood.name)} className={`flex-shrink-0 px-4 py-2 rounded-full flex items-center gap-2 transition-all ${selectedMood === mood.name ? 'bg-[#C084FC] text-white' : 'bg-white border border-gray-100'}`}>
+              <span className="text-sm">{mood.icon}</span> {/* Use selectedMood state */}
+              <span className="text-[10px] font-black uppercase">{mood.name}</span>
+            </button>
+          ))}
+        </div>
+        {(aiLoading || aiSuggestion) && (
+          <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-4 rounded-2xl border border-pink-100">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-black text-[#C084FC]">🤖 Ayoo AI</p>
+              {aiLoading && <div className="w-3 h-3 border-2 border-[#C084FC] border-t-transparent rounded-full animate-spin"></div>}
+            </div>
+            {aiSuggestion && <p className="text-gray-700 font-bold text-sm mt-1">"{aiSuggestion}"</p>}
+          </div>
+        )}
+      </div>
+
+      {/* Nearby Restaurants */}
+      <div className="mb-24">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">🏪 Nearby Merchants</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-3"> {/* Use filteredRestaurants */}
+          {filteredRestaurants.length > 0 ? (
+            filteredRestaurants.slice(0, 8).map(res => (
+              <div key={res.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100" onClick={() => handleSelectRestaurant(res)}>
+                <div className="h-24 overflow-hidden relative">
+                  <img src={res.image} alt={res.name} className="w-full h-full object-cover" />
+                  <div className="absolute top-2 left-2 bg-white/90 px-2 py-1 rounded-lg text-[8px] font-black">🛵 {res.deliveryTime}</div>
+                </div>
+                <div className="p-2">
+                  <h4 className="font-black text-xs text-gray-900 truncate">{res.name}</h4>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-[8px] text-gray-500">{res.cuisine}</span>
+                    <span className="text-yellow-500 font-black text-[8px]">⭐ {res.rating}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-2 py-8 text-center opacity-50">
+              <span className="text-4xl mb-2 block">🏜️</span>
+              <p className="font-black uppercase text-xs">No restaurants found</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  // Render Community Tab
+  const renderCommunity = () => (
+    <>
+      {/* Welcome Banner */}
+      <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl p-4 mb-6 text-white">
+        <h3 className="font-black text-lg">👋 Welcome to Ayoo Community!</h3>
+        <p className="text-white/80 text-xs mt-1">Connect with riders, merchants, and customers</p>
+      </div>
+
+      {/* User's Role Card */}
+      <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-2xl">
+            {userRole === 'MERCHANT' ? '🏪' : userRole === 'RIDER' ? '🛵' : '👤'}
+          </div>
+          <div className="flex-1">
+            <p className="font-black text-gray-900">{currentUser?.name || 'Guest User'}</p>
+            <p className="text-[#FF1493] text-xs font-bold uppercase">{userRole}</p>
+          </div>
+          <button onClick={() => onNavigate?.('MESSAGES')} className="bg-purple-500 text-white text-xs font-black px-4 py-2 rounded-full"> {/* Use onNavigate prop */}
+            💬 Chat
+          </button>
+        </div>
+      </div>
+
+      {/* Dynamic Leaderboard Based on User Role */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-black text-gray-900 text-base">{getLeaderboardTitle()}</h3>
+          {/* Period Toggle */} {/* Use leaderboardPeriod state */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setLeaderboardPeriod('week')}
+              className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${leaderboardPeriod === 'week' ? 'bg-purple-500 text-white' : 'text-gray-500'}`}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setLeaderboardPeriod('month')}
+              className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${leaderboardPeriod === 'month' ? 'bg-[#FF1493] text-white' : 'text-gray-500'}`}
+            >
+              Month
+            </button>
+            <button
+              onClick={() => setLeaderboardPeriod('all')}
+              className={`px-2 py-1 rounded-md text-[8px] font-black uppercase transition-all ${leaderboardPeriod === 'all' ? 'bg-[#FF1493] text-white' : 'text-gray-500'}`}
+            >
+              All
+            </button>
+          </div>
+        </div>
+        {/* Use leaderboardLoading state */}
+        {leaderboardLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-8 h-8 border-4 border-[#FF1493] border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : getLeaderboardForRole().length > 0 ? (
+          <div className="space-y-2">
+            {getLeaderboardForRole().slice(0, 10).map((entry) => (
+              <div key={entry.userId} className="bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100"> {/* Use getLeaderboardForRole */}
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${entry.rank === 1 ? 'bg-yellow-400 text-black' : entry.rank === 2 ? 'bg-gray-300 text-black' : entry.rank === 3 ? 'bg-orange-200 text-black' : 'bg-gray-100 text-gray-500'}`}>
+                  {entry.rank}
+                </div>
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                  {entry.avatar || '👤'}
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-sm text-gray-900">{entry.name}</p>
+                  <p className="text-[10px] text-gray-500">
+                    {userRole === 'CUSTOMER' && `${entry.ordersCount} orders • ₱${(entry.totalSpent || 0).toFixed(0)} spent`}
+                    {userRole === 'MERCHANT' && `${entry.completedOrders} orders • ⭐ ${(entry.averageRating || 0).toFixed(1)} rating`}
+                    {userRole === 'RIDER' && `${entry.deliveriesCount} deliveries • ⭐ ${(entry.riderRating || 0).toFixed(1)} rating`}
+                    {userRole === 'ADMIN' && `${entry.ordersCount || entry.completedOrders || entry.deliveriesCount} orders`}
+                  </p>
+                </div>
+                {entry.rank <= 3 && (
+                  <span className="text-[#FF1493] text-[10px] font-bold">
+                    {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-100">
+            <p className="text-4xl mb-2">📊</p>
+            <p className="text-gray-500 text-xs font-black uppercase">No data yet for this period</p> {/* No data message */}
+          </div>
+        )}
+      </div>
+
+      {/* Featured Merchants Spotlight (always visible) */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">⭐ Merchant Spotlight</h3>
+        <div className="space-y-2">
+          {FEATURED_MERCHANTS.map((merchant: CommunityMember) => (
+            <button key={merchant.id} className="w-full bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100">
+              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-2xl">{merchant.avatar}</div>
+              <div className="flex-1 text-left">
+                <p className="font-black text-sm text-gray-900">{merchant.name}</p>
+                <p className="text-[10px] text-gray-500">{merchant.stats}</p>
+              </div>
+            <span className="bg-purple-100 text-[#C084FC] text-[8px] font-black px-2 py-1 rounded-full">{merchant.badge}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Community Posts with full interactivity */}
+      <div className="mb-6">
+        <h3 className="font-black text-gray-900 text-base mb-3">📢 Community Posts</h3>
+        {communityPosts.map((post: CommunityPost) => renderPost(post))}
+      </div>
+
+      {/* Recent Activity Feed */}
+      <div className="mb-24">
+        <h3 className="font-black text-gray-900 text-base mb-3">📊 Recent Activity</h3>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          {recentOrders.length > 0 ? (
+            recentOrders.slice(0, 5).map((order: OrderRecord, idx: number) => (
+              <div key={idx} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                <span className="text-lg">🛵</span>
+                <div className="flex-1">
+                  <p className="font-bold text-xs text-gray-900">{order.restaurantName}</p>
+                  <p className="text-[8px] text-gray-500">{order.status} • ₱{order.total}</p>
+                </div>
+                <span className="text-[8px] text-gray-400">{order.date}</span>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-4 opacity-50">
+              <p className="text-2xl mb-2">📦</p>
+              <p className="text-xs font-black">No recent orders</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50 pb-24 overflow-y-auto scroll-smooth scrollbar-hide">
+      {/* Share Modal */}
+      {showShareModal && sharePost && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-end justify-center" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white w-full max-w-md rounded-t-[50px] p-8 animate-in slide-in-from-bottom-10 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-6"></div>
+            <h3 className="text-xl font-black uppercase tracking-tighter mb-4 text-center">📤 Share Post</h3>
+            <div className="space-y-3">
+              <button onClick={() => handleShare(sharePost, 'facebook')} className="w-full p-4 bg-blue-600 text-white rounded-2xl flex items-center gap-3">
+                <span className="text-2xl">📘</span>
+                <span className="font-black">Share on Facebook</span>
+              </button>
+              <button onClick={() => handleShare(sharePost, 'twitter')} className="w-full p-4 bg-black text-white rounded-2xl flex items-center gap-3">
+                <span className="text-2xl">🐦</span>
+                <span className="font-black">Share on Twitter</span>
+              </button>
+              <button onClick={() => handleShare(sharePost, 'whatsapp')} className="w-full p-4 bg-green-500 text-white rounded-2xl flex items-center gap-3">
+                <span className="text-2xl">💬</span>
+                <span className="font-black">Share on WhatsApp</span>
+              </button>
+              <button onClick={() => handleShare(sharePost, 'messages')} className="w-full p-4 bg-[#FF1493] text-white rounded-2xl flex items-center gap-3">
+                <span className="text-2xl">✉️</span>
+                <span className="font-black">Send via Messages</span>
+              </button>
+            </div>
+            <button onClick={() => setShowShareModal(false)} className="w-full mt-4 text-gray-400 text-xs font-black uppercase">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-end justify-center">
+          <div className="bg-white w-full max-w-md rounded-t-[50px] p-8 animate-in slide-in-from-bottom-10 shadow-2xl">
+            <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-6"></div>
+            <h3 className="text-xl font-black uppercase tracking-tighter mb-4 text-center">📍 Select Location</h3>
+            <button onClick={handleGetCurrentLocation} disabled={geoStatus === 'FETCHING'} className="w-full mb-4 p-4 bg-gradient-to-r from-[#FF1493] to-[#FF69B4] rounded-2xl flex items-center justify-center gap-2 text-white font-black uppercase text-sm shadow-lg">
+              {geoStatus === 'FETCHING' ? '📡 Locating...' : '📍 Use Current Location'}
+            </button>
+            <div className="space-y-2 max-h-[30vh] overflow-y-auto pb-4">
+              {PHILIPPINE_CITIES.map(city => (
+                <button key={city} onClick={() => { onSetDeliveryCity(city); setShowLocationPicker(false); }} className={`w-full p-3 rounded-2xl flex items-center justify-between border-2 transition-all ${deliveryCity === city ? 'bg-pink-50 border-[#FF1493]' : 'bg-gray-50 border-gray-100'}`}>
+                  <span className={`font-bold text-sm ${deliveryCity === city ? 'text-[#FF1493]' : 'text-gray-900'}`}>{city}</span>
+                  {deliveryCity === city && <span className="text-[#FF1493]">✓</span>}
                 </button>
               ))}
             </div>
@@ -202,37 +998,34 @@ const featuredRestaurants = React.useMemo(() => {
         </div>
       )}
 
-      <header className="relative overflow-hidden rounded-b-[36px] border-b border-white/50 bg-gradient-to-br from-[#7C3AED] via-[#9F7AEA] to-[#D6BCFA] px-6 pb-8 pt-6 text-white shadow-[0_20px_55px_rgba(109,40,217,0.22)]">
-        <div className="absolute -left-10 top-0 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
-        <div className="absolute right-0 top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl"></div>
-
-        <div className="relative flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-white/70">Ayoo now</p>
-            <h1 className="mt-2 text-[28px] font-black leading-none">Hi, {firstName}</h1>
-            <button
-              type="button"
-              onClick={() => setShowLocationPicker(true)}
-              className="mt-3 flex items-center gap-2 rounded-full bg-white/16 px-4 py-2 text-left text-sm font-bold backdrop-blur-md"
-            >
-              <span className="text-base">📍</span>
-              <span>{deliveryCity}</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="rounded-[24px] border border-white/20 bg-white/14 px-4 py-3 text-right backdrop-blur-md">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/70">Points</p>
-              <p className="mt-1 text-lg font-black">{points}</p>
+      {/* Header */}
+      <div className="bg-gradient-to-br from-[#C084FC] via-[#A78BFA] to-[#8B5CF6] p-4 pb-28 shadow-lg rounded-b-[32px]">
+        <div className="flex justify-between items-start mb-3">
+          <div className="cursor-pointer flex items-center gap-2 flex-1" onClick={() => setShowLocationPicker(true)}>
+            <div className="bg-white/30 backdrop-blur-md p-2 rounded-xl">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
             </div>
-            <button
-              type="button"
-              onClick={onOpenCart}
-              className="relative flex h-14 w-14 items-center justify-center rounded-[24px] bg-white text-[#6D28D9] shadow-[0_16px_30px_rgba(47,16,84,0.16)]"
-            >
-              <span className="text-2xl">🛒</span>
+            <div>
+              <p className="text-[8px] font-bold text-white/80 uppercase tracking-widest">Delivering to</p>
+              <p className="font-bold text-white text-base flex items-center gap-1">{deliveryCity} <svg className="w-3 h-3 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="bg-white/30 backdrop-blur-md px-3 py-2 rounded-xl flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-white font-bold text-sm">{points}</span>
+            </div>
+            <button onClick={() => onOpenCart?.()} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center relative shadow-md">
+              <svg className="w-5 h-5 text-[#C084FC]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
               {cartCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#4C1D95] text-[10px] font-black text-white">
+                <span className="absolute -top-1.5 -right-1.5 bg-yellow-400 text-black text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
@@ -240,344 +1033,23 @@ const featuredRestaurants = React.useMemo(() => {
           </div>
         </div>
 
-        {/* Moved to Profile */}
-
-        <div className="relative mt-5">
-          <input
-            type="text"
-            placeholder="Search food, coffee, groceries, or merchants"
-            className="w-full rounded-[28px] border border-white/35 bg-white px-14 py-4 text-sm font-bold text-[#432067] outline-none ring-0 placeholder:text-purple-300 shadow-[0_16px_30px_rgba(47,16,84,0.1)]"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-xl">🔍</span>
-          <button
-            type="button"
-            onClick={() => onNavigate?.('SEARCH')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-purple-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#7C3AED]"
-          >
-            Explore
+        {/* Tab Switcher */}
+        <div className="bg-white/20 backdrop-blur-sm rounded-xl p-1 flex">
+          <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'discover' ? 'bg-white text-purple-500 shadow-md' : 'text-white'}`}>
+            Discover
+          </button>
+          <button onClick={() => setActiveTab('community')} className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'community' ? 'bg-white text-purple-500 shadow-md' : 'text-white'}`}>
+            Community
           </button>
         </div>
-      </header>
+      </div>
 
-      <main className="px-5 pt-6">
-        <section className="rounded-[30px] border border-white/70 bg-white/80 p-3 shadow-[0_18px_45px_rgba(109,40,217,0.08)] backdrop-blur-xl">
-          <div className="grid grid-cols-4 gap-3">
-            {quickServices.map((service) => (
-              <button
-                key={service.name}
-                type="button"
-                onClick={() => handleServiceClick(service.screen)}
-                className="rounded-[24px] bg-[#F8F4FF] p-4 text-left transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_16px_30px_rgba(124,58,237,0.12)]"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-gradient-to-br from-purple-700 via-purple-500 to-purple-300 text-2xl text-white shadow-[0_12px_22px_rgba(124,58,237,0.18)]">
-                  {service.icon}
-                </div>
-                <p className="mt-4 text-[11px] font-black uppercase tracking-[0.18em] text-[#40205F]">{service.name}</p>
-                <p className="mt-1 text-[10px] font-bold text-purple-400">{service.caption}</p>
-              </button>
-            ))}
-          </div>
-        </section>
+      {/* Content Area */}
+      <div className="px-4 -mt-20 relative z-10">
+        {activeTab === 'discover' ? renderDiscoveries() : renderCommunity()}
+      </div>
 
-        <section className="mt-6">
-          <div className="flex items-center gap-2 rounded-full bg-white/70 p-1 backdrop-blur-sm shadow-sm">
-            <button
-              type="button"
-              onClick={() => setActiveTab('discover')}
-              className={[
-                'flex-1 rounded-full px-4 py-3 text-xs font-black uppercase tracking-[0.2em] transition-all',
-                activeTab === 'discover' ? 'bg-[#7C3AED] text-white shadow-md' : 'text-purple-500',
-              ].join(' ')}
-            >
-              Discover
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('community')}
-              className={[
-                'flex-1 rounded-full px-4 py-3 text-xs font-black uppercase tracking-[0.2em] transition-all',
-                activeTab === 'community' ? 'bg-[#7C3AED] text-white shadow-md' : 'text-purple-500',
-              ].join(' ')}
-            >
-              Community
-            </button>
-          </div>
-        </section>
-
-        {activeTab === 'discover' ? (
-          <>
-            <section className="mt-6 rounded-[32px] border border-purple-100 bg-white/80 p-5 shadow-[0_18px_45px_rgba(109,40,217,0.08)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-purple-400">Browse by taste</p>
-                  <h2 className="mt-2 text-2xl font-black text-[#2E1358]">What are you in the mood for?</h2>
-                </div>
-                {selectedCategory && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategory(null)}
-                    className="rounded-full bg-purple-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-purple-500"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="mt-4 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                {CATEGORIES.slice(0, 8).map((category) => (
-                  <button
-                    key={category.name}
-                    type="button"
-                    onClick={() => setSelectedCategory(category.name === selectedCategory ? null : category.name)}
-                    className={[
-                      'flex shrink-0 items-center gap-2 rounded-full border px-4 py-3 text-sm font-black transition-all',
-                      selectedCategory === category.name
-                        ? 'border-purple-500 bg-[#7C3AED] text-white shadow-[0_14px_26px_rgba(124,58,237,0.16)]'
-                        : 'border-purple-100 bg-[#FAF7FF] text-[#5C3198] hover:bg-white',
-                    ].join(' ')}
-                  >
-                    <span>{category.icon}</span>
-                    <span>{category.name}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="mt-6 rounded-[32px] border border-purple-100 bg-gradient-to-r from-white via-[#FCFAFF] to-[#F4EDFF] p-5 shadow-[0_18px_45px_rgba(109,40,217,0.08)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-purple-400">Ayoo AI picks</p>
-                  <h2 className="mt-2 text-2xl font-black text-[#2E1358]">Match your vibe</h2>
-                </div>
-                <span className="rounded-full bg-purple-100 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-purple-600">
-                  {aiLoading ? 'Thinking' : 'Ready'}
-                </span>
-              </div>
-
-              <div className="mt-4 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                {moodOptions.map((mood) => (
-                  <button
-                    key={mood.name}
-                    type="button"
-                    onClick={() => askAiForMood(mood.name)}
-                    className={[
-                      'flex shrink-0 items-center gap-3 rounded-[24px] border px-5 py-4 text-left transition-all',
-                      selectedMood === mood.name
-                        ? 'border-purple-500 bg-[#7C3AED] text-white shadow-[0_16px_30px_rgba(124,58,237,0.18)]'
-                        : 'border-purple-100 bg-white text-[#48207A] hover:border-purple-200 hover:bg-purple-50',
-                    ].join(' ')}
-                  >
-                    <span className="text-2xl">{mood.icon}</span>
-                    <span className="text-xs font-black uppercase tracking-[0.18em]">{mood.name}</span>
-                  </button>
-                ))}
-              </div>
-
-              {(aiSuggestion || aiLoading) && (
-                <div className="mt-5 rounded-[28px] bg-[#F7F1FF] p-5">
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-purple-400">Suggestion</p>
-                  <p className="mt-2 text-base font-bold text-[#432067]">
-                    {aiLoading ? 'Ayoo AI is preparing something that fits your mood...' : aiSuggestion}
-                  </p>
-                </div>
-              )}
-            </section>
-
-            <section className="mt-6">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-purple-400">Featured merchants</p>
-                  <h2 className="mt-2 text-2xl font-black text-[#2E1358]">Top picks near you</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigate?.('SEARCH')}
-                  className="text-xs font-black uppercase tracking-[0.18em] text-purple-500"
-                >
-                  View all
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {featuredRestaurants.map((restaurant) => (
-                  <button
-                    key={restaurant.id}
-                    type="button"
-                    onClick={() => handleSelectRestaurant(restaurant)}
-                    className="overflow-hidden rounded-[30px] border border-white/80 bg-white text-left shadow-[0_16px_38px_rgba(109,40,217,0.08)] transition-all hover:-translate-y-1"
-                  >
-                    <div className="relative h-44 overflow-hidden">
-                      <img src={restaurant.image || PLACEHOLDER_RESTAURANT} alt={restaurant.name} className="h-full w-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
-                      <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#5A2E93]">
-                        {restaurant.deliveryTime}
-                      </div>
-                      <div className="absolute bottom-4 left-4 right-4">
-                        <p className="truncate text-lg font-black text-white">{restaurant.name}</p>
-                        <p className="truncate text-sm font-bold text-white/80">{restaurant.cuisine}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-4">
-                      <span className="text-sm font-black text-[#4C1D95]">⭐ {restaurant.rating}</span>
-                      <span className="rounded-full bg-purple-50 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-purple-500">
-                        Order
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="mt-6 rounded-[32px] border border-purple-100 bg-white/80 p-5 shadow-[0_18px_45px_rgba(109,40,217,0.08)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-purple-400">Trending now</p>
-                  <h2 className="mt-2 text-2xl font-black text-[#2E1358]">Popular bites on Ayoo</h2>
-                </div>
-                <span className="rounded-full bg-[#F7F1FF] px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-purple-500">
-                  {trendingItems.length} items
-                </span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {trendingItems.map((item) => (
-                  <div key={item.id} className="rounded-[24px] bg-[#FAF7FF] p-4">
-                    <p className="text-sm font-black text-[#432067]">{item.name}</p>
-                    <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-purple-400">{item.category}</p>
-                    <p className="mt-3 text-sm font-black text-purple-600">PHP {item.price}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="mt-6 pb-[180px]">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-purple-400">All merchants</p>
-                  <h2 className="mt-2 text-2xl font-black text-[#2E1358]">Browse nearby stores</h2>
-                </div>
-                <span className="rounded-full bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-purple-500 shadow-sm">
-                  {filteredRestaurants.length} results
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                {filteredRestaurants.map((restaurant) => (
-                  <button
-                    key={restaurant.id}
-                    type="button"
-                    onClick={() => handleSelectRestaurant(restaurant)}
-                    className="flex w-full items-center gap-4 rounded-[30px] border border-white/80 bg-white p-4 text-left shadow-[0_16px_38px_rgba(109,40,217,0.08)] transition-all hover:-translate-y-0.5"
-                  >
-                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[22px] bg-purple-50">
-                      <img src={restaurant.image || PLACEHOLDER_RESTAURANT} alt={restaurant.name} className="h-full w-full object-cover" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="truncate text-lg font-black text-[#2E1358]">{restaurant.name}</p>
-                          <p className="mt-1 text-sm font-bold text-purple-400">{restaurant.cuisine}</p>
-                        </div>
-                        <span className="shrink-0 text-sm font-black text-[#4C1D95]">⭐ {restaurant.rating}</span>
-                      </div>
-                      <div className="mt-4 flex items-center justify-between gap-3">
-                        <span className="rounded-full bg-[#F7F1FF] px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-purple-500">
-                          {restaurant.deliveryTime}
-                        </span>
-                        <span className="rounded-full bg-gradient-to-r from-purple-700 via-purple-500 to-purple-300 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white">
-                          View menu
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-
-                {filteredRestaurants.length === 0 && (
-                  <div className="rounded-[32px] border border-dashed border-purple-200 bg-white/70 px-6 py-16 text-center">
-                    <div className="text-6xl">🔍</div>
-                    <h3 className="mt-4 text-2xl font-black text-[#432067]">No merchants found</h3>
-                    <p className="mt-2 text-sm font-bold text-purple-400">Try a different search or switch your delivery area.</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowLocationPicker(true)}
-                      className="mt-6 rounded-[22px] bg-gradient-to-r from-purple-700 via-purple-500 to-purple-300 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-white"
-                    >
-                      Change location
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
-          </>
-        ) : (
-          <section className="mt-6 pb-[180px] space-y-6">
-            <div className="rounded-[32px] border border-purple-100 bg-white p-6 shadow-[0_18px_45px_rgba(109,40,217,0.08)]">
-              <h2 className="text-2xl font-black text-gray-900 mb-2">Community Feed</h2>
-              <p className="text-sm font-bold text-purple-600 mb-6">Latest posts from Ayoo riders & eaters</p>
-              
-              {/* 12+ Interactive Mock Posts - No View More Button */}
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {Array.from({ length: 12 }).map((_, i) => {
-                  const users = ['Juan E.', 'Maria C.', 'Pedro R.', 'Liza S.', 'Tony M.', 'Ana L.', 'Rico P.', 'Sofia G.'];
-                  const user = users[i % users.length];
-                  const contents = [
-                    'Chickenjoy arrived steaming hot! Rider was super polite 🚀',
-                    'Jollibee spaghetti perfect spice! 5⭐🌟',
-                    'Green Meadows salad fresh AF! 🥗🥬',
-                    'Rider flew through traffic! 8km in 12min ⚡',
-                    'Sisig spicy level 10/10 🌶️🔥',
-                    'Groceries + food in one app! Ayoo MVP 🛒🍔',
-                    'Rainy day ramen delivered warm ☔🍜',
-                    'Merchant added extra chili! Perfect ❤️',
-                    'Halo-halo first time - obsessed! ❄️🍧',
-                    'Rider nailed traffic! 5⭐👏',
-                    'Family meal for 5 perfect 👨‍👩‍👧‍👦',
-                    '1AM cravings saved! 🌙🍕'
-                  ];
-                  const likes = (i + 5) * 3;
-                  const loves = (i + 1) * 2;
-                  const timeAgo = ['2m', '5m', '10m', '15m', '30m', '1h', '2h', '1h'][i % 8];
-                  return (
-                    <div key={i} className="bg-[#FAF7FF] p-5 rounded-2xl hover:shadow-md transition-all group">
-                      <div className="flex gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-400 rounded-2xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md">
-                          {user.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <p className="font-bold text-sm">{user}</p>
-                            <span className="text-xs text-gray-500">{timeAgo} ago</span>
-                          </div>
-                          <p className="text-sm font-medium text-gray-800 mb-3 line-clamp-2">{contents[i % contents.length]}</p>
-                          <div className="flex items-center gap-4 mb-2">
-                            <button className="flex items-center gap-1 p-2 rounded-xl hover:bg-white group-hover:bg-purple-50 transition-all">
-                              <span className="text-lg">👍</span>
-                              <span className="text-xs font-bold text-gray-600">{likes}</span>
-                            </button>
-                            <button className="flex items-center gap-1 p-2 rounded-xl hover:bg-white group-hover:bg-pink-50 transition-all">
-                              <span className="text-lg">❤️</span>
-                              <span className="text-xs font-bold text-gray-600">{loves}</span>
-                            </button>
-                            <button className="text-xs font-medium text-gray-500 hover:text-gray-700">Reply</button>
-                          </div>
-                          {Math.random() > 0.6 && (
-                            <div className="pl-16 mt-1 pt-1 border-l border-purple-200">
-                              <p className="text-xs text-gray-600">{user} replied</p>
-                              <p className="text-xs text-gray-800 mt-1">Love this! 🙌</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-            </div>
-          </section>
-        )}
-      </main>
+      <BottomNav active="HOME" onNavigate={onNavigate!} />
     </div>
   );
 };

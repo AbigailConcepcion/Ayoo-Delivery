@@ -1,19 +1,14 @@
 
-import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem, Conversation, Message, Promo, ServiceCategory } from './types';
+import { UserAccount, Address, PaymentMethod, OrderRecord, Voucher, Restaurant, WalletTransaction, FoodItem, Conversation, Message, Promo, ServiceCategory, LeaderboardEntry, LeaderboardPeriod } from './types';
 import { MOCK_RESTAURANTS, GLOBAL_REGISTRY_KEY } from './constants';
-
-// allow access to Vite env vars without TS errors
-declare global {
-  interface ImportMeta {
-    env: any;
-  }
-}
+import { messagingHub } from './api';
 
 class AyooDatabase {
   public static ENV = {
     // controlled by Vite build variables (e.g. VITE_USE_REAL_BACKEND=true)
     USE_REAL_BACKEND: import.meta.env.VITE_USE_REAL_BACKEND === 'true',
     BASE_URL: import.meta.env.VITE_API_BASE || 'http://localhost:4000',
+    STRIPE_PUBLISHABLE_KEY: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
     TIMEOUT: 10000,
     RETRY_ATTEMPTS: 3
   };
@@ -36,18 +31,43 @@ class AyooDatabase {
 
   // utility used when talking to the real backend
   private async request(path: string, options: RequestInit = {}) {
-    const url = `${AyooDatabase.ENV.BASE_URL}${path}`;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const token = localStorage.getItem(this.STORAGE_KEYS.AUTH_TOKEN);
-    if (token) headers.Authorization = `Bearer ${token}`;
-    options.headers = { ...headers, ...(options.headers as object || {}) };
+    const maxRetries = AyooDatabase.ENV.RETRY_ATTEMPTS;
+    let lastError;
 
-    const res = await fetch(url, options);
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || `HTTP ${res.status}`);
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const url = `${AyooDatabase.ENV.BASE_URL}${path}`;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem(this.STORAGE_KEYS.AUTH_TOKEN);
+        if (token) headers.Authorization = `Bearer ${token}`;
+        options.headers = { ...headers, ...(options.headers as object || {}) };
+
+        const res = await fetch(url, options);
+        
+        // Only retry on 5xx errors or network timeouts
+        if (!res.ok) {
+          if (res.status < 500 || i === maxRetries - 1) {
+            let errorMessage = `HTTP ${res.status}`;
+            try {
+              const text = await res.text();
+              const json = JSON.parse(text);
+              errorMessage = json.error || text || errorMessage;
+            } catch { /* use default */ }
+            
+            console.error(`[AyooDB] Request failed: ${errorMessage}`);
+            throw new Error(errorMessage);
+          }
+          throw new Error(`Ayoo Cloud is temporarily unavailable (${res.status}). Retrying...`);
+        }
+        return await res.json();
+      } catch (err) {
+        lastError = err;
+        if (i === maxRetries - 1) throw err;
+        const delay = 1000 * Math.pow(2, i);
+        await new Promise(res => setTimeout(res, delay));
+      }
     }
-    return res.json();
+    throw lastError;
   }
 
   async connect() {
@@ -117,7 +137,7 @@ class AyooDatabase {
           return result.user;
         }
       } catch (err) {
-        console.error('login failed', err);
+        console.error('AyooDatabase: login failed', err); // In production, integrate with an error reporting service
         return null;
       }
       return null;
@@ -127,6 +147,10 @@ class AyooDatabase {
     const user = registry.find((u: any) => u.email.toLowerCase() === cleanEmail && u.password === cleanPass);
 
     if (user) {
+      // In mock mode, we generate a dummy token to satisfy session checks
+      if (!localStorage.getItem(this.STORAGE_KEYS.AUTH_TOKEN)) {
+        localStorage.setItem(this.STORAGE_KEYS.AUTH_TOKEN, 'mock_token_' + Date.now());
+      }
       // Set the active session
       localStorage.setItem(this.STORAGE_KEYS.USER_PROFILE, JSON.stringify(user));
 
@@ -163,7 +187,7 @@ class AyooDatabase {
         }
         return { success: false, message: result.error || 'registration failed' };
       } catch (err: any) {
-        console.error('register failed', err);
+        console.error('AyooDatabase: register failed', err); // In production, integrate with an error reporting service
         return { success: false, message: err.message || 'registration failed' };
       }
     }
@@ -208,7 +232,7 @@ class AyooDatabase {
         const result: any = await this.request(`/users/${cleanEmail}`);
         return result.user || null;
       } catch (err) {
-        console.error('getUserByEmail failed', err);
+        console.error('AyooDatabase: getUserByEmail failed', err); // In production, integrate with an error reporting service
         return null;
       }
     }
@@ -233,7 +257,7 @@ class AyooDatabase {
           return result.user;
         }
       } catch (err) {
-        console.error('updateProfile failed', err);
+        console.error('AyooDatabase: updateProfile failed', err); // In production, integrate with an error reporting service
         return null;
       }
       return null;
@@ -263,7 +287,7 @@ class AyooDatabase {
         const result: any = await this.request('/restaurants');
         return result.restaurants || [];
       } catch (err) {
-        console.error('getRestaurants failed', err);
+        console.error('AyooDatabase: getRestaurants failed', err); // In production, integrate with an error reporting service
         return [];
       }
     }
@@ -279,8 +303,8 @@ class AyooDatabase {
           method: 'POST',
           body: JSON.stringify(r)
         })));
-      } catch (err) {
-        console.error('saveRestaurants failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: saveRestaurants failed', err);
       }
     }
     localStorage.setItem(this.STORAGE_KEYS.RESTAURANTS, JSON.stringify(list));
@@ -299,8 +323,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request(`/orders/customer/${clean}`);
         return result.orders || [];
-      } catch (err) {
-        console.error('getHistory failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getHistory failed', err);
         return [];
       }
     }
@@ -312,8 +336,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request(`/orders/merchant/${encodeURIComponent(restaurantName)}`);
         return result.orders || [];
-      } catch (err) {
-        console.error('getMerchantOrders failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getMerchantOrders failed', err);
         return [];
       }
     }
@@ -327,8 +351,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request(`/orders/market?city=${encodeURIComponent(city)}`);
         return result.orders || [];
-      } catch (err) {
-        console.error('getMarketOrders failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getMarketOrders failed', err);
         return [];
       }
     }
@@ -341,8 +365,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request(`/orders/rider/${encodeURIComponent(riderEmail)}`);
         return result.orders || [];
-      } catch (err) {
-        console.error('getMyRiderTasks failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getMyRiderTasks failed', err);
         return [];
       }
     }
@@ -371,8 +395,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request(`/ledger/${ownerId.toLowerCase()}`);
         return result.ledger || [];
-      } catch (err) {
-        console.error('getLedger failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getLedger failed', err);
         return [];
       }
     }
@@ -408,8 +432,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request(`/addresses/${clean}`);
         return result.addresses || [];
-      } catch (err) {
-        console.error('getAddresses failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getAddresses failed', err);
         return [];
       }
     }
@@ -424,8 +448,8 @@ class AyooDatabase {
           method: 'POST',
           body: JSON.stringify(addr)
         })));
-      } catch (err) {
-        console.error('saveAddresses failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: saveAddresses failed', err);
       }
     }
     localStorage.setItem(`addresses_${clean}`, JSON.stringify(a));
@@ -436,8 +460,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request(`/payments/methods/${clean}`);
         return result.payments || [];
-      } catch (err) {
-        console.error('getPayments failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getPayments failed', err);
         return [];
       }
     }
@@ -451,8 +475,8 @@ class AyooDatabase {
           method: 'POST',
           body: JSON.stringify(pm)
         })));
-      } catch (err) {
-        console.error('savePayments failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: savePayments failed', err);
       }
     }
     localStorage.setItem(`pay_${clean}`, JSON.stringify(p));
@@ -465,8 +489,8 @@ class AyooDatabase {
           method: 'PUT',
           body: JSON.stringify({ balance: bal })
         });
-      } catch (err) {
-        console.error('updatePaymentBalance failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: updatePaymentBalance failed', err);
       }
     }
     const pay = await this.getPayments(email);
@@ -483,8 +507,8 @@ class AyooDatabase {
           body: JSON.stringify({ methodId: mid, amount })
         });
         return result.balance || 0;
-      } catch (err) {
-        console.error('topUpPayment failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: topUpPayment failed', err);
         throw err;
       }
     }
@@ -499,8 +523,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request('/users');
         return result.users || [];
-      } catch (err) {
-        console.error('getRegistryUsers failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getRegistryUsers failed', err);
         return [];
       }
     }
@@ -513,8 +537,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request('/orders/live');
         return result.orders || [];
-      } catch (err) {
-        console.error('getAllLiveOrders failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getAllLiveOrders failed', err);
         return [];
       }
     }
@@ -530,8 +554,8 @@ class AyooDatabase {
           body: JSON.stringify(entry)
         });
         return;
-      } catch (err) {
-        console.error('addLedgerEntry failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: addLedgerEntry failed', err);
       }
     }
     const ledger = JSON.parse(localStorage.getItem('ayoo_financial_ledger_v2') || '{}');
@@ -547,8 +571,8 @@ class AyooDatabase {
           method: 'POST',
           body: JSON.stringify(order)
         });
-      } catch (err) {
-        console.error('saveOrder failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: saveOrder failed', err);
       }
     }
     const key = `orders_${clean}`;
@@ -582,8 +606,8 @@ class AyooDatabase {
           method: 'PUT',
           body: JSON.stringify({ status, ...extra })
         });
-      } catch (err) {
-        console.error('updateOrderStatus failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: updateOrderStatus failed', err);
       }
     }
     // also update local cache if needed
@@ -596,8 +620,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request('/config');
         return result;
-      } catch (err) {
-        console.error('getSystemConfig failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getSystemConfig failed', err);
       }
     }
     return JSON.parse(localStorage.getItem(this.STORAGE_KEYS.SYSTEM_CONFIG) || '{"deliveryFee":45,"masterPin":"1234"}');
@@ -609,8 +633,8 @@ class AyooDatabase {
           method: 'PUT',
           body: JSON.stringify(c)
         });
-      } catch (err) {
-        console.error('saveSystemConfig failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: saveSystemConfig failed', err);
       }
     }
     localStorage.setItem(this.STORAGE_KEYS.SYSTEM_CONFIG, JSON.stringify(c));
@@ -637,8 +661,8 @@ class AyooDatabase {
       try {
         const result: any = await this.request('/content/promos');
         return result.promos || [];
-      } catch (err) {
-        console.error('getPromos failed', err);
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getPromos failed', err);
         return [];
       }
     }
@@ -738,6 +762,17 @@ class AyooDatabase {
   }
 
   async getMessages(conversationId: string): Promise<Message[]> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      try {
+        const convo = this.getAllConversations().find(c => c.id === conversationId);
+        if (convo?.orderId) {
+          const result: any = await this.request(`/orders/${convo.orderId}/messages`);
+          return result.messages || [];
+        }
+      } catch (err) { // In production, integrate with an error reporting service
+        console.error('AyooDatabase: getMessages failed', err);
+      }
+    }
     const allMessages = this.getAllMessages();
     return allMessages
       .filter(m => m.conversationId === conversationId)
@@ -750,6 +785,13 @@ class AyooDatabase {
     senderName: string,
     text: string
   ): Promise<Message> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      const convo = this.getAllConversations().find(c => c.id === conversationId);
+      if (convo?.orderId) {
+        messagingHub.sendMessage(convo.orderId, text);
+      }
+    }
+
     const newMessage: Message = {
       id: `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       conversationId,
@@ -783,11 +825,8 @@ class AyooDatabase {
       this.saveAllConversations(allConversations);
     }
 
-    // Notify other tabs/browsers via BroadcastChannel
-    new BroadcastChannel('ayoo_messaging_v1').postMessage({
-      type: 'NEW_MESSAGE',
-      message: newMessage
-    });
+    // Notify other tabs
+    messagingHub.broadcastNewMessage(newMessage);
 
     return newMessage;
   }
@@ -827,6 +866,13 @@ class AyooDatabase {
   }
 
   async markConversationAsRead(conversationId: string, email: string): Promise<void> {
+    if (AyooDatabase.ENV.USE_REAL_BACKEND) {
+      const convo = this.getAllConversations().find(c => c.id === conversationId);
+      if (convo?.orderId) {
+        messagingHub.markAsRead(convo.orderId);
+      }
+    }
+
     const allMessages = this.getAllMessages();
     const updatedMessages = allMessages.map(m =>
       m.conversationId === conversationId && m.senderEmail.toLowerCase() !== email.toLowerCase()
@@ -878,6 +924,22 @@ class AyooDatabase {
       orderId,
       orderStatus
     );
+  }
+
+  async cancelService(id: string, reason: string): Promise<void> {
+    console.log(`Ayoo Database: Cancelling service ${id}. Reason: ${reason}`);
+  }
+
+  async getCustomerLeaderboard(period: LeaderboardPeriod): Promise<LeaderboardEntry[]> {
+    return [];
+  }
+
+  async getMerchantLeaderboard(period: LeaderboardPeriod): Promise<LeaderboardEntry[]> {
+    return [];
+  }
+
+  async getRiderLeaderboard(period: LeaderboardPeriod): Promise<LeaderboardEntry[]> {
+    return [];
   }
 }
 

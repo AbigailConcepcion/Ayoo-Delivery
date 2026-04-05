@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { ayooCloud } from './api';
 import { useToast } from './components/ToastContext';
 import { Restaurant, FoodItem, Review } from './types';
 
@@ -26,7 +27,7 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
     showToast(`Added ${item.name} to cart`);
   };
 
-  const handleReviewSubmit = () => {
+  const handleReviewSubmit = async () => {
     if (!newComment.trim()) return;
     
     const newReview: Review = {
@@ -38,11 +39,17 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
       date: 'Just now'
     };
     
-    setLocalReviews([newReview, ...localReviews]);
-    setNewComment('');
-    setNewRating(5);
-    setShowReviewModal(false);
-    showToast('Review posted successfully! ✨');
+    try {
+      // Persist feedback to the cloud
+      await ayooCloud.submitFeedback(restaurant.id, newRating, newComment, 0);
+      setLocalReviews([newReview, ...localReviews]);
+      setNewComment('');
+      setNewRating(5);
+      setShowReviewModal(false);
+      showToast('Review posted successfully! ✨');
+    } catch (err) {
+      showToast('Could not save review. Please try again.');
+    }
   };
 
 

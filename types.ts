@@ -38,6 +38,7 @@ export interface WalletTransaction {
   orderId?: string;
   methodType?: PaymentType;
   referenceId: string;
+  idempotencyKey?: string;
   status: 'SETTLED' | 'PENDING' | 'FAILED';
 }
 
@@ -97,6 +98,7 @@ export interface OrderRecord {
   paymentMethod?: string;
   paymentId?: string;
   isPaid?: boolean | number;
+  amountPaid?: number;
   transactionId?: string;
   rating?: number;
   comment?: string;
@@ -208,4 +210,22 @@ export interface ServiceCategory {
   icon: string;
   color: string;
   route: string;
+}
+
+export type OrderTrackingStatus = 'PENDING' | 'ACCEPTED' | 'PREPARING' | 'READY_FOR_PICKUP' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
+
+export type LeaderboardPeriod = 'week' | 'month' | 'all';
+
+export interface LeaderboardEntry {
+  userId: string;
+  name: string;
+  avatar?: string;
+  rank: number;
+  points?: number;
+  ordersCount?: number;
+  totalSpent?: number;
+  completedOrders?: number;
+  averageRating?: number;
+  deliveriesCount?: number;
+  riderRating?: number;
 }

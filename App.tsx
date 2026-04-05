@@ -7,13 +7,14 @@ import BottomNav from './components/BottomNav';
 import Logo from './components/Logo';
 import Button from './components/Button';
 import { db } from './db';
-import { ayooCloud } from './api';
+import { ayooCloud, notificationHub } from './api';
 import { COLORS } from './constants';
 import { calculateCheckoutBreakdown } from './src/utils/pricing';
 import { useToast } from './components/ToastContext';
 import './theme.css';
 
-const OWNER_EMAIL = 'ayoo.admin@gmail.com';
+// In production, this should always be an environment variable
+const OWNER_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'ayoo.admin@gmail.com';
 
 const ScreenFallback: React.FC = () => (
   <div className="h-screen bg-[radial-gradient(circle_at_top,_rgba(214,188,250,0.95),_rgba(139,92,246,0.82)_45%,_rgba(109,40,217,0.88)_100%)] flex items-center justify-center px-6">
@@ -50,6 +51,144 @@ const Pharmacy = lazy(() => import('./screens/Pharmacy'));
 const AIChat = lazy(() => import('./components/AIChat'));
 const Community = lazy(() => import('./screens/Community'));
 
+// --- UI Sub-components for better maintainability ---
+
+const SplashScreen: React.FC = () => (
+  <div className="max-w-[430px] mx-auto h-screen bg-[radial-gradient(circle_at_top,_rgba(214,188,250,0.98),_rgba(139,92,246,0.88)_44%,_rgba(109,40,217,0.92)_100%)] flex flex-col items-center justify-center p-8">
+    <div className="relative mb-12">
+      <div className="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
+      <div className="w-48 h-48 rounded-[40px] bg-white/95 flex items-center justify-center shadow-2xl animate-pulse overflow-hidden">
+        <img src="/logo.png" alt="Ayoo Logo" className="w-full h-full object-cover" />
+      </div>
+    </div>
+    <h1 className="text-5xl font-bold text-white tracking-tight mb-2 drop-shadow-lg">AYOO</h1>
+    <p className="text-white/90 text-sm font-medium tracking-[0.2em] mb-16">Super App</p>
+    <div className="w-64 h-2 bg-white/25 rounded-full overflow-hidden backdrop-blur-sm">
+      <div className="h-full bg-white rounded-full animate-progress shadow-lg" style={{ width: '70%' }}></div>
+    </div>
+    <p className="mt-8 text-xs font-medium tracking-wide text-white/80 animate-pulse text-center">Initializing...</p>
+  </div>
+);
+
+const SyncErrorView: React.FC<{ error: string }> = ({ error }) => (
+  <div className="min-h-screen bg-transparent flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
+    <div className="w-24 h-24 rounded-[40px] flex items-center justify-center text-5xl mb-10 shadow-lg animate-bounce" style={{ backgroundColor: COLORS.primaryBg }}>📵</div>
+    <h2 className="text-3xl font-black uppercase tracking-tighter mb-4" style={{ color: COLORS.black }}>Connection Issue</h2>
+    <p className="text-gray-500 font-medium text-sm mb-12 leading-relaxed px-4">{error || "We're having trouble reaching our servers. Please check your internet connection and try again."}</p>
+    <Button onClick={() => window.location.reload()}>Try Again</Button>
+  </div>
+);
+
+interface ScreenManagerProps {
+  screen: AppScreen;
+  currentUser: UserAccount | null;
+  activeRole: UserRole;
+  restaurants: Restaurant[];
+  selectedRestaurant: Restaurant | null;
+  setSelectedRestaurant: (r: Restaurant | null) => void;
+  cartItems: { id: string; quantity: number }[];
+  lastOrder: { id: string; quantity: number }[];
+  history: OrderRecord[];
+  deliveryCity: string;
+  setDeliveryCity: (c: string) => void;
+  deliveryAddress: string;
+  setDeliveryAddress: (a: string) => void;
+  deliveryFee: number;
+  setDeliveryFee: (f: number) => void;
+  cartTip: number;
+  setCartTip: (t: number) => void;
+  appliedVoucher: Voucher | null;
+  setAppliedVoucher: (v: Voucher | null) => void;
+  isGroupOrder: boolean;
+  setIsGroupOrder: (b: boolean) => void;
+  isOwner: boolean;
+  onNavigate: (s: string) => void;
+  onLogin: (u: UserAccount) => void;
+  onLogout: () => void;
+  onSetRole: (r: UserRole) => void;
+  onManualFinish: () => void;
+  onAddToCart: (id: string) => void;
+  onUpdateQuantity: (id: string, d: number) => void;
+  onCheckout: (pm?: any, paid?: boolean, meta?: any) => void;
+  onUpdateUser: (u: UserAccount) => void;
+  onUpdateRestaurants: (r: Restaurant[]) => void;
+}
+
+const ScreenManager: React.FC<ScreenManagerProps> = ({
+  screen, currentUser, activeRole, restaurants, selectedRestaurant, setSelectedRestaurant,
+  cartItems, lastOrder, history, deliveryCity, setDeliveryCity, deliveryAddress, setDeliveryAddress,
+  deliveryFee, setDeliveryFee, cartTip, setCartTip, appliedVoucher, setAppliedVoucher,
+  isGroupOrder, setIsGroupOrder, isOwner, onNavigate, onLogin, onLogout, onSetRole,
+  onManualFinish, onAddToCart, onUpdateQuantity, onCheckout, onUpdateUser, onUpdateRestaurants
+}) => {
+  const customerHomeScreen = (
+    <Home
+      restaurants={restaurants}
+      onSelectRestaurant={(r) => { setSelectedRestaurant(r); onNavigate('RESTAURANT'); }}
+      onOpenCart={() => onNavigate('CART')}
+      onNavigate={onNavigate}
+      cartCount={cartItems.length}
+      points={currentUser?.points || 0}
+      streak={currentUser?.streak || 0}
+      badges={currentUser?.badges || []}
+      deliveryCity={deliveryCity}
+      onSetDeliveryCity={setDeliveryCity}
+      currentUser={currentUser}
+      recentOrders={history}
+    />
+  );
+
+  switch (screen) {
+    case 'ONBOARDING': return <Onboarding onFinish={async () => { await db.setOnboardingSeen(true); onNavigate('AUTH'); }} />;
+    case 'AUTH': return <Auth onLogin={onLogin} />;
+    case 'MANUAL': return <AyooManual role={activeRole} onFinish={onManualFinish} />;
+    case 'SERVICES': return <Services user={currentUser} deliveryCity={deliveryCity} onNavigate={onNavigate} />;
+    case 'HOME': return customerHomeScreen;
+    case 'SEARCH':
+      return (
+        <Search
+          restaurants={restaurants}
+          onSelectRestaurant={(r) => { setSelectedRestaurant(r); onNavigate('RESTAURANT'); }}
+          onOpenCart={() => onNavigate('CART')}
+          onNavigate={onNavigate}
+          cartCount={cartItems.length}
+          deliveryCity={deliveryCity}
+          onSetDeliveryCity={setDeliveryCity}
+          onBack={() => onNavigate('HOME')}
+        />
+      );
+    case 'MESSAGES': return currentUser ? <Messages currentUser={currentUser} onBack={() => onNavigate('HOME')} onNavigate={onNavigate} /> : <Auth onLogin={onLogin} />;
+    case 'GROCERIES': return <Groceries onBack={() => onNavigate('HOME')} onNavigate={onNavigate} />;
+    case 'COURIER': return <Courier onBack={() => onNavigate('HOME')} onNavigate={onNavigate} />;
+    case 'RIDES': return <Rides onBack={() => onNavigate('HOME')} onNavigate={onNavigate} />;
+    case 'DINE_OUT': return <DineOut onBack={() => onNavigate('HOME')} onNavigate={onNavigate} />;
+    case 'PHARMACY': return <Pharmacy onBack={() => onNavigate('HOME')} onNavigate={onNavigate} />;
+    case 'RESTAURANT': return selectedRestaurant ? <RestaurantDetail restaurant={selectedRestaurant} onBack={() => onNavigate('HOME')} onAddToCart={onAddToCart} onOpenCart={() => onNavigate('CART')} cartCount={cartItems.length} /> : null;
+    case 'CART': return <Cart items={cartItems} restaurants={restaurants} email={currentUser?.email || ''} currentAddress={deliveryAddress} onBack={() => onNavigate('HOME')} onCheckout={onCheckout} onNavigateToTracking={() => onNavigate('TRACKING')} isGroup={isGroupOrder} onStartGroup={() => setIsGroupOrder(true)} appliedVoucher={appliedVoucher} onApplyVoucher={setAppliedVoucher} onUpdateQuantity={onUpdateQuantity} customDeliveryFee={deliveryFee} tipAmount={cartTip} onTipChange={setCartTip} onSelectAddress={(addr) => { setDeliveryCity(addr.city); setDeliveryAddress(addr.details); if (typeof addr.deliveryFee === 'number' && !Number.isNaN(addr.deliveryFee)) setDeliveryFee(addr.deliveryFee); }} />;
+    case 'TRACKING': return <OrderTracking onBack={() => onNavigate('HOME')} onNavigate={onNavigate} orderItems={lastOrder} restaurant={selectedRestaurant} deliveryCity={deliveryCity} customerEmail={currentUser?.email || ''} currentUser={currentUser} onOpenMessages={() => { onNavigate('MESSAGES'); }} />;
+    case 'VOUCHERS': return <Vouchers onBack={() => onNavigate('HOME')} onApply={(v) => { setAppliedVoucher(v); onNavigate('CART'); }} onNavigate={onNavigate} />;
+    case 'HISTORY': return <History onBack={() => onNavigate('HOME')} orders={history} onNavigate={onNavigate} />;
+    case 'PROFILE': return <Profile onBack={() => onNavigate('HOME')} user={currentUser} onLogout={onLogout} onNavigate={onNavigate} onUpdateUser={onUpdateUser} onSetRole={onSetRole} />;
+    case 'ADDRESSES': return <AddressesScreen onBack={() => onNavigate('PROFILE')} email={currentUser?.email || ''} currentCity={deliveryCity} onSelectAddress={(addr) => {
+      setDeliveryCity(addr.city);
+      setDeliveryAddress(addr.details);
+      if (typeof addr.deliveryFee === 'number' && !Number.isNaN(addr.deliveryFee)) setDeliveryFee(addr.deliveryFee);
+    }} />;
+    case 'PAYMENTS': return <PaymentsScreen onBack={() => onNavigate('PROFILE')} email={currentUser?.email || ''} />;
+    case 'PABILI': return <PabiliScreen onBack={() => onNavigate('HOME')} email={currentUser?.email || ''} />;
+    case 'COMMUNITY': return <Community onBack={() => onNavigate('HOME')} onNavigate={onNavigate} currentUser={currentUser} />;
+    case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name || 'Ayoo Merchant'} onBack={() => onNavigate('SERVICES')} onNavigate={onNavigate} isOwner={isOwner} />;
+    case 'RIDER_DASHBOARD': return <RiderDashboard onBack={() => onNavigate('SERVICES')} onNavigate={onNavigate} isOwner={isOwner} />;
+    case 'ADMIN_PANEL':
+      return isOwner
+        ? <AdminPanel onBack={() => onNavigate('PROFILE')} onNavigate={onNavigate} restaurants={restaurants} onUpdateRestaurants={onUpdateRestaurants} />
+        : <Profile onBack={() => onNavigate('HOME')} user={currentUser} onLogout={onLogout} onNavigate={onNavigate} onUpdateUser={onUpdateUser} onSetRole={onSetRole} />;
+    default: return null;
+  }
+};
+
+// --- End Sub-components ---
+
 const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(true);
   const [screen, setScreen] = useState<AppScreen>('ONBOARDING');
@@ -65,13 +204,30 @@ const App: React.FC = () => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [deliveryFee, setDeliveryFee] = useState(45);
   const [cartTip, setCartTip] = useState(0);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
   const [isGroupOrder, setIsGroupOrder] = useState(false);
   const isOwner = (currentUser?.email || '').toLowerCase() === OWNER_EMAIL.toLowerCase();
   const { showToast } = useToast();
 
-  const handleNavigate = (nextScreen: string) => {
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      showToast("Connection restored! ⚡");
+    };
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [showToast]);
+
+  const handleNavigate = useCallback((nextScreen: string) => {
     const rawTarget = nextScreen as AppScreen;
     const target = activeRole === 'CUSTOMER' && rawTarget === 'SERVICES' ? 'HOME' : rawTarget;
     if (!currentUser && target !== 'AUTH' && target !== 'ONBOARDING') {
@@ -83,7 +239,28 @@ const App: React.FC = () => {
       return;
     }
     setScreen(target);
-  };
+  }, [activeRole, currentUser, isOwner]);
+
+  useEffect(() => {
+    // Handle tap on notification popup or system tray
+    const unsubscribeTap = notificationHub.onTap((data) => {
+      if (data?.orderId) {
+        handleNavigate('TRACKING');
+      }
+    });
+
+    // Display in-app notification when a push is received in foreground
+    const unsubscribeReceive = notificationHub.subscribe((n) => {
+      if (n.body || n.title) {
+        showToast(n.body || n.title || "New notification");
+      }
+    });
+
+    return () => {
+      unsubscribeTap();
+      unsubscribeReceive();
+    };
+  }, [showToast, handleNavigate]);
 
   useEffect(() => {
     if (currentUser) {
@@ -114,50 +291,61 @@ const App: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const initApp = async () => {
+  const initializeApp = useCallback(async () => {
+    setIsConnecting(true);
+    setSyncError(null);
+    try {
       try {
-        try {
-          await db.connect();
-          // Fix: Clear corrupted merchants cache, force load full MOCK_RESTAURANTS (fixes Jollibee-only issue)
-          localStorage.removeItem('ayoo_merchants_registry_v2');
-          const [session, resList, config] = await Promise.all([
-            db.getSession(),
-            db.getRestaurants(),
-            db.getSystemConfig()
-          ]);
-          console.log(`✅ Loaded ${resList.length} restaurants (Jollibee fix)`);
-          setRestaurants(resList);
-          setDeliveryFee(config.deliveryFee);
+        await db.connect();
+        
+        const [session, resList, config, hasSeenOnboarding] = await Promise.all([
+          db.getSession(),
+          db.getRestaurants(),
+          db.getSystemConfig(),
+          db.hasSeenOnboarding()
+        ]);
 
-          // Force fresh sign-in whenever the app is opened.
-          if (session) await db.logout();
-          setCurrentUser(null);
-          setScreen('AUTH');
-        } catch (err: any) {
-          const backendRequired = Boolean((db as any).ENV?.USE_REAL_BACKEND);
-          if (backendRequired) {
-            throw new Error('Real backend is enabled but not reachable. Please start the API server.');
-          }
-          console.warn('Backend connection issue, falling back to local storage', err.message);
-          const [session, resList, config] = await Promise.all([
-            db.getSession(),
-            db.getRestaurants(),
-            db.getSystemConfig()
-          ]);
-          setRestaurants(resList);
-          setDeliveryFee(config.deliveryFee);
-          if (session) await db.logout();
-          setCurrentUser(null);
-          setScreen('AUTH');
+        setRestaurants(resList);
+        setDeliveryFee(config.deliveryFee);
+
+        if (session) {
+          await loadUserData(session);
+          setScreen('HOME');
+        } else {
+          setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
         }
       } catch (err: any) {
-        setSyncError(err.message || "Unable to connect to Ayoo");
-      } finally {
-        setTimeout(() => setIsConnecting(false), 2000);
+        const backendRequired = Boolean((db as any).ENV?.USE_REAL_BACKEND);
+        if (backendRequired) {
+          throw new Error('Real backend is enabled but not reachable. Please start the API server.');
+        }
+        
+        const [session, resList, config, hasSeenOnboarding] = await Promise.all([
+          db.getSession(),
+          db.getRestaurants(),
+          db.getSystemConfig(),
+          db.hasSeenOnboarding()
+        ]);
+        setRestaurants(resList);
+        setDeliveryFee(config.deliveryFee);
+        
+        if (session) {
+          await loadUserData(session);
+          setScreen('HOME');
+        } else {
+          setScreen(hasSeenOnboarding ? 'AUTH' : 'ONBOARDING');
+        }
       }
-    };
-    initApp();
+    } catch (err: any) {
+      console.error("[AppInit] Fatal Error:", err);
+      setSyncError(err.message || "Unable to connect to Ayoo");
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [loadUserData]);
+
+  useEffect(() => {
+    initializeApp();
 
     return ayooCloud.subscribe(() => {
       if (currentUser) {
@@ -165,7 +353,7 @@ const App: React.FC = () => {
         db.getSession().then(s => { if (s) setCurrentUser(s); });
       }
     });
-  }, [loadUserData]);
+  }, [initializeApp, currentUser]);
 
   const handleSetRole = async (role: UserRole) => {
     setActiveRole(role);
@@ -327,82 +515,6 @@ const App: React.FC = () => {
     }
   };
 
-  const renderScreen = () => {
-    if (syncError) return (
-      <div className="min-h-screen bg-transparent flex flex-col items-center justify-center p-12 text-center animate-in fade-in">
-        <div className="w-24 h-24 rounded-[40px] flex items-center justify-center text-5xl mb-10 shadow-lg animate-bounce" style={{ backgroundColor: COLORS.primaryBg }}>📵</div>
-        <h2 className="text-3xl font-black uppercase tracking-tighter mb-4" style={{ color: COLORS.black }}>Connection Issue</h2>
-        <p className="text-gray-500 font-medium text-sm mb-12 leading-relaxed px-4">We're having trouble reaching our servers. Please check your internet connection and try again.</p>
-        <Button onClick={() => window.location.reload()}>Try Again</Button>
-      </div>
-    );
-
-    const customerHomeScreen = (
-      <Home
-        restaurants={restaurants}
-        onSelectRestaurant={(r) => { setSelectedRestaurant(r); setScreen('RESTAURANT'); }}
-        onOpenCart={() => setScreen('CART')}
-        onNavigate={handleNavigate}
-        cartCount={cartItems.length}
-        points={currentUser?.points || 0}
-        streak={currentUser?.streak || 0}
-        badges={currentUser?.badges || []}
-        deliveryCity={deliveryCity}
-        onSetDeliveryCity={(c) => setDeliveryCity(c)}
-        currentUser={currentUser}
-        recentOrders={history}
-      />
-    );
-
-    switch (screen) {
-      case 'ONBOARDING': return <Onboarding onFinish={async () => { await db.setOnboardingSeen(true); setScreen('AUTH'); }} />;
-      case 'AUTH': return <Auth onLogin={handleLogin} />;
-      case 'MANUAL': return <AyooManual role={activeRole} onFinish={handleManualFinish} />;
-case 'SERVICES': return <Services user={currentUser} deliveryCity={deliveryCity} onNavigate={handleNavigate} />;
-      case 'HOME': return customerHomeScreen;
-      case 'SEARCH':
-        return (
-          <Search
-            restaurants={restaurants}
-            onSelectRestaurant={(r) => { setSelectedRestaurant(r); setScreen('RESTAURANT'); }}
-            onOpenCart={() => setScreen('CART')}
-            onNavigate={handleNavigate}
-            cartCount={cartItems.length}
-            deliveryCity={deliveryCity}
-            onSetDeliveryCity={(c) => setDeliveryCity(c)}
-            onBack={() => setScreen('HOME')}
-          />
-        );
-      case 'MESSAGES': return currentUser ? <Messages currentUser={currentUser} onBack={() => setScreen('HOME')} onNavigate={handleNavigate} /> : <Auth onLogin={handleLogin} />;
-      case 'GROCERIES': return <Groceries onBack={() => setScreen('HOME')} onNavigate={handleNavigate} />;
-      case 'COURIER': return <Courier onBack={() => setScreen('HOME')} onNavigate={handleNavigate} />;
-      case 'RIDES': return <Rides onBack={() => setScreen('HOME')} onNavigate={handleNavigate} />;
-      case 'DINE_OUT': return <DineOut onBack={() => setScreen('HOME')} onNavigate={handleNavigate} />;
-      case 'PHARMACY': return <Pharmacy onBack={() => setScreen('HOME')} onNavigate={handleNavigate} />;
-      case 'RESTAURANT': return selectedRestaurant ? <RestaurantDetail restaurant={selectedRestaurant} onBack={() => setScreen('HOME')} onAddToCart={addToCart} onOpenCart={() => setScreen('CART')} cartCount={cartItems.length} /> : null;
-      case 'CART': return <Cart items={cartItems} restaurants={restaurants} email={currentUser?.email || ''} currentAddress={deliveryAddress} onBack={() => setScreen('HOME')} onCheckout={handleCheckout} onNavigateToTracking={() => setScreen('TRACKING')} isGroup={isGroupOrder} onStartGroup={() => setIsGroupOrder(true)} appliedVoucher={appliedVoucher} onApplyVoucher={setAppliedVoucher} onUpdateQuantity={updateQuantity} customDeliveryFee={deliveryFee} tipAmount={cartTip} onTipChange={setCartTip} onSelectAddress={(addr) => { setDeliveryCity(addr.city); setDeliveryAddress(addr.details); if (typeof addr.deliveryFee === 'number' && !Number.isNaN(addr.deliveryFee)) setDeliveryFee(addr.deliveryFee); }} />;
-      case 'TRACKING': return <OrderTracking onBack={() => setScreen('HOME')} onNavigate={handleNavigate} orderItems={lastOrder} restaurant={selectedRestaurant} deliveryCity={deliveryCity} customerEmail={currentUser?.email || ''} currentUser={currentUser} onOpenMessages={(convoId) => { setScreen('MESSAGES'); }} />;
-      case 'VOUCHERS': return <Vouchers onBack={() => setScreen('HOME')} onApply={(v) => { setAppliedVoucher(v); setScreen('CART'); }} onNavigate={handleNavigate} />;
-      case 'HISTORY': return <History onBack={() => setScreen('HOME')} orders={history} onNavigate={handleNavigate} />;
-      case 'PROFILE': return <Profile onBack={() => setScreen('HOME')} user={currentUser} onLogout={handleLogout} onNavigate={handleNavigate} onUpdateUser={setCurrentUser} onSetRole={handleSetRole} />;
-      case 'ADDRESSES': return <AddressesScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} currentCity={deliveryCity} onSelectAddress={(addr) => {
-        setDeliveryCity(addr.city);
-        setDeliveryAddress(addr.details);
-        if (typeof addr.deliveryFee === 'number' && !Number.isNaN(addr.deliveryFee)) setDeliveryFee(addr.deliveryFee);
-      }} />;
-      case 'PAYMENTS': return <PaymentsScreen onBack={() => setScreen('PROFILE')} email={currentUser?.email || ''} />;
-      case 'PABILI': return <PabiliScreen onBack={() => setScreen('HOME')} email={currentUser?.email || ''} />;
-      case 'COMMUNITY': return <Community onBack={() => setScreen('HOME')} onNavigate={handleNavigate} currentUser={currentUser} />;
-      case 'MERCHANT_DASHBOARD': return <MerchantDashboard restaurantName={currentUser?.name || 'Ayoo Merchant'} onBack={() => setScreen('SERVICES')} onNavigate={handleNavigate} isOwner={isOwner} />;
-      case 'RIDER_DASHBOARD': return <RiderDashboard onBack={() => setScreen('SERVICES')} onNavigate={handleNavigate} isOwner={isOwner} />;
-      case 'ADMIN_PANEL':
-        return isOwner
-          ? <AdminPanel onBack={() => setScreen('PROFILE')} onNavigate={handleNavigate} restaurants={restaurants} onUpdateRestaurants={setRestaurants} />
-          : <Profile onBack={() => setScreen('HOME')} user={currentUser} onLogout={handleLogout} onNavigate={handleNavigate} onUpdateUser={setCurrentUser} onSetRole={handleSetRole} />;
-      default: return null;
-    }
-  };
-
   const hideTopNavOnScreens: AppScreen[] = ['SERVICES', 'HOME', 'GROCERIES', 'COURIER', 'RIDES', 'DINE_OUT', 'PHARMACY', 'TRACKING', 'VOUCHERS', 'HISTORY', 'PROFILE', 'PABILI', 'MERCHANT_DASHBOARD', 'RIDER_DASHBOARD', 'ADMIN_PANEL', 'MESSAGES'];
   const shouldShowTopNav = false;
 
@@ -420,34 +532,62 @@ case 'SERVICES': return <Services user={currentUser} deliveryCity={deliveryCity}
 
   return (
       <div className="app-shell max-w-[430px] mx-auto min-h-screen relative overflow-x-hidden overflow-y-auto scrollbar-hide lg:my-8 lg:rounded-[40px] lg:shadow-2xl lg:border-[8px] lg:border-gray-900 bg-gray-50">
-{isConnecting ? (
-          <div className="max-w-[430px] mx-auto h-screen bg-[radial-gradient(circle_at_top,_rgba(214,188,250,0.98),_rgba(139,92,246,0.88)_44%,_rgba(109,40,217,0.92)_100%)] flex flex-col items-center justify-center p-8">
-            {/* AYOO LOGO - Full screen dramatic entrance with actual logo */}
-            <div className="relative mb-12">
-              <div className="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
-              <div className="w-48 h-48 rounded-[40px] bg-white/95 flex items-center justify-center shadow-2xl animate-pulse overflow-hidden">
-                <img
-                  src="/logo.png"
-                  alt="Ayoo Logo"
-                  className="w-full h-full object-cover"
-                />
-              </div>
+        {isOffline && (
+          <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-widest py-3 px-4 flex items-center justify-between gap-2 sticky top-0 z-[100] shadow-lg animate-in slide-in-from-top">
+            <div className="flex items-center gap-2">
+              <span className="text-base">📡</span>
+              Offline Mode • Limited Features
             </div>
-
-            {/* Brand Name */}
-            <h1 className="text-5xl font-bold text-white tracking-tight mb-2 drop-shadow-lg">AYOO</h1>
-            <p className="text-white/90 text-sm font-medium tracking-[0.2em] mb-16">Super App</p>
-
-            <div className="w-64 h-2 bg-white/25 rounded-full overflow-hidden backdrop-blur-sm">
-              <div className="h-full bg-white rounded-full animate-progress shadow-lg" style={{ width: '70%' }}></div>
-            </div>
-            <p className="mt-8 text-xs font-medium tracking-wide text-white/80 animate-pulse text-center">Initializing...</p>
+            <button 
+              onClick={() => initializeApp()}
+              disabled={isConnecting}
+              className="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1"
+            >
+              {isConnecting ? 'Reconnecting...' : 'Retry ↻'}
+            </button>
           </div>
+        )}
+        {syncError ? (
+          <SyncErrorView error={syncError} />
+        ) : isConnecting ? (
+          <SplashScreen />
         ) : (
           <>
-            {/* Top NavBar removed per request - BottomNav handles navigation */}
             <Suspense fallback={<ScreenFallback />}>
-              {renderScreen()}
+              <ScreenManager
+                screen={screen}
+                currentUser={currentUser}
+                activeRole={activeRole}
+                restaurants={restaurants}
+                selectedRestaurant={selectedRestaurant}
+                setSelectedRestaurant={setSelectedRestaurant}
+                cartItems={cartItems}
+                lastOrder={lastOrder}
+                history={history}
+                deliveryCity={deliveryCity}
+                setDeliveryCity={setDeliveryCity}
+                deliveryAddress={deliveryAddress}
+                setDeliveryAddress={setDeliveryAddress}
+                deliveryFee={deliveryFee}
+                setDeliveryFee={setDeliveryFee}
+                cartTip={cartTip}
+                setCartTip={setCartTip}
+                appliedVoucher={appliedVoucher}
+                setAppliedVoucher={setAppliedVoucher}
+                isGroupOrder={isGroupOrder}
+                setIsGroupOrder={setIsGroupOrder}
+                isOwner={isOwner}
+                onNavigate={handleNavigate}
+                onLogin={handleLogin}
+                onLogout={handleLogout}
+                onSetRole={handleSetRole}
+                onManualFinish={handleManualFinish}
+                onAddToCart={addToCart}
+                onUpdateQuantity={updateQuantity}
+                onCheckout={handleCheckout}
+                onUpdateUser={setCurrentUser}
+                onUpdateRestaurants={setRestaurants}
+              />
             </Suspense>
             {shouldShowBottomNav && (
               <BottomNav

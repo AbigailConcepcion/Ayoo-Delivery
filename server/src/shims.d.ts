@@ -27,3 +27,10 @@ declare module 'cors';
 declare module 'dotenv';
 
 declare module 'stripe';
+declare module 'express-rate-limit';
+declare module 'socket.io';
+declare module 'socket.io-client';
+declare module 'pg';
+declare module '@socket.io/redis-adapter';
+declare module 'ioredis';
+declare module 'winston';

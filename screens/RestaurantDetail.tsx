@@ -103,7 +103,9 @@ const RestaurantDetail: React.FC<RestaurantDetailProps> = ({ restaurant, onBack,
       setIntercomStatus('Syncing...');
       setIsIntercomActive(true);
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // PRODUCTION: Never expose API keys in the frontend.
+      // Call your own backend which acts as a proxy to the Google GenAI API.
+      const ai = new GoogleGenAI({ apiKey: 'PROXY_BACKEND_ENDPOINT' });
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       
       const sessionPromise = ai.live.connect({

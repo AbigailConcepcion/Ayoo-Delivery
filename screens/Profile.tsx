@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AppScreen, UserAccount, UserRole, WalletTransaction } from '../types';
 import { db } from '../db';
+import { ayooCloud } from '../api';
 import { PHILIPPINE_CITIES } from '../constants';
 import Button from '../components/Button';
 
@@ -99,8 +100,10 @@ const [showLedger, setShowLedger] = useState(false);
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const config = await db.getSystemConfig();
-    if (pin === (config.masterPin || '1234')) {
+    // PRODUCTION: Never check PINs on the client. 
+    // Send to a secure backend endpoint that returns a session token if valid.
+    const isAuthorized = await ayooCloud.verifyAdminPin(user.email, pin);
+    if (isAuthorized) {
       onNavigate('ADMIN_PANEL');
       setShowPinPrompt(false);
       setPin('');
@@ -371,4 +374,3 @@ const handleSaveProfile = async () => {
 };
 
 export default Profile;
-

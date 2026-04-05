@@ -1,20 +1,20 @@
-// small wrapper around a real payment gateway (Stripe in this example).
-// the goal is to demonstrate wiring to a third‑party API; you can
-// replace Stripe with whatever provider you prefer.
+import Stripe from 'stripe';
 
-// we declare everything as `any` so that the workspace doesn't
-// require installing stripe types during analysis.
+const stripeSecret = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET || '';
 
-declare const process: any;
-declare module 'stripe';
-const Stripe: any = require('stripe');
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2020-08-27'
+export const stripe = new Stripe(stripeSecret, {
+  apiVersion: '2022-11-15'
 });
 
-export async function chargeCard(token: string, amount: number, currency = 'php'): Promise<any> {
-  // amount is in the smallest currency unit (centavos)
-  const cents = Math.round(amount * 100);
-  return stripe.charges.create({ amount: cents, currency, source: token });
+/**
+ * Creates a PaymentIntent which is the recommended way to handle payments with Stripe.
+ * This supports SCA/3D Secure.
+ */
+export async function createStripePaymentIntent(amount: number, currency = 'php', orderId: string, idempotencyKey?: string) {
+  return stripe.paymentIntents.create({
+    amount: Math.round(amount * 100), // Stripe expects amount in smallest unit (cents/centavos)
+    currency,
+    metadata: { orderId },
+    automatic_payment_methods: { enabled: true }
+  }, { idempotencyKey });
 }

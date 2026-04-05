@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import Button from '../components/Button';
-import { MOCK_RESTAURANTS } from '../constants';
-import { Voucher } from '../types';
+import Button from './components/Button';
+import { Restaurant, Voucher, FoodItem } from './types';
 
 interface CartProps {
   items: { id: string; quantity: number }[];
+  restaurants: Restaurant[];
   onBack: () => void;
   onCheckout: () => void;
   onUpdateQuantity: (itemId: string, delta: number) => void;
@@ -15,13 +15,13 @@ interface CartProps {
   customDeliveryFee?: number;
 }
 
-const Cart: React.FC<CartProps> = ({ items, onBack, onCheckout, onUpdateQuantity, isGroup, onStartGroup, appliedVoucher, customDeliveryFee = 45 }) => {
+const Cart: React.FC<CartProps> = ({ items, restaurants, onBack, onCheckout, onUpdateQuantity, isGroup, onStartGroup, appliedVoucher, customDeliveryFee = 45 }) => {
   const [splitCount, setSplitCount] = useState(1);
   const [isSquadMode, setIsSquadMode] = useState(isGroup || false);
 
   const cartDetails = items.map(cartItem => {
-    for (const res of MOCK_RESTAURANTS) {
-      const item = res.items.find(i => i.id === cartItem.id);
+    for (const res of restaurants) {
+      const item = res.items.find((i: FoodItem) => i.id === cartItem.id);
       if (item) return { ...item, quantity: cartItem.quantity };
     }
     return null;

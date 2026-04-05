@@ -10,8 +10,11 @@ import {
   comparePassword,
   generateToken,
   authMiddleware,
+  asyncHandler,
   AuthRequest
 } from './auth.js';
+import { createStripePaymentIntent, stripe as stripeInstance } from './payments.js';
+import winston from 'winston';
 
 declare const process: {
   env: {
@@ -19,6 +22,7 @@ declare const process: {
     STRIPE_SECRET_KEY?: string;
     PAYMONGO_SECRET_KEY?: string;
     PAYMONGO_WEBHOOK_SECRET?: string;
+    STRIPE_WEBHOOK_SECRET?: string;
     APP_BASE_URL?: string;
     [key: string]: string | undefined;
   };
@@ -27,6 +31,16 @@ declare const process: {
 const getStripeSecret = () => process.env.STRIPE_SECRET || process.env.STRIPE_SECRET_KEY;
 const getPayMongoSecret = () => process.env.PAYMONGO_SECRET_KEY;
 const getAppBaseUrl = () => process.env.APP_BASE_URL || 'http://localhost:5173';
+
+// Structured Logger for routes
+const logger = winston.createLogger({
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [new winston.transports.Console()]
+});
 const PAYMONGO_API_BASE = 'https://api.paymongo.com/v1';
 
 const PAYMONGO_METHODS: Record<string, string[]> = {
@@ -77,7 +91,8 @@ const paymentProcessSchema = z.object({
   email: z.string().email(),
   methodId: z.string(),
   amount: z.number().min(0),
-  orderId: z.string()
+  orderId: z.string(),
+  idempotencyKey: z.string().uuid()
 });
 
 const payMongoCheckoutSchema = z.object({
@@ -143,7 +158,8 @@ const ledgerSchema = z.object({
   timestamp: z.string(),
   orderId: z.string().optional(),
   methodType: z.string().optional(),
-  referenceId: z.string(),
+  referenceId: z.string().optional(),
+  idempotencyKey: z.string().uuid().optional(),
   status: z.string()
 });
 
@@ -165,6 +181,8 @@ const configSchema = z.object({
   deliveryFee: z.number().min(0).optional(),
   masterPin: z.string().min(4).max(10).optional()
 });
+
+const fcmTokenSchema = z.object({ token: z.string() });
 
 function parseJsonField(value: any, fallback: any) {
   if (value === null || value === undefined) return fallback;
@@ -216,22 +234,23 @@ function verifyPayMongoSignature(rawBody: string, signatureHeader: string | unde
   ));
 }
 
-async function payMongoRequest(path: string, payload?: any, method: 'POST' | 'GET' = 'POST') {
+async function payMongoRequest(path: string, payload?: any, method: 'POST' | 'GET' = 'POST', idempotencyKey?: string) {
   const secret = getPayMongoSecret();
   if (!secret) throw new Error('PayMongo secret is not configured');
 
   const auth = Buffer.from(`${secret}:`).toString('base64');
   const response = await fetch(`${PAYMONGO_API_BASE}${path}`, {
     method,
-    headers: {
-      Authorization: `Basic ${auth}`,
+    headers: { // PayMongo API expects Basic Auth
+      'Authorization': `Basic ${auth}`,
+      ...(idempotencyKey ? { 'X-Idempotency-Key': idempotencyKey } : {}),
       'Content-Type': 'application/json'
     },
     ...(method === 'POST' ? { body: JSON.stringify(payload || {}) } : {})
   });
   const text = await response.text();
   const data = text ? parseJsonField(text, {}) : {};
-  if (!response.ok) {
+  if (!response.ok) { // PayMongo API returns 4xx/5xx for errors
     const details = data?.errors?.[0]?.detail || data?.errors?.[0]?.code || `HTTP ${response.status}`;
     throw new Error(`PayMongo error: ${details}`);
   }
@@ -274,10 +293,11 @@ function resolvePayMongoState(eventTypeRaw: string, statusRaw: string): 'SETTLED
   return 'PENDING';
 }
 
-function resolveOrderContextFromReferences(db: any, references: string[]) {
+async function resolveOrderContextFromReferences(db: any, references: string[]) {
   for (const reference of references) {
     if (!reference) continue;
-    const row = db.prepare('SELECT ownerId, orderId FROM ledger WHERE referenceId = ? ORDER BY timestamp DESC LIMIT 1').get(reference);
+    const result = await db.query('SELECT "ownerId", "orderId" FROM ledger WHERE "referenceId" = $1 ORDER BY timestamp DESC LIMIT 1', [reference]);
+    const row = result.rows[0];
     if (row?.orderId) {
       return {
         orderId: String(row.orderId),
@@ -288,7 +308,7 @@ function resolveOrderContextFromReferences(db: any, references: string[]) {
   return { orderId: '', email: '' };
 }
 
-function syncOrderPaymentState(
+async function syncOrderPaymentState( // This function is used by both webhook and manual status check
   db: any,
   params: {
     orderId: string;
@@ -300,47 +320,89 @@ function syncOrderPaymentState(
     receiptUrl?: string;
   }
 ) {
-  const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(params.orderId);
-  if (!existing) return null;
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
 
-  const method = mapPayMongoOrderMethod(params.sourceType);
-  const paymentId = params.paymentId || null;
-  const transactionId = params.transactionId || params.paymentId || null;
-  const receiptUrl = params.receiptUrl || null;
+    const resExisting = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [params.orderId]);
+    const existing = resExisting.rows[0];
+    if (!existing) {
+      await client.query('ROLLBACK');
+      return null;
+    }
 
-  if (params.status === 'SETTLED') {
-    db.prepare(`UPDATE orders
-      SET isPaid = 1,
-          paymentId = COALESCE(?, paymentId),
-          transactionId = COALESCE(?, transactionId),
-          paymentMethod = COALESCE(NULLIF(paymentMethod,''), ?),
-          receiptUrl = COALESCE(?, receiptUrl)
-      WHERE id = ?`).run(paymentId, transactionId, method, receiptUrl, params.orderId);
-  } else if (params.status === 'FAILED') {
-    db.prepare(`UPDATE orders
-      SET isPaid = 0,
-          paymentId = COALESCE(?, paymentId),
-          transactionId = COALESCE(?, transactionId),
-          paymentMethod = COALESCE(NULLIF(paymentMethod,''), ?),
-          status = CASE WHEN status = 'PENDING' THEN 'CANCELLED' ELSE status END,
-          receiptUrl = COALESCE(?, receiptUrl)
-      WHERE id = ?`).run(paymentId, transactionId, method, receiptUrl, params.orderId);
-  } else {
-    db.prepare(`UPDATE orders
-      SET paymentId = COALESCE(?, paymentId),
-          paymentMethod = COALESCE(NULLIF(paymentMethod,''), ?),
-          receiptUrl = COALESCE(?, receiptUrl)
-      WHERE id = ?`).run(paymentId, method, receiptUrl, params.orderId);
+    const refId = params.paymentId || params.transactionId;
+    if (refId) {
+      await client.query('UPDATE ledger SET status = $1 WHERE "referenceId" = $2 AND "orderId" = $3', [params.status, refId, params.orderId]);
+    } // Note: idempotencyKey is used for initial ledger entry, not for status updates
+
+    const ledgerRes = await client.query('SELECT SUM(amount) as settled FROM ledger WHERE "orderId" = $1 AND status = \'SETTLED\' AND type = \'DEBIT\'', [params.orderId]);
+    const totalSettled = Number(ledgerRes.rows[0].settled || 0);
+    const isFullyPaid = totalSettled >= Number(existing.total);
+
+    const method = mapPayMongoOrderMethod(params.sourceType);
+    const paymentId = params.paymentId || null;
+    const transactionId = params.transactionId || params.paymentId || null;
+    const receiptUrl = params.receiptUrl || null;
+
+    await client.query(`UPDATE orders
+      SET "isPaid" = $1,
+          "amountPaid" = $2,
+          "paymentId" = COALESCE($3, "paymentId"),
+          "transactionId" = COALESCE($4, "transactionId"),
+          "paymentMethod" = COALESCE(NULLIF("paymentMethod",''), $5),
+          "receiptUrl" = COALESCE($6, "receiptUrl"),
+          status = CASE WHEN $7 = 'FAILED' AND $1 = 0 AND status = 'PENDING' THEN 'CANCELLED' ELSE status END
+      WHERE id = $8`, [
+        isFullyPaid ? 1 : 0, 
+        totalSettled, 
+        paymentId, transactionId, method, receiptUrl, 
+        params.status, params.orderId
+      ]);
+
+    const ownerEmail = (params.email || existing.customerEmail || '').toLowerCase();
+    if (ownerEmail) {
+      await client.query('UPDATE ledger SET status = $1 WHERE "ownerId" = $2 AND "orderId" = $3', [params.status, ownerEmail, params.orderId]);
+    } else {
+      await client.query('UPDATE ledger SET status = $1 WHERE "orderId" = $2', [params.status, params.orderId]);
+    }
+
+    await client.query('COMMIT');
+
+    // After successful payment settlement, notify all participants
+    if (params.status === 'SETTLED') {
+      try {
+        // Find everyone who has contributed to this order via the ledger
+        const participantsRes = await client.query(
+          'SELECT DISTINCT u."fcmToken", u.name FROM users u JOIN ledger l ON u.email = l."ownerId" WHERE l."orderId" = $1 AND u."fcmToken" IS NOT NULL',
+          [params.orderId]
+        );
+        
+        const remaining = Number(existing.total) - totalSettled;
+        const message = remaining > 0 
+          ? `A payment was made! ₱${remaining.toFixed(2)} remaining for order ${params.orderId}.`
+          : `Order ${params.orderId} is now fully paid!`;
+
+        // Integration point for Firebase Admin SDK or OneSignal
+        participantsRes.rows.forEach(p => {
+          logger.info(`[PushNotification] Sending to ${p.name} (${p.fcmToken}): ${message}`);
+          // Example: admin.messaging().sendToDevice(p.fcmToken, { 
+          //   notification: { title: 'Payment Update', body: message } 
+          // });
+        });
+      } catch (pnErr) {
+        logger.error('Failed to send push notifications:', pnErr);
+      }
+    }
+
+    const finalResult = await client.query('SELECT * FROM orders WHERE id = $1', [params.orderId]);
+    return finalResult.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-
-  const ownerEmail = (params.email || existing.customerEmail || '').toLowerCase();
-  if (ownerEmail) {
-    db.prepare('UPDATE ledger SET status = ? WHERE ownerId = ? AND orderId = ?').run(params.status, ownerEmail, params.orderId);
-  } else {
-    db.prepare('UPDATE ledger SET status = ? WHERE orderId = ?').run(params.status, params.orderId);
-  }
-
-  return db.prepare('SELECT * FROM orders WHERE id = ?').get(params.orderId);
 }
 
 function normalizeUser(row: any) {
@@ -365,7 +427,7 @@ function canAccessEmail(req: any, email: string) {
   return caller === email.toLowerCase() || req.user?.role === 'ADMIN';
 }
 
-export function setupRoutes(app: Application) {
+export function setupRoutes(app: Application) { // Main function to set up all API routes
   const db: any = getDb();
 
   app.use((req: any, res: any, next: any) => {
@@ -373,71 +435,88 @@ export function setupRoutes(app: Application) {
     const isPublicConfig = req.path === '/config' && req.method === 'GET';
     const isPublicRestaurants = req.path === '/restaurants' && req.method === 'GET';
     const isPublicPayMongoWebhook = req.path === '/webhooks/paymongo' && req.method === 'POST';
-    if (isPublicAuth || isPublicConfig || isPublicRestaurants || isPublicPayMongoWebhook) return next();
+    const isPublicStripeWebhook = req.path === '/webhooks/stripe' && req.method === 'POST';
+    if (isPublicAuth || isPublicConfig || isPublicRestaurants || isPublicPayMongoWebhook || isPublicStripeWebhook) return next();
     return authMiddleware(req as AuthRequest, res, next);
   });
 
-  app.post('/auth/register', async (req: Request, res: Response) => {
+  app.post('/auth/register', asyncHandler(async (req: Request, res: Response) => {
+    const user = registerSchema.parse(req.body);
+    const email = user.email.toLowerCase();
+    const hashed = await hashPassword(user.password);
+
+    const client = await db.connect();
+
     try {
-      const user = registerSchema.parse(req.body);
-      const email = user.email.toLowerCase();
-      const existing = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
-      if (existing) return res.status(409).json({ error: 'Email already exists' });
+      await client.query('BEGIN');
 
-      const hashed = await hashPassword(user.password);
-      db.prepare(`INSERT INTO users (email,name,password,points,xp,level,streak,badges,preferredCity,role,merchantId,earnings,manualsSeen)
-                  VALUES (@email,@name,@password,500,0,1,1,'[]',@preferredCity,@role,@merchantId,0,'[]')`).run({
-        email,
-        name: user.name,
-        password: hashed,
-        preferredCity: user.preferredCity || null,
-        role: user.role || 'CUSTOMER',
-        merchantId: user.merchantId || null
-      });
+      // 1. Insert the new user into the database
+      await client.query(`
+        INSERT INTO users (email, name, password, points, xp, level, streak, badges, "preferredCity", role, "merchantId", earnings, "manualsSeen")
+        VALUES ($1, $2, $3, 500, 0, 1, 1, '[]', $4, $5, $6, 0, '[]')
+      `, [email, user.name, hashed, user.preferredCity || null, user.role || 'CUSTOMER', user.merchantId || null]);
 
-      const token = generateToken({ email, role: user.role || 'CUSTOMER' });
-      res.json({ success: true, token });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Registration failed' });
+      // 2. Initialize Metadata: Record the 500 welcome points in the financial ledger
+      await client.query(`
+        INSERT INTO ledger ("ownerId", id, amount, type, description, timestamp, status, "methodType", "referenceId")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `, [email, uuidv4(), 500, 'CREDIT', 'Welcome Gift Points', new Date().toISOString(), 'SETTLED', 'SYSTEM', 'WELCOME_PROMO']);
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err; // Global handler in index.ts will catch this and send the error response
+    } finally {
+      client.release();
     }
-  });
 
-  app.post('/auth/login', async (req: Request, res: Response) => {
-    try {
-      const { email, password } = loginSchema.parse(req.body);
-      const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
-      if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    const token = generateToken({ 
+      email, 
+      role: user.role || 'CUSTOMER',
+      name: user.name,
+      merchantId: user.merchantId || null
+    });
+    res.json({ success: true, token });
+  }));
 
-      const valid = await comparePassword(password, user.password);
-      if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+  app.post('/auth/login', asyncHandler(async (req: Request, res: Response) => {
+    const { email, password } = loginSchema.parse(req.body);
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+    const user = result.rows[0];
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-      const normalized = normalizeUser(user);
-      const token = generateToken({ email: normalized.email.toLowerCase(), role: normalized.role });
-      res.json({ user: normalized, token });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Login failed' });
-    }
-  });
+    const valid = await comparePassword(password, user.password);
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-  app.get('/users', (_req: Request, res: Response) => {
-    const rows = db.prepare('SELECT * FROM users').all();
-    res.json({ users: rows.map(normalizeUser) });
-  });
+    const normalized = normalizeUser(user);
+    const token = generateToken({ 
+      email: normalized.email.toLowerCase(), 
+      role: normalized.role,
+      name: normalized.name,
+      merchantId: normalized.merchantId || null
+    });
+    res.json({ user: normalized, token });
+  }));
 
-  app.get('/users/:email', (req: any, res: Response) => {
+  app.get('/users', asyncHandler(async (_req: Request, res: Response) => {
+    const result = await db.query('SELECT * FROM users');
+    res.json({ users: result.rows.map(normalizeUser) });
+  }));
+
+  app.get('/users/:email', asyncHandler(async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
     if (!user) return res.status(404).json({ error: 'Not found' });
     res.json({ user: normalizeUser(user) });
-  });
+  }));
 
-  app.put('/users/:email', (req: any, res: Response) => {
+  app.put('/users/:email', asyncHandler(async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-    const current = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const current = result.rows[0];
     if (!current) return res.status(404).json({ error: 'Not found' });
 
     const incoming = req.body || {};
@@ -449,235 +528,213 @@ export function setupRoutes(app: Application) {
       manualsSeen: JSON.stringify(Array.isArray(incoming.manualsSeen) ? incoming.manualsSeen : parseJsonField(current.manualsSeen, [])),
     };
 
-    db.prepare(`UPDATE users
-      SET name=@name, avatar=@avatar, points=@points, xp=@xp, level=@level, streak=@streak,
-          badges=@badges, preferredCity=@preferredCity, role=@role, merchantId=@merchantId,
-          earnings=@earnings, manualsSeen=@manualsSeen
-      WHERE email=@email`).run(merged);
+    await db.query(`UPDATE users
+      SET name=$1, avatar=$2, points=$3, xp=$4, level=$5, streak=$6,
+          badges=$7, "preferredCity"=$8, role=$9, "merchantId"=$10,
+          earnings=$11, "manualsSeen"=$12
+      WHERE email=$13`, [
+        merged.name, merged.avatar, merged.points, merged.xp, merged.level, merged.streak,
+        merged.badges, merged.preferredCity, merged.role, merged.merchantId, merged.earnings, merged.manualsSeen, email
+      ]);
 
     res.json({ user: normalizeUser(merged) });
-  });
+  }));
 
-  app.get('/restaurants', (_req: Request, res: Response) => {
-    const rows = db.prepare('SELECT * FROM restaurants').all();
-    const restaurants = rows.map((r: any) => ({
+  app.put('/users/:email/fcm-token', asyncHandler(async (req: any, res: Response) => {
+    const email = req.params.email.toLowerCase();
+    if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
+    const { token } = fcmTokenSchema.parse(req.body);
+    await db.query('UPDATE users SET "fcmToken" = $1 WHERE email = $2', [token, email]);
+    res.json({ success: true });
+  }));
+
+  app.get('/restaurants', asyncHandler(async (_req: Request, res: Response) => {
+    const result = await db.query('SELECT * FROM restaurants');
+    const restaurants = result.rows.map((r: any) => ({
       ...r,
       items: parseJsonField(r.items, []),
       reviews: parseJsonField(r.reviews, [])
     }));
     res.json({ restaurants });
-  });
+  }));
 
-  app.post('/restaurants', (req: Request, res: Response) => {
-    try {
-      const rest = restaurantSchema.parse(req.body);
-      db.prepare(`INSERT INTO restaurants (id,name,rating,deliveryTime,image,cuisine,items,isPartner,address,hasLiveCam,reviews)
-        VALUES (@id,@name,@rating,@deliveryTime,@image,@cuisine,@items,@isPartner,@address,@hasLiveCam,@reviews)
-        ON CONFLICT(id) DO UPDATE SET
-          name=excluded.name,
-          rating=excluded.rating,
-          deliveryTime=excluded.deliveryTime,
-          image=excluded.image,
-          cuisine=excluded.cuisine,
-          items=excluded.items,
-          isPartner=excluded.isPartner,
-          address=excluded.address,
-          hasLiveCam=excluded.hasLiveCam,
-          reviews=excluded.reviews`).run({
-        ...rest,
-        items: JSON.stringify(rest.items || []),
-        reviews: JSON.stringify(rest.reviews || []),
-        isPartner: rest.isPartner ? 1 : 0,
-        hasLiveCam: rest.hasLiveCam ? 1 : 0
-      });
-      res.json({ success: true });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Restaurant upsert failed' });
-    }
-  });
+  app.post('/restaurants', asyncHandler(async (req: Request, res: Response) => {
+    const rest = restaurantSchema.parse(req.body);
+    await db.query(`INSERT INTO restaurants (id,name,rating,"deliveryTime",image,cuisine,items,"isPartner",address,"hasLiveCam",reviews)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      ON CONFLICT(id) DO UPDATE SET
+        name=EXCLUDED.name,
+        rating=EXCLUDED.rating,
+        "deliveryTime"=EXCLUDED."deliveryTime",
+        image=EXCLUDED.image,
+        cuisine=EXCLUDED.cuisine,
+        items=EXCLUDED.items,
+        "isPartner"=EXCLUDED."isPartner",
+        address=EXCLUDED.address,
+        "hasLiveCam"=EXCLUDED."hasLiveCam",
+        reviews=EXCLUDED.reviews`, [
+          rest.id, rest.name, rest.rating, rest.deliveryTime, rest.image, rest.cuisine, 
+          JSON.stringify(rest.items || []), rest.isPartner ? 1 : 0, rest.address, rest.hasLiveCam ? 1 : 0, JSON.stringify(rest.reviews || [])
+        ]);
+    res.json({ success: true });
+  }));
 
-  app.post('/orders', (req: any, res: Response) => {
+  app.post('/orders', asyncHandler(async (req: any, res: Response) => {
+    const client = await db.connect();
     try {
       const o = orderSchema.parse(req.body);
       if (!o.id) o.id = `AYO-${Math.floor(Math.random() * 90000) + 10000}`;
       o.customerEmail = (req.user?.email || o.customerEmail || '').toLowerCase();
 
-      db.prepare(`INSERT INTO orders (id,date,items,total,status,restaurantName,customerEmail,customerName,riderName,riderEmail,deliveryAddress,tipAmount,pointsEarned,paymentMethod,paymentId,isPaid,transactionId,rating,comment,receiptUrl)
-                  VALUES (@id,@date,@items,@total,@status,@restaurantName,@customerEmail,@customerName,@riderName,@riderEmail,@deliveryAddress,@tipAmount,@pointsEarned,@paymentMethod,@paymentId,@isPaid,@transactionId,@rating,@comment,@receiptUrl)`).run({
-        ...o,
-        items: JSON.stringify(o.items || []),
-        riderName: o.riderName || null,
-        riderEmail: o.riderEmail || null,
-        tipAmount: o.tipAmount || 0,
-        pointsEarned: o.pointsEarned || 0,
-        paymentMethod: o.paymentMethod || 'COD',
-        paymentId: o.paymentId || null,
-        isPaid: o.isPaid || 0,
-        transactionId: o.transactionId || null,
-        rating: o.rating || null,
-        comment: o.comment || null,
-        receiptUrl: o.receiptUrl || null
-      });
+      await client.query('BEGIN');
+
+      await client.query(`INSERT INTO orders (id,date,items,total,status,"restaurantName","customerEmail","customerName","riderName","riderEmail","deliveryAddress","tipAmount","pointsEarned","paymentMethod","paymentId","isPaid","transactionId",rating,comment,"receiptUrl")
+                  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`, [
+                    o.id, o.date, JSON.stringify(o.items || []), o.total, o.status, o.restaurantName, o.customerEmail, o.customerName, 
+                    o.riderName || null, o.riderEmail || null, o.deliveryAddress, o.tipAmount || 0, o.pointsEarned || 0, 
+                    o.paymentMethod || 'COD', o.paymentId || null, o.isPaid || 0, o.transactionId || null, o.rating || null, 
+                    o.comment || null, o.receiptUrl || null
+                  ]);
+
+      await client.query('COMMIT');
       res.json({ success: true, order: o });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Order creation failed' });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err; // Passed to global handler via asyncHandler
+    } finally {
+      client.release();
     }
-  });
+  }));
 
-  app.get('/orders/customer/:email', (req: any, res: Response) => {
+  app.get('/orders/customer/:email', asyncHandler(async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-    const rows = db.prepare('SELECT * FROM orders WHERE customerEmail = ? ORDER BY rowid DESC').all(email);
-    res.json({ orders: rows.map(normalizeOrder) });
-  });
+    const result = await db.query('SELECT * FROM orders WHERE "customerEmail" = $1 ORDER BY date DESC', [email]);
+    res.json({ orders: result.rows.map(normalizeOrder) });
+  }));
 
-  app.get('/orders/merchant/:restaurantName', (_req: any, res: Response) => {
+  app.get('/orders/merchant/:restaurantName', asyncHandler(async (_req: any, res: Response) => {
     const restaurantName = decodeURIComponent(_req.params.restaurantName || '');
-    const rows = db.prepare("SELECT * FROM orders WHERE restaurantName = ? AND status NOT IN ('DELIVERED','CANCELLED') ORDER BY rowid DESC").all(restaurantName);
-    res.json({ orders: rows.map(normalizeOrder) });
-  });
+    const result = await db.query("SELECT * FROM orders WHERE \"restaurantName\" = $1 AND status NOT IN ('DELIVERED','CANCELLED') ORDER BY date DESC", [restaurantName]);
+    res.json({ orders: result.rows.map(normalizeOrder) });
+  }));
 
-  app.get('/orders/market', (_req: Request, res: Response) => {
-    const rows = db.prepare("SELECT * FROM orders WHERE status = 'READY_FOR_PICKUP' AND (riderEmail IS NULL OR riderEmail = '') ORDER BY rowid DESC").all();
-    res.json({ orders: rows.map(normalizeOrder) });
-  });
+  app.get('/orders/market', asyncHandler(async (_req: Request, res: Response) => {
+    const result = await db.query("SELECT * FROM orders WHERE status = 'READY_FOR_PICKUP' AND (\"riderEmail\" IS NULL OR \"riderEmail\" = '') ORDER BY date DESC");
+    res.json({ orders: result.rows.map(normalizeOrder) });
+  }));
 
-  app.get('/orders/rider/:email', (req: any, res: Response) => {
+  app.get('/orders/rider/:email', asyncHandler(async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-    const rows = db.prepare("SELECT * FROM orders WHERE riderEmail = ? AND status NOT IN ('DELIVERED','CANCELLED') ORDER BY rowid DESC").all(email);
-    res.json({ orders: rows.map(normalizeOrder) });
-  });
+    const result = await db.query("SELECT * FROM orders WHERE \"riderEmail\" = $1 AND status NOT IN ('DELIVERED','CANCELLED') ORDER BY date DESC", [email]);
+    res.json({ orders: result.rows.map(normalizeOrder) });
+  }));
 
-  app.get('/orders/live', (_req: Request, res: Response) => {
-    const rows = db.prepare("SELECT * FROM orders WHERE status NOT IN ('DELIVERED','CANCELLED') ORDER BY rowid DESC").all();
-    res.json({ orders: rows.map(normalizeOrder) });
-  });
+  app.get('/orders/live', asyncHandler(async (_req: Request, res: Response) => {
+    const result = await db.query("SELECT * FROM orders WHERE status NOT IN ('DELIVERED','CANCELLED') ORDER BY date DESC");
+    res.json({ orders: result.rows.map(normalizeOrder) });
+  }));
 
-  app.get('/orders/live/:email', (req: any, res: Response) => {
+  app.get('/orders/live/:email', asyncHandler(async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-    const row = db.prepare("SELECT * FROM orders WHERE customerEmail = ? AND status NOT IN ('DELIVERED','CANCELLED') ORDER BY rowid DESC LIMIT 1").get(email);
-    if (!row) return res.json({ order: null });
-    res.json({ order: normalizeOrder(row) });
-  });
+    const result = await db.query("SELECT * FROM orders WHERE \"customerEmail\" = $1 AND status NOT IN ('DELIVERED','CANCELLED') ORDER BY date DESC LIMIT 1", [email]);
+    if (result.rowCount === 0) return res.json({ order: null });
+    res.json({ order: normalizeOrder(result.rows[0]) });
+  }));
 
-  app.put('/orders/:id/status', (req: Request, res: Response) => {
+  app.put('/orders/:id/status', asyncHandler(async (req: any, res: Response) => {
     const id = req.params.id;
     const { status, ...extra } = req.body || {};
     if (!status) return res.status(400).json({ error: 'Status is required' });
-    const current = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+    const result = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
+    const current = result.rows[0];
     if (!current) return res.status(404).json({ error: 'Order not found' });
 
     const merged = { ...current, ...extra, status };
-    db.prepare(`UPDATE orders
-      SET status=@status, riderName=@riderName, riderEmail=@riderEmail, tipAmount=@tipAmount,
-          rating=@rating, comment=@comment, transactionId=@transactionId, receiptUrl=@receiptUrl
-      WHERE id=@id`).run({
-      ...merged,
-      riderName: merged.riderName || null,
-      riderEmail: merged.riderEmail || null,
-      tipAmount: merged.tipAmount || 0,
-      rating: merged.rating || null,
-      comment: merged.comment || null,
-      transactionId: merged.transactionId || null,
-      receiptUrl: merged.receiptUrl || null
-    });
+    await db.query(`UPDATE orders
+      SET status=$1, "riderName"=$2, "riderEmail"=$3, "tipAmount"=$4,
+          rating=$5, comment=$6, "transactionId"=$7, "receiptUrl"=$8
+      WHERE id=$9`, [
+        merged.status, merged.riderName || null, merged.riderEmail || null, merged.tipAmount || 0, 
+        merged.rating || null, merged.comment || null, merged.transactionId || null, merged.receiptUrl || null, id
+      ]);
 
-    res.json({ success: true, order: normalizeOrder(merged) });
-  });
+    const normalized = normalizeOrder(merged);
+    const io = req.app.get('io');
+    io.to(`order_${id}`).emit('ORDER_UPDATED', normalized);
 
-  app.get('/addresses/:email', (req: any, res: Response) => {
+    res.json({ success: true, order: normalized });
+  }));
+
+  app.get('/addresses/:email', asyncHandler(async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-    const rows = db.prepare('SELECT * FROM addresses WHERE email = ? ORDER BY rowid DESC').all(email);
-    res.json({ addresses: rows });
-  });
+    const result = await db.query('SELECT * FROM addresses WHERE email = $1', [email]);
+    res.json({ addresses: result.rows });
+  }));
 
-  app.post('/addresses/:email', (req: any, res: Response) => {
-    try {
-      const email = req.params.email.toLowerCase();
-      if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-      const address = addressSchema.parse(req.body);
-      db.prepare(`INSERT INTO addresses (id,email,label,details,city,latitude,longitude,distanceKm,deliveryFee)
-        VALUES (@id,@email,@label,@details,@city,@latitude,@longitude,@distanceKm,@deliveryFee)
-        ON CONFLICT(id) DO UPDATE SET label=excluded.label, details=excluded.details, city=excluded.city, latitude=excluded.latitude, longitude=excluded.longitude, distanceKm=excluded.distanceKm, deliveryFee=excluded.deliveryFee`).run({
-        ...address,
-        email
-      });
-      res.json({ success: true });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Address save failed' });
-    }
-  });
-
-  app.get('/payments/methods/:email', (req: any, res: Response) => {
+  app.post('/addresses/:email', asyncHandler(async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-    const rows = db.prepare('SELECT * FROM payments WHERE email = ? ORDER BY rowid DESC').all(email);
-    res.json({ payments: rows });
-  });
+    const address = addressSchema.parse(req.body);
+    await db.query(`INSERT INTO addresses (id,email,label,details,city,latitude,longitude,"distanceKm","deliveryFee")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      ON CONFLICT(id) DO UPDATE SET label=EXCLUDED.label, details=EXCLUDED.details, city=EXCLUDED.city, latitude=EXCLUDED.latitude, longitude=EXCLUDED.longitude, "distanceKm"=EXCLUDED."distanceKm", "deliveryFee"=EXCLUDED."deliveryFee"`, [
+        address.id, email, address.label, address.details, address.city, address.latitude, address.longitude, address.distanceKm, address.deliveryFee
+      ]);
+    res.json({ success: true });
+  }));
 
-  app.post('/payments/methods/:email', (req: any, res: Response) => {
-    try {
-      const email = req.params.email.toLowerCase();
-      if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-      const method = paymentMethodSchema.parse(req.body);
-      db.prepare(`INSERT INTO payments (id,email,type,last4,expiry,phoneNumber,balance,token)
-        VALUES (@id,@email,@type,@last4,@expiry,@phoneNumber,@balance,@token)
-        ON CONFLICT(id) DO UPDATE SET
-          type=excluded.type,
-          last4=excluded.last4,
-          expiry=excluded.expiry,
-          phoneNumber=excluded.phoneNumber,
-          balance=excluded.balance,
-          token=excluded.token`).run({
-        ...method,
-        email,
-        balance: method.balance ?? 0,
-        last4: method.last4 || null,
-        expiry: method.expiry || null,
-        phoneNumber: method.phoneNumber || null,
-        token: method.token || null
-      });
-      res.json({ success: true });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Payment method save failed' });
-    }
-  });
+  app.get('/payments/methods/:email', asyncHandler(async (req: any, res: Response) => {
+    const email = req.params.email.toLowerCase();
+    if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
+    const result = await db.query('SELECT * FROM payments WHERE email = $1', [email]);
+    res.json({ payments: result.rows });
+  }));
 
-  app.put('/payments/methods/:email/:id/balance', (req: any, res: Response) => {
+  app.post('/payments/methods/:email', asyncHandler(async (req: any, res: Response) => {
+    const email = req.params.email.toLowerCase();
+    if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
+    const method = paymentMethodSchema.parse(req.body);
+    await db.query(`INSERT INTO payments (id,email,type,last4,expiry,"phoneNumber",balance,token)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      ON CONFLICT(id) DO UPDATE SET
+        type=EXCLUDED.type,
+        last4=EXCLUDED.last4,
+        expiry=EXCLUDED.expiry,
+        "phoneNumber"=EXCLUDED."phoneNumber",
+        balance=EXCLUDED.balance,
+        token=EXCLUDED.token`, [
+          method.id, email, method.type, method.last4 || null, method.expiry || null, method.phoneNumber || null, method.balance ?? 0, method.token || null
+        ]);
+    res.json({ success: true });
+  }));
+
+  app.put('/payments/methods/:email/:id/balance', asyncHandler(async (req: any, res: Response) => {
     const email = req.params.email.toLowerCase();
     const id = req.params.id;
     if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
     const balance = Number(req.body?.balance || 0);
-    db.prepare('UPDATE payments SET balance = ? WHERE id = ? AND email = ?').run(balance, id, email);
+    await db.query('UPDATE payments SET balance = $1 WHERE id = $2 AND email = $3', [balance, id, email]);
     res.json({ success: true, balance });
-  });
+  }));
 
-  app.post('/payments/methods/:email/topup', (req: any, res: Response) => {
-    try {
-      const email = req.params.email.toLowerCase();
-      if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
-      const { methodId, amount } = topUpSchema.parse(req.body);
-      const pay = db.prepare('SELECT * FROM payments WHERE id = ? AND email = ?').get(methodId, email);
-      if (!pay) return res.status(404).json({ error: 'Method not found' });
-      const newBal = Number(pay.balance || 0) + amount;
-      db.prepare('UPDATE payments SET balance = ? WHERE id = ? AND email = ?').run(newBal, methodId, email);
-      res.json({ success: true, balance: newBal });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Top-up failed' });
-    }
-  });
+  app.post('/payments/methods/:email/topup', asyncHandler(async (req: any, res: Response) => {
+    const email = req.params.email.toLowerCase();
+    if (!canAccessEmail(req, email)) return res.status(403).json({ error: 'Forbidden' });
+    const { methodId, amount } = topUpSchema.parse(req.body);
+    const result = await db.query('SELECT * FROM payments WHERE id = $1 AND email = $2', [methodId, email]);
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Method not found' });
+    const pay = result.rows[0];
+    const newBal = Number(pay.balance || 0) + amount;
+    await db.query('UPDATE payments SET balance = $1 WHERE id = $2 AND email = $3', [newBal, methodId, email]);
+    res.json({ success: true, balance: newBal });
+  }));
 
-  app.post('/payments/paymongo/checkout-session', async (req: any, res: Response) => {
-    try {
-      const { email, orderId, amount, preferredType } = payMongoCheckoutSchema.parse(req.body);
+  app.post('/payments/paymongo/checkout-session', asyncHandler(async (req: any, res: Response) => {
+    const { email, orderId, amount, preferredType, idempotencyKey } = payMongoCheckoutSchema.parse(req.body);
       if (!canAccessEmail(req, email)) return res.status(403).json({ success: false, error: 'Forbidden' });
 
       const paymentMethodTypes = preferredType ? (PAYMONGO_METHODS[preferredType] || ['gcash', 'paymaya', 'card']) : ['gcash', 'paymaya', 'card'];
@@ -712,7 +769,7 @@ export function setupRoutes(app: Application) {
         }
       };
 
-      const response: any = await payMongoRequest('/checkout_sessions', payload);
+      const response: any = await payMongoRequest('/checkout_sessions', payload, 'POST', idempotencyKey);
       const checkout = response?.data || {};
       const checkoutId = checkout?.id || '';
       const checkoutUrl = checkout?.attributes?.checkout_url || '';
@@ -720,35 +777,22 @@ export function setupRoutes(app: Application) {
         return res.status(502).json({ success: false, error: 'Missing checkout session URL from PayMongo' });
       }
 
-      db.prepare(`INSERT INTO ledger (ownerId,id,amount,type,description,timestamp,orderId,methodType,referenceId,status)
-        VALUES (@ownerId,@id,@amount,@type,@description,@timestamp,@orderId,@methodType,@referenceId,@status)`).run({
-        ownerId: email.toLowerCase(),
-        id: uuidv4(),
-        amount,
-        type: 'DEBIT',
-        description: `PayMongo checkout created: ${orderId}`,
-        timestamp: new Date().toISOString(),
-        orderId,
-        methodType: preferredType || 'AUTO',
-        referenceId: checkoutId,
-        status: 'PENDING'
-      });
+      await db.query(`INSERT INTO ledger ("ownerId",id,amount,type,description,timestamp,"orderId","methodType","referenceId","idempotencyKey",status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [
+          email.toLowerCase(), uuidv4(), amount, 'DEBIT', `PayMongo checkout created: ${orderId}`,
+          new Date().toISOString(), orderId, preferredType || 'AUTO', checkoutId, idempotencyKey, 'PENDING'
+        ]);
 
-      res.json({
+      return res.json({
         success: true,
         checkoutId,
         checkoutUrl,
         reference: checkoutId
       });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ success: false, error: err.errors });
-      res.status(500).json({ success: false, error: err.message || 'PayMongo checkout creation failed' });
-    }
-  });
+  }));
 
-  app.post('/payments/paymongo/payment-intents', async (req: any, res: Response) => {
-    try {
-      const { email, orderId, amount, preferredType } = payMongoPaymentIntentSchema.parse(req.body);
+  app.post('/payments/paymongo/payment-intents', asyncHandler(async (req: any, res: Response) => {
+      const { email, orderId, amount, preferredType, idempotencyKey } = payMongoPaymentIntentSchema.parse(req.body);
       if (!canAccessEmail(req, email)) return res.status(403).json({ success: false, error: 'Forbidden' });
 
       const paymentMethodAllowed = preferredType
@@ -772,7 +816,7 @@ export function setupRoutes(app: Application) {
         }
       };
 
-      const response: any = await payMongoRequest('/payment_intents', payload);
+      const response: any = await payMongoRequest('/payment_intents', payload, 'POST', idempotencyKey);
       const intent = response?.data || {};
       const intentId = intent?.id || '';
       const intentStatus = intent?.attributes?.status || '';
@@ -781,19 +825,11 @@ export function setupRoutes(app: Application) {
         return res.status(502).json({ success: false, error: 'Missing payment intent id from PayMongo' });
       }
 
-      db.prepare(`INSERT INTO ledger (ownerId,id,amount,type,description,timestamp,orderId,methodType,referenceId,status)
-        VALUES (@ownerId,@id,@amount,@type,@description,@timestamp,@orderId,@methodType,@referenceId,@status)`).run({
-        ownerId: email.toLowerCase(),
-        id: uuidv4(),
-        amount,
-        type: 'DEBIT',
-        description: `PayMongo intent created: ${orderId}`,
-        timestamp: new Date().toISOString(),
-        orderId,
-        methodType: preferredType || 'AUTO',
-        referenceId: intentId,
-        status: 'PENDING'
-      });
+      await db.query(`INSERT INTO ledger ("ownerId",id,amount,type,description,timestamp,"orderId","methodType","referenceId","idempotencyKey",status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [
+          email.toLowerCase(), uuidv4(), amount, 'DEBIT', `PayMongo intent created: ${orderId}`,
+          new Date().toISOString(), orderId, preferredType || 'AUTO', intentId, idempotencyKey, 'PENDING'
+        ]);
 
       res.json({
         success: true,
@@ -802,14 +838,9 @@ export function setupRoutes(app: Application) {
         status: intentStatus,
         reference: intentId
       });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ success: false, error: err.errors });
-      res.status(500).json({ success: false, error: err.message || 'PayMongo payment intent creation failed' });
-    }
-  });
+  }));
 
-  app.post('/payments/paymongo/payment-methods', async (req: any, res: Response) => {
-    try {
+  app.post('/payments/paymongo/payment-methods', asyncHandler(async (req: any, res: Response) => {
       const { email, type, details, billing, metadata } = payMongoPaymentMethodCreateSchema.parse(req.body);
       if (!canAccessEmail(req, email)) return res.status(403).json({ success: false, error: 'Forbidden' });
 
@@ -840,14 +871,9 @@ export function setupRoutes(app: Application) {
         type: paymentMethod?.attributes?.type || type,
         details: paymentMethod?.attributes?.details || details
       });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ success: false, error: err.errors });
-      res.status(500).json({ success: false, error: err.message || 'PayMongo payment method creation failed' });
-    }
-  });
+  }));
 
-  app.post('/payments/paymongo/payment-intents/:intentId/attach', async (req: any, res: Response) => {
-    try {
+  app.post('/payments/paymongo/payment-intents/:intentId/attach', asyncHandler(async (req: any, res: Response) => {
       const intentId = req.params.intentId;
       const { email, orderId, paymentMethodId, clientKey } = payMongoAttachIntentSchema.parse(req.body);
       if (!canAccessEmail(req, email)) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -869,7 +895,7 @@ export function setupRoutes(app: Application) {
       const nextActionUrl = attrs?.next_action?.redirect?.url || '';
       const sourceType = attrs?.payment_method_allowed?.[0] || attrs?.payment_method?.type || '';
 
-      const updated = syncOrderPaymentState(db, {
+      const updated = await syncOrderPaymentState(db, {
         orderId,
         status: state,
         email,
@@ -880,19 +906,11 @@ export function setupRoutes(app: Application) {
       });
 
       if (state === 'PENDING') {
-        db.prepare(`INSERT INTO ledger (ownerId,id,amount,type,description,timestamp,orderId,methodType,referenceId,status)
-          VALUES (@ownerId,@id,@amount,@type,@description,@timestamp,@orderId,@methodType,@referenceId,@status)`).run({
-          ownerId: email.toLowerCase(),
-          id: uuidv4(),
-          amount: Number(updated?.total || 0),
-          type: 'DEBIT',
-          description: `PayMongo intent attached: ${orderId}`,
-          timestamp: new Date().toISOString(),
-          orderId,
-          methodType: mapPayMongoOrderMethod(sourceType),
-          referenceId: intent?.id || intentId,
-          status: 'PENDING'
-        });
+        await db.query(`INSERT INTO ledger ("ownerId",id,amount,type,description,timestamp,"orderId","methodType","referenceId",status)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [
+            email.toLowerCase(), uuidv4(), Number(updated?.total || 0), 'DEBIT', `PayMongo intent attached: ${orderId}`,
+            new Date().toISOString(), orderId, mapPayMongoOrderMethod(sourceType), intent?.id || intentId, 'PENDING'
+          ]);
       }
 
       res.json({
@@ -902,22 +920,18 @@ export function setupRoutes(app: Application) {
         nextActionUrl: nextActionUrl || null,
         order: updated ? normalizeOrder(updated) : null
       });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ success: false, error: err.errors });
-      res.status(500).json({ success: false, error: err.message || 'PayMongo attach payment intent failed' });
-    }
-  });
+  }));
 
-  app.get('/payments/paymongo/orders/:orderId/status', async (req: any, res: Response) => {
-    try {
+  app.get('/payments/paymongo/orders/:orderId/status', asyncHandler(async (req: any, res: Response) => {
       const orderId = String(req.params.orderId || '');
-      const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+      const result = await db.query('SELECT * FROM orders WHERE id = $1', [orderId]);
+      const order = result.rows[0];
       if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
 
       const email = String(order.customerEmail || '').toLowerCase();
       if (!canAccessEmail(req, email)) return res.status(403).json({ success: false, error: 'Forbidden' });
 
-      const paymentRef = String(order.paymentId || order.transactionId || '').trim();
+      const paymentRef = String(order.paymentId || order.transactionId || order.paymentid || '').trim();
       if (!paymentRef || paymentRef === 'COD') {
         return res.json({ success: true, synced: false, state: 'NO_REFERENCE', order: normalizeOrder(order) });
       }
@@ -958,7 +972,7 @@ export function setupRoutes(app: Application) {
         || ''
       );
 
-      const updated = syncOrderPaymentState(db, {
+      const updated = await syncOrderPaymentState(db, {
         orderId,
         status: syncState,
         email,
@@ -968,6 +982,9 @@ export function setupRoutes(app: Application) {
         receiptUrl
       });
 
+      const io = req.app.get('io');
+      if (updated) io.to(`order_${orderId}`).emit('ORDER_UPDATED', normalizeOrder(updated));
+
       res.json({
         success: true,
         synced: true,
@@ -975,13 +992,9 @@ export function setupRoutes(app: Application) {
         order: normalizeOrder(updated || order),
         remoteStatus
       });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message || 'PayMongo order sync failed' });
-    }
-  });
+  }));
 
-  app.post('/webhooks/paymongo', (req: any, res: Response) => {
-    try {
+  app.post('/webhooks/paymongo', asyncHandler(async (req: any, res: Response) => {
       const rawBody = req.rawBody || JSON.stringify(req.body || {});
       const signature = normalizeHeaderValue(
         (req.headers['x-paymongo-signature'] || req.headers['paymongo-signature']) as string | string[] | undefined
@@ -1006,7 +1019,7 @@ export function setupRoutes(app: Application) {
         String(attrs?.source?.id || ''),
         String(attrs?.reference_number || '')
       ].filter(Boolean);
-      const fromLedger = resolveOrderContextFromReferences(db, references);
+      const fromLedger = await resolveOrderContextFromReferences(db, references);
       const orderId = fromLedger.orderId || fallbackOrderId;
       const email = fromLedger.email || fallbackEmail;
 
@@ -1032,7 +1045,7 @@ export function setupRoutes(app: Application) {
       );
       const receiptUrl = String(attrs?.next_action?.redirect?.url || attrs?.checkout_url || '');
 
-      syncOrderPaymentState(db, {
+      const updated = await syncOrderPaymentState(db, {
         orderId,
         status: state,
         email,
@@ -1042,46 +1055,91 @@ export function setupRoutes(app: Application) {
         receiptUrl
       });
 
-      res.json({ received: true });
-    } catch (err: any) {
-      res.status(500).json({ received: false, error: err.message || 'Webhook processing failed' });
-    }
-  });
+      const io = req.app.get('io');
+      if (updated) io.to(`order_${orderId}`).emit('ORDER_UPDATED', normalizeOrder(updated));
 
-  app.post('/payments/process', async (req: any, res: Response) => {
+      res.json({ received: true });
+  }));
+
+  app.post('/webhooks/stripe', asyncHandler(async (req: any, res: Response) => {
+    const sig = req.headers['stripe-signature'] as string;
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      logger.error('STRIPE_WEBHOOK_SECRET is not configured');
+      return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
+
+    let event: Stripe.Event;
+
     try {
-      const { email, methodId, amount, orderId } = paymentProcessSchema.parse(req.body);
+      event = stripeInstance.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
+    } catch (err: any) {
+      logger.warn(`Stripe Webhook signature verification failed: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    const intent = event.data.object as Stripe.PaymentIntent;
+    const orderId = intent.metadata?.orderId;
+
+    if (orderId) {
+      const state = event.type === 'payment_intent.succeeded' ? 'SETTLED' : 
+                    event.type === 'payment_intent.payment_failed' ? 'FAILED' : null;
+
+      if (state) {
+        const updated = await syncOrderPaymentState(db, {
+          orderId,
+          status: state,
+          paymentId: intent.id,
+          transactionId: intent.id,
+          sourceType: 'card'
+        });
+
+        const io = req.app.get('io');
+        if (updated) io.to(`order_${orderId}`).emit('ORDER_UPDATED', normalizeOrder(updated));
+        logger.info(`Stripe payment event ${event.type} for order: ${orderId}`);
+      }
+    }
+
+    res.json({ received: true });
+  }));
+
+  app.post('/payments/process', asyncHandler(async (req: any, res: Response) => {
+      const { email, methodId, amount, orderId, idempotencyKey } = paymentProcessSchema.parse(req.body);
       if (!canAccessEmail(req, email)) return res.status(403).json({ success: false, error: 'Forbidden' });
 
-      const pay = db.prepare('SELECT * FROM payments WHERE id = ? AND email = ?').get(methodId, email.toLowerCase());
+      // Idempotency check: If a ledger entry with this key already exists and is settled/pending, return it.
+      const existingLedgerEntry = await db.query('SELECT * FROM ledger WHERE "idempotencyKey" = $1 AND ("status" = \'SETTLED\' OR "status" = \'PENDING\') LIMIT 1', [idempotencyKey]);
+      if (existingLedgerEntry.rowCount > 0) {
+        const entry = existingLedgerEntry.rows[0];
+        logger.info(`Idempotent request for order ${orderId} with key ${idempotencyKey} already processed. Returning existing result.`);
+        // Depending on the payment method, you might need to fetch the clientSecret again for Stripe
+        // or the checkoutUrl for PayMongo if the frontend needs it.
+        // For simplicity, we'll return a success with the existing transaction ID.
+        return res.json({ success: true, transactionId: entry.referenceId, reference: entry.referenceId, clientSecret: entry.clientSecret || undefined, pending: entry.status === 'PENDING' });
+      }
+
+      const resPay = await db.query('SELECT * FROM payments WHERE id = $1 AND email = $2', [methodId, email.toLowerCase()]);
+      const pay = resPay.rows[0];
       if (!pay) return res.status(404).json({ success: false, error: 'Method not found' });
 
       if (['VISA', 'MASTERCARD'].includes(pay.type)) {
-        const stripeSecret = getStripeSecret();
-        if (!stripeSecret) return res.status(500).json({ success: false, error: 'Stripe not configured' });
-        try {
-          const stripe = new Stripe(stripeSecret, { apiVersion: '2024-12-18.acacia' as any });
-          const charge = await stripe.charges.create({
-            amount: Math.round(amount * 100),
-            currency: 'usd',
-            source: pay.token || 'tok_visa',
-            description: `Order ${orderId}`
+      const stripeSecret = getStripeSecret();
+      if (!stripeSecret) return res.status(500).json({ success: false, error: 'Stripe not configured' }); // This should be caught by the global env check
+      try {
+          const intent = await createStripePaymentIntent(amount, 'php', orderId, idempotencyKey);
+          const ref = intent.id;
+
+          await db.query(`INSERT INTO ledger ("ownerId",id,amount,type,description,timestamp,"orderId","methodType","referenceId","idempotencyKey",status)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [
+              email.toLowerCase(), uuidv4(), amount, 'DEBIT', `Stripe: ${orderId}`,
+              new Date().toISOString(), orderId, pay.type, ref, idempotencyKey, 'PENDING'
+          return res.json({ 
+            success: true, 
+            transactionId: intent.id, 
+            clientSecret: intent.client_secret, 
+            reference: ref 
           });
-          const ref = (charge.balance_transaction || charge.id) as string;
-          db.prepare(`INSERT INTO ledger (ownerId,id,amount,type,description,timestamp,orderId,methodType,referenceId,status)
-            VALUES (@ownerId,@id,@amount,@type,@description,@timestamp,@orderId,@methodType,@referenceId,@status)`).run({
-            ownerId: email.toLowerCase(),
-            id: uuidv4(),
-            amount,
-            type: 'DEBIT',
-            description: `Stripe: ${orderId}`,
-            timestamp: new Date().toISOString(),
-            orderId,
-            methodType: pay.type,
-            referenceId: ref,
-            status: 'SETTLED'
-          });
-          return res.json({ success: true, transactionId: charge.id, reference: ref });
         } catch (stripeErr: any) {
           return res.status(502).json({ success: false, error: stripeErr.message, reference: '' });
         }
@@ -1094,29 +1152,16 @@ export function setupRoutes(app: Application) {
       const txnId = `TXN-${uuidv4()}`;
       const ref = `AYO-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
       const newBal = pay.balance !== null ? Number(pay.balance) - amount : null;
-      db.prepare('UPDATE payments SET balance = ? WHERE id = ?').run(newBal, methodId);
-      db.prepare(`INSERT INTO ledger (ownerId,id,amount,type,description,timestamp,orderId,methodType,referenceId,status)
-        VALUES (@ownerId,@id,@amount,@type,@description,@timestamp,@orderId,@methodType,@referenceId,@status)`).run({
-        ownerId: email.toLowerCase(),
-        id: uuidv4(),
-        amount,
-        type: 'DEBIT',
-        description: `Checkout: ${orderId}`,
-        timestamp: new Date().toISOString(),
-        orderId,
-        methodType: pay.type,
-        referenceId: ref,
-        status: 'SETTLED'
-      });
+      await db.query('UPDATE payments SET balance = $1 WHERE id = $2 AND email = $3', [newBal, methodId, email]);
+      await db.query(`INSERT INTO ledger ("ownerId",id,amount,type,description,timestamp,"orderId","methodType","referenceId","idempotencyKey",status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [
+          email.toLowerCase(), uuidv4(), amount, 'DEBIT', `Checkout: ${orderId}`,
+          new Date().toISOString(), orderId, pay.type, ref, idempotencyKey, 'SETTLED'
+        ]);
       res.json({ success: true, transactionId: txnId, reference: ref });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ success: false, error: err.errors, transactionId: '', reference: '' });
-      res.status(500).json({ success: false, error: 'Internal payment error', transactionId: '', reference: '' });
-    }
-  });
+  }));
 
-  app.post('/payments/stripe', async (req: Request, res: Response) => {
-    try {
+  app.post('/payments/stripe', asyncHandler(async (req: Request, res: Response) => {
       const amount = Number((req.body as any)?.amount || 0);
       const source = (req.body as any)?.source || 'tok_visa';
       const description = (req.body as any)?.description || 'Ayoo charge';
@@ -1124,66 +1169,89 @@ export function setupRoutes(app: Application) {
       const stripeSecret = getStripeSecret();
       if (!stripeSecret) {
         const fakeId = `ch_local_${Math.random().toString(36).slice(2, 10)}`;
-        return res.json({ success: true, charge: { id: fakeId, balance_transaction: fakeId } });
-      }
+      return res.json({ success: true, charge: { id: fakeId, balance_transaction: fakeId } });
+    }
 
-      const stripe = new Stripe(stripeSecret, { apiVersion: '2024-12-18.acacia' as any });
-      const charge = await stripe.charges.create({
+      const charge = await stripeInstance.charges.create({
         amount: Math.round(amount * 100),
-        currency: 'usd',
+        currency: 'php',
         source,
         description
       });
       res.json({ success: true, charge });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message || 'Stripe charge failed' });
-    }
-  });
+  }));
 
-  app.get('/ledger/:ownerId', (req: any, res: Response) => {
+  app.get('/ledger/:ownerId', asyncHandler(async (req: any, res: Response) => {
     const ownerId = req.params.ownerId.toLowerCase();
     if (!canAccessEmail(req, ownerId)) return res.status(403).json({ error: 'Forbidden' });
-    const rows = db.prepare('SELECT * FROM ledger WHERE ownerId = ? ORDER BY timestamp DESC').all(ownerId);
-    res.json({ ledger: rows });
-  });
+    const result = await db.query('SELECT * FROM ledger WHERE "ownerId" = $1 ORDER BY timestamp DESC', [ownerId]);
+    res.json({ ledger: result.rows });
+  }));
 
-  app.post('/ledger/:ownerId', (req: any, res: Response) => {
-    try {
-      const ownerId = req.params.ownerId.toLowerCase();
-      if (!canAccessEmail(req, ownerId)) return res.status(403).json({ error: 'Forbidden' });
-      const entry = ledgerSchema.parse(req.body);
-      db.prepare(`INSERT INTO ledger (ownerId,id,amount,type,description,timestamp,orderId,methodType,referenceId,status)
-        VALUES (@ownerId,@id,@amount,@type,@description,@timestamp,@orderId,@methodType,@referenceId,@status)`).run({
-        ...entry,
-        ownerId
-      });
-      res.json({ success: true });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Ledger insert failed' });
-    }
-  });
+  app.post('/ledger/:ownerId', asyncHandler(async (req: any, res: Response) => {
+    const ownerId = req.params.ownerId.toLowerCase();
+    if (!canAccessEmail(req, ownerId)) return res.status(403).json({ error: 'Forbidden' });
+    const entry = ledgerSchema.parse(req.body); // idempotencyKey is optional in schema, but should be present for payment attempts
+    await db.query(`INSERT INTO ledger ("ownerId",id,amount,type,description,timestamp,"orderId","methodType","referenceId","idempotencyKey",status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [
+        ownerId, entry.id, entry.amount, entry.type, entry.description, entry.timestamp, entry.orderId, entry.methodType, entry.referenceId, entry.idempotencyKey || null, entry.status
+      ]);
+    res.json({ success: true });
+  }));
 
-  app.get('/config', (_req: Request, res: Response) => {
-    const row = db.prepare('SELECT deliveryFee, masterPin FROM system_config WHERE id = 1').get();
+  app.get('/config', asyncHandler(async (_req: Request, res: Response) => {
+    const result = await db.query('SELECT "deliveryFee", "masterPin" FROM system_config WHERE id = 1');
+    const row = result.rows[0];
     res.json({
-      deliveryFee: row?.deliveryFee ?? 45,
-      masterPin: row?.masterPin ?? '1234'
+      deliveryFee: row?.deliveryFee ?? row?.deliveryfee ?? 45,
+      masterPin: row?.masterPin ?? row?.masterpin ?? '1234'
     });
-  });
+  }));
 
-  app.put('/config', (req: Request, res: Response) => {
-    try {
-      const payload = configSchema.parse(req.body || {});
-      const current = db.prepare('SELECT deliveryFee, masterPin FROM system_config WHERE id = 1').get() || { deliveryFee: 45, masterPin: '1234' };
-      db.prepare('UPDATE system_config SET deliveryFee = ?, masterPin = ? WHERE id = 1').run(
-        payload.deliveryFee ?? current.deliveryFee,
-        payload.masterPin ?? current.masterPin
+  app.put('/config', asyncHandler(async (req: Request, res: Response) => {
+    const payload = configSchema.parse(req.body || {});
+    const result = await db.query('SELECT "deliveryFee", "masterPin" FROM system_config WHERE id = 1');
+    const current = result.rows[0] || { deliveryFee: 45, masterPin: '1234' };
+    
+    await db.query('UPDATE system_config SET "deliveryFee" = $1, "masterPin" = $2 WHERE id = 1', [
+      payload.deliveryFee ?? (current.deliveryFee || current.deliveryfee),
+      payload.masterPin ?? (current.masterPin || current.masterpin)
+    ]);
+    res.json({ success: true });
+  }));
+
+  // Chat History
+  app.get('/orders/:id/messages', asyncHandler(async (req: any, res: Response) => {
+      const orderId = req.params.id;
+      const order = await db.query('SELECT "customerEmail", "riderEmail" FROM orders WHERE id = $1', [orderId]);
+      
+      if (order.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
+      const o = order.rows[0];
+      if (req.user.email !== o.customeremail && req.user.email !== o.rideremail && req.user.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      const result = await db.query(
+        'SELECT id, "orderId" as "conversationId", "senderEmail", "senderName", text, timestamp, "isRead" as read FROM messages WHERE "orderId" = $1 ORDER BY timestamp ASC',
+        [orderId]
       );
+      
+      // Map integer isRead to boolean read
+      const messages = result.rows.map((m: any) => ({ ...m, read: Boolean(m.read) }));
+      res.json({ messages });
+  }));
+
+  // Mark messages as read
+  app.put('/orders/:id/messages/read', asyncHandler(async (req: any, res: Response) => {
+      const orderId = req.params.id;
+      const email = req.user.email;
+      const pool = getDb();
+      
+      await pool.query(
+        'UPDATE messages SET "isRead" = 1 WHERE "orderId" = $1 AND "senderEmail" != $2 AND "isRead" = 0',
+        [orderId, email]
+      );
+      
       res.json({ success: true });
-    } catch (err: any) {
-      if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
-      res.status(500).json({ error: 'Config update failed' });
-    }
-  });
+  }));
 }
